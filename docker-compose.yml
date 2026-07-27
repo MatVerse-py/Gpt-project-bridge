@@ -1,0 +1,58 @@
+name: gpt-project-bridge
+services:
+  api:
+    build:
+      context: ./apps/api
+    restart: unless-stopped
+    environment:
+      PROJECTVAULT_HOST: 0.0.0.0
+      PROJECTVAULT_PORT: 8787
+      PROJECTVAULT_DB: /app/data/projectvault.db
+      PROJECTVAULT_PUBLIC_BASE_URL: ${GPB_PUBLIC_API_URL:-http://localhost:8787}
+      PROJECTVAULT_AUTH_MODE: ${PROJECTVAULT_AUTH_MODE:-static}
+      PROJECTVAULT_STATIC_TOKEN: ${GPB_API_TOKEN:?Set GPB_API_TOKEN in .env}
+      PROJECTVAULT_REQUIRED_SCOPE: ${PROJECTVAULT_REQUIRED_SCOPE:-projects.read}
+      PROJECTVAULT_ALLOWED_ORIGINS: https://chatgpt.com
+      PROJECTVAULT_OIDC_ISSUER: ${PROJECTVAULT_OIDC_ISSUER:-}
+      PROJECTVAULT_OIDC_AUDIENCE: ${PROJECTVAULT_OIDC_AUDIENCE:-}
+      PROJECTVAULT_OIDC_JWKS_URL: ${PROJECTVAULT_OIDC_JWKS_URL:-}
+    volumes:
+      - gpb_data:/app/data
+    ports:
+      - "127.0.0.1:8787:8787"
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  web:
+    build:
+      context: ./apps/web
+    restart: unless-stopped
+    environment:
+      GPB_API_TOKEN: ${GPB_API_TOKEN:?Set GPB_API_TOKEN in .env}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+    read_only: true
+    tmpfs:
+      - /config
+      - /data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  gpb_data:
