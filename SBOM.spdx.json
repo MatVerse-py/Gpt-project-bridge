@@ -1,0 +1,27 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "creationInfo": {
+    "created": "2026-07-27T00:00:00Z",
+    "creators": [
+      "Tool: scripts/generate_sbom.py"
+    ]
+  },
+  "dataLicense": "CC0-1.0",
+  "documentNamespace": "https://github.com/MatVerse-py/Gpt-project-bridge/sbom/1.1.0",
+  "name": "GPT-Project-Bridge-declared-dependencies",
+  "packages": [
+    {"SPDXID":"SPDXRef-Package-fastapi","downloadLocation":"NOASSERTION","filesAnalyzed":false,"name":"fastapi","versionInfo":"0.128.2"},
+    {"SPDXID":"SPDXRef-Package-uvicorn-standard","downloadLocation":"NOASSERTION","filesAnalyzed":false,"name":"uvicorn[standard]","versionInfo":"0.48.0"},
+    {"SPDXID":"SPDXRef-Package-pydantic","downloadLocation":"NOASSERTION","filesAnalyzed":false,"name":"pydantic","versionInfo":"2.13.4"},
+    {"SPDXID":"SPDXRef-Package-python-multipart","downloadLocation":"NOASSERTION","filesAnalyzed":false,"name":"python-multipart","versionInfo":"0.0.29"},
+    {"SPDXID":"SPDXRef-Package-httpx","downloadLocation":"NOASSERTION","filesAnalyzed":false,"name":"httpx","versionInfo":"0.28.1"},
+    {"SPDXID":"SPDXRef-Package-PyJWT-crypto","downloadLocation":"NOASSERTION","filesAnalyzed":false,"name":"PyJWT[crypto]","versionInfo":"2.13.0"},
+    {"SPDXID":"SPDXRef-Package-pypdf","downloadLocation":"NOASSERTION","filesAnalyzed":false,"name":"pypdf","versionInfo":"5.9.0"},
+    {"SPDXID":"SPDXRef-Package-python-docx","downloadLocation":"NOASSERTION","filesAnalyzed":false,"name":"python-docx","versionInfo":"1.2.0"},
+    {"SPDXID":"SPDXRef-Package-openpyxl","downloadLocation":"NOASSERTION","filesAnalyzed":false,"name":"openpyxl","versionInfo":"3.1.5"},
+    {"SPDXID":"SPDXRef-Package-python-pptx","downloadLocation":"NOASSERTION","filesAnalyzed":false,"name":"python-pptx","versionInfo":"1.0.2"},
+    {"SPDXID":"SPDXRef-Image-Caddy","downloadLocation":"NOASSERTION","filesAnalyzed":false,"name":"caddy","versionInfo":"2.8.4-alpine"},
+    {"SPDXID":"SPDXRef-Image-Python","downloadLocation":"NOASSERTION","filesAnalyzed":false,"name":"python","versionInfo":"3.13-slim"}
+  ],
+  "spdxVersion": "SPDX-2.3"
+}

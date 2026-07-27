@@ -1,11 +1,12 @@
 from pathlib import Path
-import json, tomllib
+import json, re, tomllib
 
 project=tomllib.loads(Path('apps/api/pyproject.toml').read_text())['project']
 packages=[]
 for dependency in project.get('dependencies',[]):
     name, _, version=dependency.partition('==')
-    packages.append({'SPDXID':f'SPDXRef-Package-{name}','name':name,'versionInfo':version or 'declared','downloadLocation':'NOASSERTION','filesAnalyzed':False})
+    spdx_name=re.sub(r'[^A-Za-z0-9.-]+','-',name).strip('-')
+    packages.append({'SPDXID':f'SPDXRef-Package-{spdx_name}','name':name,'versionInfo':version or 'declared','downloadLocation':'NOASSERTION','filesAnalyzed':False})
 packages += [
     {'SPDXID':'SPDXRef-Image-Caddy','name':'caddy','versionInfo':'2.8.4-alpine','downloadLocation':'NOASSERTION','filesAnalyzed':False},
     {'SPDXID':'SPDXRef-Image-Python','name':'python','versionInfo':'3.13-slim','downloadLocation':'NOASSERTION','filesAnalyzed':False},
