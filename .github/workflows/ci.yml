@@ -1,0 +1,18 @@
+name: MATVERSE_REAL_v1 CI
+
+on:
+  push:
+    branches: [main, world-real/v1-bootstrap]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: pytest -q
