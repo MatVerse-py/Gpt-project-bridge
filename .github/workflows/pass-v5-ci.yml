@@ -1,0 +1,25 @@
+name: PASS v5 integrated Bridge Federation CI
+
+on:
+  push:
+    branches: [pass/v5-hardening]
+  pull_request:
+    branches: [world-real/v1-bootstrap, main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - run: python -m compileall -q app tests
+      - run: pytest -q
