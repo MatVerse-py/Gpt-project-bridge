@@ -1,27 +1,43 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
 from .core import stable_hash
 
-PROTOCOL_VERSION = "matverse.model-bridge.v1"
+PROTOCOL_VERSION = "matverse.model-bridge.v1.1"
 
-FORBIDDEN_STATE_KEYS = {
-    "chain_of_thought",
-    "chain-of-thought",
+_ALLOWED_ROOT_KEYS = {
+    "kind",
+    "public_summary",
+    "decision",
+    "claims",
+    "safety",
+    "state",
+    "evidence",
+    "metadata",
+    "ontology_state",
+    "policy_state",
+}
+
+_FORBIDDEN_CANONICAL = {
+    "chainofthought",
     "cot",
-    "reasoning_trace",
-    "hidden_reasoning",
-    "hidden_state",
-    "private_memory",
-    "internal_memory",
-    "system_prompt",
-    "developer_prompt",
+    "reasoningtrace",
+    "hiddenreasoning",
+    "hiddenstate",
+    "privatememory",
+    "internalmemory",
+    "systemprompt",
+    "developerprompt",
     "credentials",
-    "api_key",
-    "secret_key",
+    "apikey",
+    "secretkey",
+    "accesstoken",
+    "refreshtoken",
+    "password",
 }
 
 InvariantMode = Literal["exact", "set_equal", "type_equal"]
@@ -36,6 +52,12 @@ class InvariantResult:
     right: Any
 
 
+def canonical_key(key: Any) -> str:
+    text = str(key).strip()
+    text = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", text)
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
 def contract_hash(contract: Mapping[str, str]) -> str:
     required = {
         "ontology_hash",
@@ -45,8 +67,11 @@ def contract_hash(contract: Mapping[str, str]) -> str:
         "memory_policy_hash",
     }
     missing = sorted(required - set(contract))
+    extra = sorted(set(contract) - required)
     if missing:
         raise ValueError(f"missing frozen contract fields: {', '.join(missing)}")
+    if extra:
+        raise ValueError(f"unexpected frozen contract fields: {', '.join(extra)}")
     for key in required:
         value = contract[key]
         if not isinstance(value, str) or len(value) != 64:
@@ -58,17 +83,21 @@ def contract_hash(contract: Mapping[str, str]) -> str:
     return stable_hash({"protocol_version": PROTOCOL_VERSION, **dict(contract)})
 
 
-def assert_transferable_state(value: Any, path: str = "$") -> None:
+def assert_transferable_state(value: Any, path: str = "$", *, root: bool = True) -> None:
     if isinstance(value, Mapping):
+        if root:
+            unexpected = sorted(str(key) for key in value if str(key) not in _ALLOWED_ROOT_KEYS)
+            if unexpected:
+                raise ValueError(f"undeclared transferable root fields: {', '.join(unexpected)}")
         for key, nested in value.items():
-            normalized = str(key).strip().lower()
-            if normalized in FORBIDDEN_STATE_KEYS:
+            canonical = canonical_key(key)
+            if canonical in _FORBIDDEN_CANONICAL:
                 raise ValueError(f"forbidden hidden/private field at {path}.{key}")
-            assert_transferable_state(nested, f"{path}.{key}")
+            assert_transferable_state(nested, f"{path}.{key}", root=False)
         return
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         for index, nested in enumerate(value):
-            assert_transferable_state(nested, f"{path}[{index}]")
+            assert_transferable_state(nested, f"{path}[{index}]", root=False)
 
 
 def build_handoff_digest(
@@ -147,15 +176,7 @@ def compare_invariants(
             left_value = None
             right_value = None
             passed = False
-        results.append(
-            InvariantResult(
-                path=path,
-                mode=mode,  # type: ignore[arg-type]
-                passed=passed,
-                left=left_value,
-                right=right_value,
-            )
-        )
+        results.append(InvariantResult(path=path, mode=mode, passed=passed, left=left_value, right=right_value))  # type: ignore[arg-type]
 
     portable = all(item.passed for item in results)
     return {
@@ -164,13 +185,7 @@ def compare_invariants(
         "passed": sum(1 for item in results if item.passed),
         "total": len(results),
         "results": [
-            {
-                "path": item.path,
-                "mode": item.mode,
-                "passed": item.passed,
-                "left": item.left,
-                "right": item.right,
-            }
+            {"path": item.path, "mode": item.mode, "passed": item.passed, "left": item.left, "right": item.right}
             for item in results
         ],
     }
