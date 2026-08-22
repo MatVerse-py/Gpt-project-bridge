@@ -33,6 +33,9 @@ def _connect() -> sqlite3.Connection:
     conn.execute("CREATE TABLE IF NOT EXISTS auth_nonces (principal_id TEXT NOT NULL, nonce TEXT NOT NULL, expires_at INTEGER NOT NULL, PRIMARY KEY(principal_id,nonce))")
     conn.execute("CREATE TABLE IF NOT EXISTS contract_artifacts (artifact_hash TEXT PRIMARY KEY, kind TEXT NOT NULL, version TEXT NOT NULL, content_json TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL)")
     conn.execute("CREATE TABLE IF NOT EXISTS model_sessions (session_id TEXT PRIMARY KEY, protocol_version TEXT NOT NULL, contract_json TEXT NOT NULL, contract_hash TEXT NOT NULL, participants_json TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL)")
+    session_columns = {row[1] for row in conn.execute("PRAGMA table_info(model_sessions)").fetchall()}
+    if "created_by" not in session_columns:
+        conn.execute("ALTER TABLE model_sessions ADD COLUMN created_by TEXT NOT NULL DEFAULT 'legacy'")
     conn.execute("""CREATE TABLE IF NOT EXISTS model_handoffs (
         handoff_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, session_seq INTEGER NOT NULL,
         from_participant TEXT NOT NULL, to_participant TEXT NOT NULL, parent_handoff_id TEXT,
