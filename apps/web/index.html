@@ -37,6 +37,7 @@
         <h2>Quick Actions</h2>
         <div class="grid actions">
           <a class="card action" href="#ingest"><strong>Ingest ChatGPT Export</strong><span>Import the official ZIP with explicit provenance.</span></a>
+          <a class="card action" href="#ingest"><strong>Ingest Manus Backup</strong><span>Preserve a `.manustask` container with a SHA-256 receipt.</span></a>
           <a class="card action" href="#projects"><strong>View Projects</strong><span>Inspect confirmed projects and UNASSIGNED.</span></a>
           <a class="card action" href="#search"><strong>Search Vault</strong><span>Search globally, then open a preserved source.</span></a>
         </div>
@@ -77,6 +78,15 @@
               <button class="button" type="submit">Ingest Project Files</button>
             </form>
           </article>
+          <article class="card"><h2>Manus Task Backup</h2>
+            <p>Indexes supported files from a `.manustask` ZIP container. It does not restore data to Manus or infer project membership.</p>
+            <form id="manus-form" class="form">
+              <label class="field"><span>Completed `.manustask` backup</span><input name="backup" type="file" accept=".manustask,application/zip" required></label>
+              <label class="field"><span>Project ID (only if the entire archive belongs to one project)</span><input name="project_id"></label>
+              <label class="field"><span>Project name (paired with ID)</span><input name="project_name"></label>
+              <button class="button" type="submit">Ingest Manus Backup</button>
+            </form>
+          </article>
         </div>
         <h2 class="section-title">Recent Ingestions</h2>
         <div class="table-wrap"><table><thead><tr><th>Source</th><th>Imported</th><th>Assigned</th><th>Unassigned</th><th>Completed</th></tr></thead><tbody id="ingestions-body"></tbody></table></div>
@@ -87,7 +97,7 @@
         <p>Read-only access for ChatGPT and authorized agents. Search first, then fetch only selected sources.</p>
         <div class="grid actions">
           <article class="card"><h2>Endpoint</h2><div id="mcp-endpoint" class="code"></div><p id="bridge-health"></p></article>
-          <article class="card"><h2>Tools</h2><div class="code">search({ query })\nfetch({ id })\nlist_projects({})</div></article>
+          <article class="card"><h2>Tools</h2><div class="code">search({ query })\nfetch({ id })\nlist_projects({})\nlist_ingestions({ limit? })\nlist_unassigned({ limit? })</div></article>
           <article class="card"><h2>Policy</h2><p>Explicit attribution only. UNASSIGNED is preserved. MCP tools are read-only and auditable.</p></article>
         </div>
       </section>

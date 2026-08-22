@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gpt-project-bridge-api"
-version = "1.1.0"
+version = "1.2.0"
 description = "Sovereign project knowledge API with REST, FTS5 and MCP."
 requires-python = ">=3.11"
 dependencies = [

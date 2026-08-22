@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
+from . import __version__
 from .auth import Authenticator, Principal
 from .config import Settings
 from .db import Database
@@ -24,6 +25,13 @@ def rpc_error(request_id: Any, code: int, message: str, data: Any = None, status
     if data is not None:
         error["data"] = data
     return JSONResponse({"jsonrpc": "2.0", "id": request_id, "error": error}, status_code=status)
+
+
+def bounded_limit(arguments: dict[str, Any], *, default: int, maximum: int, tool_name: str) -> int:
+    value = arguments.get("limit", default)
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= maximum:
+        raise ValueError(f"{tool_name} limit must be an integer between 1 and {maximum}")
+    return value
 
 
 def tool_security(settings: Settings) -> list[dict[str, Any]]:
@@ -70,6 +78,30 @@ def tools(settings: Settings) -> list[dict[str, Any]]:
             "annotations": annotations,
             "securitySchemes": security,
         },
+        {
+            "name": "list_ingestions",
+            "title": "List provenance runs",
+            "description": "Use this to inspect source archives, SHA-256 receipts, import counts, and bounded failure metadata without reading indexed content.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"limit": {"type": "integer", "minimum": 1, "maximum": 500, "default": 100}},
+                "additionalProperties": False,
+            },
+            "annotations": annotations,
+            "securitySchemes": security,
+        },
+        {
+            "name": "list_unassigned",
+            "title": "List content without project attribution",
+            "description": "Use this to find preserved source documents whose project membership remains UNASSIGNED. Fetch a selected ID to inspect its provenance; do not infer membership from topic or filename.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"limit": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 200}},
+                "additionalProperties": False,
+            },
+            "annotations": annotations,
+            "securitySchemes": security,
+        },
     ]
 
 
@@ -106,7 +138,7 @@ class MCPHandler:
                 result = {
                     "protocolVersion": negotiated,
                     "capabilities": {"tools": {"listChanged": False}},
-                    "serverInfo": {"name": "gpt-project-bridge", "version": "1.1.0"},
+                    "serverInfo": {"name": "gpt-project-bridge", "version": __version__},
                     "instructions": "Search first, then fetch only the sources needed. Treat UNASSIGNED as content without proven project attribution. Never infer project membership from names or themes.",
                 }
                 self.db.audit(principal.subject if principal else "anonymous", "initialize", None, str(request_id), {"protocol": negotiated})
@@ -155,5 +187,25 @@ class MCPHandler:
             projects = [dict(row) for row in self.db.list_projects()]
             result = {"projects": projects}
             self.db.audit(principal.subject, "list_projects", None, str(request_id), {"result_count": len(projects)})
+            return rpc_result(request_id, {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}], "isError": False})
+        if name == "list_ingestions":
+            limit = bounded_limit(arguments, default=100, maximum=500, tool_name="list_ingestions")
+            ingestions: list[dict[str, Any]] = []
+            for row in self.db.list_ingestions(limit):
+                item = dict(row)
+                item["metadata"] = json.loads(str(item.pop("metadata_json") or "{}"))
+                ingestions.append(item)
+            result = {"ingestions": ingestions}
+            self.db.audit(principal.subject, "list_ingestions", None, str(request_id), {"result_count": len(ingestions)})
+            return rpc_result(request_id, {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}], "isError": False})
+        if name == "list_unassigned":
+            limit = bounded_limit(arguments, default=200, maximum=1000, tool_name="list_unassigned")
+            documents: list[dict[str, Any]] = []
+            for row in self.db.list_unassigned(limit):
+                item = dict(row)
+                item["metadata"] = json.loads(str(item.pop("metadata_json") or "{}"))
+                documents.append(item)
+            result = {"documents": documents}
+            self.db.audit(principal.subject, "list_unassigned", None, str(request_id), {"result_count": len(documents)})
             return rpc_result(request_id, {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}], "isError": False})
         return rpc_error(request_id, -32602, f"Unknown tool: {name}")

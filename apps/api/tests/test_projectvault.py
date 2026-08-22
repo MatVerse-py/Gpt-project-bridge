@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import json
 import zipfile
+from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
+import projectvault.app as app_module
 from projectvault.app import create_app
 from projectvault.config import Settings
 from projectvault.db import Database
+from projectvault.files import ArchiveLimits, ingest_archive, ingest_directory
 from projectvault.ingest import ingest_export
-from projectvault.files import ingest_directory
 from projectvault.search import KnowledgeService
 
 
@@ -58,6 +61,13 @@ def sample_export(path: Path) -> None:
         archive.writestr("conversations.json", json.dumps(payload, ensure_ascii=False))
 
 
+def sample_manus_backup(path: Path) -> None:
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("tasks/task-1.json", json.dumps({"title": "Terceira Ordem", "body": "Acoplamento humano-máquina verificável"}, ensure_ascii=False))
+        archive.writestr("notes/readme.md", "# MatVerse\n\nBridge com proveniência.")
+        archive.writestr("assets/diagram.bin", b"\x00\x01\x02")
+
+
 def test_ingest_search_fetch_and_assignment(tmp_path: Path) -> None:
     export = tmp_path / "export.zip"
     sample_export(export)
@@ -100,7 +110,7 @@ def test_mcp_contract(tmp_path: Path) -> None:
 
     listed = client.post("/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
     names = [tool["name"] for tool in listed.json()["result"]["tools"]]
-    assert names == ["search", "fetch", "list_projects"]
+    assert names == ["search", "fetch", "list_projects", "list_ingestions", "list_unassigned"]
 
     searched = client.post("/mcp", json={"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "Kalman"}}})
     envelope = json.loads(searched.json()["result"]["content"][0]["text"])
@@ -109,6 +119,14 @@ def test_mcp_contract(tmp_path: Path) -> None:
     fetched = client.post("/mcp", json={"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "fetch", "arguments": {"id": "chat:conv-1"}}})
     item = json.loads(fetched.json()["result"]["content"][0]["text"])
     assert "Motor Kalman verificável" in item["text"]
+
+    ingestions = client.post("/mcp", json={"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "list_ingestions", "arguments": {"limit": 1}}})
+    ingestion_result = json.loads(ingestions.json()["result"]["content"][0]["text"])
+    assert ingestion_result["ingestions"][0]["source_name"] == "export.zip"
+
+    unassigned = client.post("/mcp", json={"jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": {"name": "list_unassigned", "arguments": {"limit": 1}}})
+    unassigned_result = json.loads(unassigned.json()["result"]["content"][0]["text"])
+    assert unassigned_result["documents"][0]["document_id"] == "chat:conv-2"
 
 
 def test_origin_guard(tmp_path: Path) -> None:
@@ -227,6 +245,106 @@ def test_browser_project_file_ingest_and_stats(tmp_path: Path) -> None:
     stats = response.json()["stats"]
     assert stats["files"] == 1
     assert stats["projects"] == 1
+
+
+def test_ingest_manus_backup_preserves_unassigned_provenance(tmp_path: Path) -> None:
+    backup = tmp_path / "tasks-data-matverse.manustask"
+    sample_manus_backup(backup)
+    db = Database(tmp_path / "vault.db")
+    staging = tmp_path / "large-upload-staging"
+    run = ingest_archive(
+        db,
+        backup,
+        source_type="manus_task_backup",
+        limits=ArchiveLimits(
+            max_files=10,
+            max_expanded_bytes=1024 * 1024,
+            max_member_bytes=1024 * 1024,
+            max_indexable_file_bytes=1024 * 1024,
+            min_free_bytes=1,
+        ),
+        staging_dir=staging,
+    )
+    assert run["imported_documents"] == 2
+    assert run["assigned_documents"] == 0
+    assert run["unassigned_documents"] == 2
+    assert run["metadata"]["source_type"] == "manus_task_backup"
+    assert run["metadata"]["member_count"] == 3
+    assert len(run["metadata"]["member_manifest_sha256"]) == 64
+    assert staging.is_dir()
+    result = KnowledgeService(db, "http://127.0.0.1:8787").search("acoplamento humano máquina")
+    item = KnowledgeService(db, "http://127.0.0.1:8787").fetch(result["results"][0]["id"])
+    assert item["metadata"]["source_type"] == "manus_task_backup"
+    assert item["metadata"]["project_id"] == "unassigned"
+
+
+def test_default_upload_capacity_covers_current_multi_gigabyte_manus_exports(tmp_path: Path) -> None:
+    assert settings(tmp_path).max_upload_bytes >= 4_810_000_000
+
+
+def test_archive_upload_preflight_rejects_oversized_declared_body(tmp_path: Path) -> None:
+    client = TestClient(create_app(replace(settings(tmp_path), max_upload_bytes=1)))
+    response = client.post(
+        "/api/ingest/manus-backup",
+        content=b"x",
+        headers={"content-length": str(2 * 1024 * 1024 + 2)},
+    )
+    assert response.status_code == 413
+
+
+def test_archive_upload_preflight_reserves_staging_space(tmp_path: Path, monkeypatch) -> None:
+    client = TestClient(create_app(settings(tmp_path)))
+    monkeypatch.setattr(app_module.shutil, "disk_usage", lambda _: SimpleNamespace(free=1))
+    response = client.post(
+        "/api/ingest/manus-backup",
+        content=b"x",
+        headers={"content-length": "1"},
+    )
+    assert response.status_code == 507
+
+
+def test_manus_backup_api_requires_completed_container_and_optional_full_assignment(tmp_path: Path) -> None:
+    cfg = settings(tmp_path)
+    client = TestClient(create_app(cfg))
+    backup = tmp_path / "tasks-data-matverse.manustask"
+    sample_manus_backup(backup)
+
+    with backup.open("rb") as handle:
+        response = client.post(
+            "/api/ingest/manus-backup",
+            data={"project_id": "matverse", "project_name": "MatVerse"},
+            files={"backup": (backup.name, handle, "application/zip")},
+        )
+    assert response.status_code == 200, response.text
+    run = response.json()["run"]
+    assert run["imported_documents"] == 2
+    assert run["assigned_documents"] == 2
+    assert run["metadata"]["source_type"] == "manus_task_backup"
+    assert response.json()["stats"]["files"] == 2
+
+    invalid = client.post(
+        "/api/ingest/manus-backup",
+        files={"backup": ("not-manus.zip", b"not-a-backup", "application/zip")},
+    )
+    assert invalid.status_code == 422
+
+
+def test_archive_rejects_unsafe_member_path_before_ingest(tmp_path: Path) -> None:
+    archive = tmp_path / "unsafe.manustask"
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("../outside.md", "must not escape")
+    db = Database(tmp_path / "vault.db")
+    try:
+        ingest_archive(
+            db,
+            archive,
+            source_type="manus_task_backup",
+            limits=ArchiveLimits(10, 1024 * 1024, 1024 * 1024, 1024 * 1024, 1),
+        )
+    except ValueError as exc:
+        assert str(exc) == "unsafe_archive_path"
+    else:
+        raise AssertionError("unsafe archive path must fail closed")
 
 
 def test_hybrid_auth_accepts_internal_static_token(tmp_path: Path) -> None:

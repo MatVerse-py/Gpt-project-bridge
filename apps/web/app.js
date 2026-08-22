@@ -23,5 +23,6 @@ window.addEventListener('hashchange',route);
 $('#search-form').addEventListener('submit',runSearch);
 $('#export-form').addEventListener('submit',event=>uploadForm(event,'/api/ingest/export'));
 $('#files-form').addEventListener('submit',event=>uploadForm(event,'/api/ingest/project-files'));
+$('#manus-form').addEventListener('submit',event=>uploadForm(event,'/api/ingest/manus-backup'));
 $('#dialog-close').addEventListener('click',()=>$('#document-dialog').close());
 route();loadStats();loadHealth();

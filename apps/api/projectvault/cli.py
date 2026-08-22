@@ -10,8 +10,8 @@ import uvicorn
 from .app import create_app
 from .config import Settings
 from .db import Database
+from .files import ArchiveLimits, ingest_archive, ingest_directory
 from .ingest import ingest_export
-from .files import ingest_directory
 
 
 def parser() -> argparse.ArgumentParser:
@@ -28,6 +28,13 @@ def parser() -> argparse.ArgumentParser:
     files.add_argument("--project-id", required=True)
     files.add_argument("--project-name", required=True)
     files.add_argument("--database", type=Path)
+
+    manus = sub.add_parser("ingest-manus", help="Ingest a Manus .manustask backup as an auditable external archive")
+    manus.add_argument("backup", type=Path)
+    manus.add_argument("--project-id")
+    manus.add_argument("--project-name")
+    manus.add_argument("--database", type=Path)
+    manus.add_argument("--staging-dir", type=Path)
 
     serve = sub.add_parser("serve", help="Run the HTTP and MCP server")
     serve.add_argument("--host")
@@ -48,6 +55,28 @@ def main() -> int:
     if args.command == "ingest-files":
         db_path = args.database.resolve() if args.database else settings.database_path
         result = ingest_directory(Database(db_path), args.directory.resolve(), args.project_id, args.project_name)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+    if args.command == "ingest-manus":
+        if args.backup.suffix.lower() != ".manustask":
+            raise ValueError("backup_must_be_manustask")
+        if bool(args.project_id) != bool(args.project_name):
+            raise ValueError("project_id_and_project_name_must_be_supplied_together")
+        db_path = args.database.resolve() if args.database else settings.database_path
+        staging_dir = (
+            args.staging_dir.resolve()
+            if args.staging_dir
+            else (db_path.parent / "staging" if args.database else settings.staging_dir)
+        )
+        result = ingest_archive(
+            Database(db_path),
+            args.backup.resolve(),
+            source_type="manus_task_backup",
+            limits=ArchiveLimits.from_settings(settings),
+            staging_dir=staging_dir,
+            project_id=args.project_id,
+            project_name=args.project_name,
+        )
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     if args.command == "stats":

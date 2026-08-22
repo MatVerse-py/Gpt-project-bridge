@@ -1,5 +1,7 @@
 .PHONY: init up prod down logs test smoke backup sbom checksums package
 
+VERSION := $(shell python3 -c "import tomllib; print(tomllib.load(open('apps/api/pyproject.toml', 'rb'))['project']['version'])")
+
 init:
 	@test ! -f .env || (echo '.env already exists' && exit 0)
 	python3 scripts/generate_env.py
@@ -35,4 +37,4 @@ checksums:
 
 package: test sbom checksums
 	mkdir -p dist
-	zip -qr dist/gpt-project-bridge-1.1.0.zip . -x '.git/*' 'data/*' 'backups/*' 'dist/*' '.env' '*.pyc' '__pycache__/*'
+	zip -qr dist/gpt-project-bridge-$(VERSION).zip . -x '.git/*' 'data/*' 'backups/*' 'dist/*' '.env' '*.pyc' '__pycache__/*'

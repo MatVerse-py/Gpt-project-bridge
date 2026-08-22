@@ -212,12 +212,12 @@ class Database:
                   (SELECT COUNT(*) FROM projects WHERE project_id != 'unassigned') AS projects,
                   (SELECT COUNT(*) FROM documents) AS documents,
                   (SELECT COUNT(*) FROM documents
-                     WHERE COALESCE(json_extract(metadata_json, '$.source_type'), 'conversation') != 'file') AS conversations,
+                     WHERE COALESCE(json_extract(metadata_json, '$.source_type'), 'conversation') = 'conversation') AS conversations,
                   (SELECT COALESCE(SUM(CAST(COALESCE(json_extract(metadata_json, '$.message_count'), 0) AS INTEGER)), 0)
                      FROM documents
-                     WHERE COALESCE(json_extract(metadata_json, '$.source_type'), 'conversation') != 'file') AS messages,
+                     WHERE COALESCE(json_extract(metadata_json, '$.source_type'), 'conversation') = 'conversation') AS messages,
                   (SELECT COUNT(*) FROM documents
-                     WHERE json_extract(metadata_json, '$.source_type') = 'file') AS files,
+                     WHERE COALESCE(json_extract(metadata_json, '$.source_type'), 'conversation') != 'conversation') AS files,
                   (SELECT COUNT(*) FROM documents WHERE project_id = 'unassigned') AS unassigned,
                   (SELECT COUNT(*) FROM ingestion_runs) AS ingestion_runs
                 """

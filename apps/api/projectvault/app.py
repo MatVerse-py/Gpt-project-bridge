@@ -15,77 +15,52 @@ from . import __version__
 from .auth import Authenticator, Principal
 from .config import Settings
 from .db import Database
-from .files import ingest_directory
+from .files import ArchiveLimits, ingest_archive
 from .ingest import ingest_export
 from .mcp import MCPHandler
 from .search import KnowledgeService
 
-MAX_UPLOAD_BYTES = 512 * 1024 * 1024
-MAX_ARCHIVE_FILES = 50_000
-MAX_ARCHIVE_EXPANDED_BYTES = 512 * 1024 * 1024
-MAX_ARCHIVE_MEMBER_BYTES = 100 * 1024 * 1024
+
+INGEST_UPLOAD_PATHS = {
+    "/api/ingest/export",
+    "/api/ingest/project-files",
+    "/api/ingest/manus-backup",
+}
+SINGLE_ARCHIVE_UPLOAD_PATHS = {
+    "/api/ingest/project-files",
+    "/api/ingest/manus-backup",
+}
+MULTIPART_OVERHEAD_BYTES = 2 * 1024 * 1024
 
 
-def _safe_destination(root: Path, member_name: str) -> Path:
-    normalised = member_name.replace("\\", "/")
-    if not normalised or normalised.startswith("/") or "\x00" in normalised:
-        raise ValueError("unsafe_archive_path")
-    parts = [part for part in normalised.split("/") if part not in ("", ".")]
-    if any(part == ".." for part in parts):
-        raise ValueError("unsafe_archive_path")
-    target = (root / Path(*parts)).resolve()
-    root_resolved = root.resolve()
-    if target != root_resolved and root_resolved not in target.parents:
-        raise ValueError("unsafe_archive_path")
-    return target
-
-
-def _safe_extract_zip(source: Path, destination: Path) -> None:
-    total = 0
-    count = 0
-    with zipfile.ZipFile(source) as archive:
-        for info in archive.infolist():
-            if info.is_dir():
-                continue
-            count += 1
-            total += info.file_size
-            if count > MAX_ARCHIVE_FILES:
-                raise ValueError("archive_file_count_limit")
-            if info.file_size > MAX_ARCHIVE_MEMBER_BYTES:
-                raise ValueError("archive_member_size_limit")
-            if total > MAX_ARCHIVE_EXPANDED_BYTES:
-                raise ValueError("archive_expanded_size_limit")
-            unix_mode = (info.external_attr >> 16) & 0xFFFF
-            if unix_mode and (unix_mode & 0o170000) == 0o120000:
-                raise ValueError("archive_symlink_rejected")
-            target = _safe_destination(destination, info.filename)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            written = 0
-            with archive.open(info) as src, target.open("wb") as dst:
-                while chunk := src.read(1024 * 1024):
-                    written += len(chunk)
-                    if written > MAX_ARCHIVE_MEMBER_BYTES:
-                        raise ValueError("archive_member_size_limit")
-                    dst.write(chunk)
-
-
-async def _save_upload(upload: UploadFile, destination: Path) -> int:
+async def _save_upload(
+    upload: UploadFile,
+    destination: Path,
+    *,
+    max_upload_bytes: int,
+    min_free_bytes: int,
+) -> int:
     size = 0
     with destination.open("wb") as handle:
         while chunk := await upload.read(1024 * 1024):
-            size += len(chunk)
-            if size > MAX_UPLOAD_BYTES:
+            if size + len(chunk) > max_upload_bytes:
                 raise HTTPException(413, "upload_too_large")
+            if shutil.disk_usage(destination.parent).free < len(chunk) + min_free_bytes:
+                raise HTTPException(507, "insufficient_storage")
             handle.write(chunk)
+            size += len(chunk)
     return size
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
+    settings.staging_dir.mkdir(parents=True, exist_ok=True)
+    tempfile.tempdir = str(settings.staging_dir)
     db = Database(settings.database_path)
     auth = Authenticator(settings)
     mcp = MCPHandler(settings, db, auth)
     knowledge = KnowledgeService(db, settings.public_base_url, settings.max_results)
+    archive_limits = ArchiveLimits.from_settings(settings)
 
     app = FastAPI(
         title="GPT Project Bridge",
@@ -100,6 +75,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         origin = request.headers.get("origin")
         if origin and origin not in settings.allowed_origins:
             return JSONResponse({"error": "origin_not_allowed"}, status_code=403)
+        if request.method == "POST" and request.url.path in INGEST_UPLOAD_PATHS:
+            content_length = request.headers.get("content-length")
+            if content_length is None:
+                return JSONResponse({"detail": "content_length_required_for_archive_upload"}, status_code=411)
+            try:
+                body_bytes = int(content_length)
+            except ValueError:
+                return JSONResponse({"detail": "invalid_content_length"}, status_code=400)
+            if body_bytes < 0:
+                return JSONResponse({"detail": "invalid_content_length"}, status_code=400)
+            if (
+                request.url.path in SINGLE_ARCHIVE_UPLOAD_PATHS
+                and body_bytes > settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES
+            ):
+                return JSONResponse({"detail": "upload_too_large"}, status_code=413)
+            # Multipart parsing first spools the request, then _save_upload copies
+            # the selected part into a controlled temporary archive. Reserve both.
+            required_bytes = body_bytes * 2 + settings.min_free_bytes
+            if shutil.disk_usage(settings.staging_dir).free < required_bytes:
+                return JSONResponse({"detail": "insufficient_storage"}, status_code=507)
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
@@ -232,14 +227,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         filename = Path(export.filename or "chatgpt-export.zip").name
         if not filename.lower().endswith(".zip"):
             raise HTTPException(422, "export_must_be_zip")
-        with tempfile.TemporaryDirectory(prefix="gpb-export-") as temp_dir:
+        with tempfile.TemporaryDirectory(prefix="gpb-export-", dir=settings.staging_dir) as temp_dir:
             root = Path(temp_dir)
             export_path = root / filename
-            await _save_upload(export, export_path)
+            await _save_upload(
+                export,
+                export_path,
+                max_upload_bytes=settings.max_upload_bytes,
+                min_free_bytes=settings.min_free_bytes,
+            )
             owner_map_path: Path | None = None
             if owner_map is not None and owner_map.filename:
                 owner_map_path = root / "owner-map.json"
-                await _save_upload(owner_map, owner_map_path)
+                await _save_upload(
+                    owner_map,
+                    owner_map_path,
+                    max_upload_bytes=settings.max_upload_bytes,
+                    min_free_bytes=settings.min_free_bytes,
+                )
             try:
                 result = ingest_export(db, export_path, owner_map_path)
             except (ValueError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
@@ -257,18 +262,68 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         filename = Path(archive.filename or "project-files.zip").name
         if not filename.lower().endswith(".zip"):
             raise HTTPException(422, "archive_must_be_zip")
-        with tempfile.TemporaryDirectory(prefix="gpb-files-") as temp_dir:
+        with tempfile.TemporaryDirectory(prefix="gpb-files-", dir=settings.staging_dir) as temp_dir:
             root = Path(temp_dir)
             archive_path = root / filename
-            extraction_path = root / "content"
-            extraction_path.mkdir()
-            await _save_upload(archive, archive_path)
+            await _save_upload(
+                archive,
+                archive_path,
+                max_upload_bytes=settings.max_upload_bytes,
+                min_free_bytes=settings.min_free_bytes,
+            )
             try:
-                _safe_extract_zip(archive_path, extraction_path)
-                result = ingest_directory(db, extraction_path, project_id, project_name)
+                result = ingest_archive(
+                    db,
+                    archive_path,
+                    source_type="owner_project_archive",
+                    limits=archive_limits,
+                    staging_dir=settings.staging_dir,
+                    project_id=project_id,
+                    project_name=project_name,
+                )
             except (ValueError, zipfile.BadZipFile) as exc:
+                if str(exc) == "insufficient_storage":
+                    raise HTTPException(507, "insufficient_storage") from exc
                 raise HTTPException(422, f"ingest_failed:{exc}") from exc
         db.audit(user.subject, "api_ingest_project_files", result["run_id"], None, {"source_name": filename})
+        return {"status": "completed", "run": result, "stats": db.stats()}
+
+    @app.post("/api/ingest/manus-backup")
+    async def api_ingest_manus_backup(
+        backup: UploadFile = File(...),
+        project_id: str | None = Form(None),
+        project_name: str | None = Form(None),
+        user: Principal = Depends(principal),
+    ) -> dict[str, object]:
+        filename = Path(backup.filename or "tasks-data.manustask").name
+        if not filename.lower().endswith(".manustask"):
+            raise HTTPException(422, "backup_must_be_manustask")
+        if bool((project_id or "").strip()) != bool((project_name or "").strip()):
+            raise HTTPException(422, "project_id_and_project_name_must_be_supplied_together")
+        with tempfile.TemporaryDirectory(prefix="gpb-manus-", dir=settings.staging_dir) as temp_dir:
+            root = Path(temp_dir)
+            backup_path = root / filename
+            await _save_upload(
+                backup,
+                backup_path,
+                max_upload_bytes=settings.max_upload_bytes,
+                min_free_bytes=settings.min_free_bytes,
+            )
+            try:
+                result = ingest_archive(
+                    db,
+                    backup_path,
+                    source_type="manus_task_backup",
+                    limits=archive_limits,
+                    staging_dir=settings.staging_dir,
+                    project_id=project_id,
+                    project_name=project_name,
+                )
+            except (ValueError, zipfile.BadZipFile) as exc:
+                if str(exc) == "insufficient_storage":
+                    raise HTTPException(507, "insufficient_storage") from exc
+                raise HTTPException(422, f"ingest_failed:{exc}") from exc
+        db.audit(user.subject, "api_ingest_manus_backup", result["run_id"], None, {"source_name": filename})
         return {"status": "completed", "run": result, "stats": db.stats()}
 
     @app.get("/documents/{document_id:path}")
