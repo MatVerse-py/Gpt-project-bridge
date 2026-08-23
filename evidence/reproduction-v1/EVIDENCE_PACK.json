@@ -1,0 +1,102 @@
+{
+  "evidence_type": "MATVERSE_CROSS_RUNTIME_REPRODUCTION",
+  "protocol": "matverse.cross-runtime-replay.v1",
+  "evidence_for_commit": "46fa0a3af799fd2ba1b4440e7f93f426f29570bb",
+  "github_actions_run_id": "32608237023",
+  "task_id": "portable-state-baseline-001",
+  "contract_hash": "67743cbe1f4d65983348401d2061e46dec22d57e232854ff263e1d646f600b26",
+  "prompt_hash": "056aa5ea660fad183e40709a3b871e2b6d4e12b88d775504a4b15d8922f518bb",
+  "comparison": {
+    "all_runtime_pass": true,
+    "distinct_models": true,
+    "same_contract": true,
+    "same_hard_invariants": true,
+    "runtime_reproduction_status": "REPRODUCTION_PASS",
+    "external_provider_status": "HOLD_SECOND_INDEPENDENT_PROVIDER_REQUIRED",
+    "world_real_status": "HOLD",
+    "scope": "EXTERNAL_COMPUTE_DISTINCT_GITHUB_RUNNERS_SAME_HOSTING_PROVIDER",
+    "receipt": "a4d6d47dd26ce7c1dbba8cea89d22d46cf600993159a09a7a472a990163f4389",
+    "result_hashes": [
+      "49d8386bc0b820c8436b0f880891d99db705835d61844a7617a2988664069b20",
+      "89bee419741db02f12a6d410841eb4629a97d7119737602239287cd06dbc87cb"
+    ]
+  },
+  "runtimes": [
+    {
+      "model_id": "Qwen/Qwen2.5-0.5B-Instruct",
+      "model_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "engine": "transformers-pytorch",
+      "runner": "GitHub Actions 1000000695",
+      "python": "3.12.14",
+      "torch": "2.13.0+cpu",
+      "transformers": "4.57.6",
+      "observable_output_hash": "b3d4886673b2fcda89f7e9700b284c33a1476410d4ddce754ca80dedd44a432c",
+      "parsed_state": {
+        "decision": "PASS",
+        "safety_gate": "PASS",
+        "claims": ["C1", "C2", "C3"],
+        "transfer_hidden_reasoning": false
+      },
+      "hard_invariants": {
+        "decision": true,
+        "safety_gate": true,
+        "claims": true,
+        "transfer_hidden_reasoning": true
+      },
+      "runtime_pass": true,
+      "raw_output_persisted": false
+    },
+    {
+      "model_id": "HuggingFaceTB/SmolLM2-360M-Instruct",
+      "model_revision": "a10cc1512eabd3dde888204e902eca88bddb4951",
+      "engine": "transformers-pytorch",
+      "runner": "GitHub Actions 1000000694",
+      "python": "3.12.14",
+      "torch": "2.13.0+cpu",
+      "transformers": "4.57.6",
+      "observable_output_hash": "d77cd61829b22f50f85f1b3a91e6dea6c6814824ac793e38815bf97528b1292a",
+      "parsed_state": {
+        "decision": "PASS",
+        "safety_gate": "PASS",
+        "claims": ["C1", "C2", "C3"],
+        "transfer_hidden_reasoning": false
+      },
+      "hard_invariants": {
+        "decision": true,
+        "safety_gate": true,
+        "claims": true,
+        "transfer_hidden_reasoning": true
+      },
+      "runtime_pass": true,
+      "raw_output_persisted": false
+    }
+  ],
+  "workflow_artifacts": [
+    {
+      "artifact_id": 9484755104,
+      "name": "cross-runtime-evidence",
+      "zip_sha256": "e527dd6c0705da0d1ace573b2109097ad10921246f1bc39a73287dbefcb31e75"
+    },
+    {
+      "artifact_id": 9484752648,
+      "name": "runtime-smollm2_360m",
+      "zip_sha256": "b1f06b5e743aecf5536349b34bcbe2240eead0f3b18ac0ed3dd7b48f1a524978"
+    },
+    {
+      "artifact_id": 9484751445,
+      "name": "runtime-qwen2_5",
+      "zip_sha256": "841c9873310f6b1c015c1da05838dd80f93c0906166003e1eb1d138b0e47b1a0"
+    }
+  ],
+  "lineage": {
+    "pilot_negative_result_run": "32608126923",
+    "pilot_qwen_runtime_pass": true,
+    "pilot_smollm2_135m_runtime_pass": false,
+    "negative_result_preserved_at": "experiments/cross_runtime/PILOT_NEGATIVE_RESULT_001.md"
+  },
+  "promotion": {
+    "CROSS_RUNTIME_REPLAY": "REPRODUCTION_PASS",
+    "EXTERNAL_PASS": "HOLD_SECOND_INDEPENDENT_PROVIDER_REQUIRED",
+    "WORLD_REAL_PASS": "HOLD"
+  }
+}
