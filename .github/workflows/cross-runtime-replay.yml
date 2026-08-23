@@ -1,0 +1,76 @@
+name: Cross-runtime replay v1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: smollm2_360m
+            model: HuggingFaceTB/SmolLM2-360M-Instruct
+          - name: qwen2_5
+            model: Qwen/Qwen2.5-0.5B-Instruct
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install --index-url https://download.pytorch.org/whl/cpu torch
+      - run: pip install 'transformers>=4.45,<5' 'safetensors>=0.4'
+      - name: Execute real model runtime under frozen contract
+        id: runtime_exec
+        continue-on-error: true
+        run: >-
+          python experiments/cross_runtime/run_model.py
+          --contract experiments/cross_runtime/contract.json
+          --model '${{ matrix.model }}'
+          --output 'results/${{ matrix.name }}.json'
+      - name: Upload runtime evidence even on invariant failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-${{ matrix.name }}
+          path: results/${{ matrix.name }}.json
+          if-no-files-found: error
+      - name: Enforce fail-closed runtime result
+        if: steps.runtime_exec.outcome != 'success'
+        run: exit 1
+
+  compare:
+    if: always()
+    needs: runtime
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: runtime-*
+          path: results
+          merge-multiple: true
+      - name: Compare frozen-contract invariants
+        run: >-
+          python experiments/cross_runtime/compare_results.py
+          --input-dir results
+          --output evidence/cross_runtime_reproduction.json
+      - name: Upload comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-runtime-evidence
+          path: evidence/cross_runtime_reproduction.json
+          if-no-files-found: error

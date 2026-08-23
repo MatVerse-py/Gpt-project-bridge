@@ -1,0 +1,20 @@
+{
+  "protocol": "matverse.cross-runtime-replay.v1",
+  "task_id": "portable-state-baseline-001",
+  "state": {
+    "decision": "PASS",
+    "safety_gate": "PASS",
+    "claims": ["C1", "C2", "C3"],
+    "transfer_hidden_reasoning": false
+  },
+  "hard_invariants": [
+    "decision",
+    "safety_gate",
+    "claims",
+    "transfer_hidden_reasoning"
+  ],
+  "promotion": {
+    "runtime_reproduction": "all hard invariants must match across distinct model executions",
+    "external_provider_pass": "requires a second independently operated provider/API; same-hosting-provider jobs are insufficient"
+  }
+}
