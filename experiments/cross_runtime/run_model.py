@@ -124,7 +124,14 @@ def main() -> int:
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
-    print(json.dumps({"model": args.model, "runtime_pass": result["runtime_pass"], "output": str(out)}))
+    # Diagnostic logging is restricted to parsed observable state and invariant booleans.
+    print(json.dumps({
+        "model": args.model,
+        "runtime_pass": result["runtime_pass"],
+        "parsed_state": parsed,
+        "hard_invariants": hard,
+        "output": str(out),
+    }, sort_keys=True))
     return 0 if result["runtime_pass"] else 2
 
 
