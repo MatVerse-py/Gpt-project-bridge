@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import inspect
+import json
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping, Sequence
 
 from .core import Decision, evaluate_hdb, omega_gate, stable_hash
-from .evidence import evidence_receipt
+from .evidence import canonical_json, evidence_receipt
 
 SCHEMA_VERSION = "matverse.organism-loop.v1"
 BINDING_VERSION = "matverse.constitutional-binding.v1"
@@ -23,9 +24,14 @@ class GuardBinding:
 class ConstraintCandidate:
     candidate_id: str
     source_event_id: str
+    source_receipt_hash: str
     generator_id: str
-    match: Mapping[str, Any]
+    match_json: str
     reason: str
+
+    @property
+    def match(self) -> dict[str, Any]:
+        return json.loads(self.match_json)
 
 
 @dataclass(frozen=True)
@@ -33,11 +39,16 @@ class InheritedConstraint:
     constraint_id: str
     candidate_id: str
     source_event_id: str
+    source_receipt_hash: str
     generator_id: str
     authorizer_id: str
-    match: Mapping[str, Any]
+    match_json: str
     reason: str
     authority_receipt: str
+
+    @property
+    def match(self) -> dict[str, Any]:
+        return json.loads(self.match_json)
 
 
 @dataclass(frozen=True)
@@ -48,6 +59,10 @@ class LoopResult:
     matched_constraint_id: str | None
     state_root: str
     evidence: Mapping[str, Any]
+
+
+def _json_clone(value: Any) -> Any:
+    return json.loads(canonical_json(value))
 
 
 def _function_fingerprint(fn: Any) -> str:
@@ -107,7 +122,8 @@ def constitutional_contract_hash(*, frozen_contract_hash: str, bindings: Sequenc
     })
 
 
-def _matches(match: Mapping[str, Any], proposal: Mapping[str, Any]) -> bool:
+def _matches(match_json: str, proposal: Mapping[str, Any]) -> bool:
+    match = json.loads(match_json)
     return bool(match) and all(proposal.get(key) == value for key, value in match.items())
 
 
@@ -144,10 +160,29 @@ class GovernedOrganism:
         lineage = state.get("lineage", [])
         if not isinstance(lineage, list):
             raise ValueError("lineage must be a list")
-        self._lineage = [dict(item) for item in lineage]
+        self._lineage = _json_clone(lineage)
+        self._validate_lineage()
         expected_root = state.get("state_root")
         if expected_root != self.state_root():
             raise ValueError("state root mismatch")
+
+    def _validate_lineage(self) -> None:
+        event_ids: set[str] = set()
+        for item in self._lineage:
+            if item.get("type") != "EVALUATION":
+                continue
+            event_id = item.get("event_id")
+            if not isinstance(event_id, str) or not event_id:
+                raise ValueError("invalid evaluation event id in lineage")
+            if event_id in event_ids:
+                raise ValueError("duplicate evaluation event id in lineage")
+            event_ids.add(event_id)
+            if item.get("decision") not in {member.value for member in Decision}:
+                raise ValueError("invalid evaluation decision in lineage")
+            if not isinstance(item.get("proposal"), dict):
+                raise ValueError("evaluation proposal missing from lineage")
+            if not isinstance(item.get("receipt_hash"), str):
+                raise ValueError("evaluation receipt hash missing from lineage")
 
     def state_payload(self) -> dict[str, Any]:
         return {
@@ -156,7 +191,7 @@ class GovernedOrganism:
             "constitutional_contract_hash": self.constitutional_contract_hash,
             "gate_fingerprint": self.gate_fingerprint,
             "constraints": [asdict(self._constraints[key]) for key in sorted(self._constraints)],
-            "lineage": list(self._lineage),
+            "lineage": _json_clone(self._lineage),
         }
 
     def state_root(self) -> str:
@@ -167,36 +202,54 @@ class GovernedOrganism:
         payload["state_root"] = self.state_root()
         return payload
 
+    def _evaluation(self, event_id: str) -> dict[str, Any]:
+        matches = [
+            item for item in self._lineage
+            if item.get("type") == "EVALUATION" and item.get("event_id") == event_id
+        ]
+        if len(matches) != 1:
+            raise ValueError("source event must identify exactly one prior evaluation")
+        return _json_clone(matches[0])
+
     def observe_rejection(
         self,
         *,
         event_id: str,
         generator_id: str,
-        proposal: Mapping[str, Any],
-        reason: str,
         causal_keys: Sequence[str],
     ) -> ConstraintCandidate:
-        if not event_id or not generator_id or not reason:
-            raise ValueError("event_id, generator_id, and reason are required")
+        if not event_id or not generator_id:
+            raise ValueError("event_id and generator_id are required")
+        source = self._evaluation(event_id)
+        if source["decision"] != Decision.BLOCK.value:
+            raise ValueError("source event is not a verified BLOCK rejection")
+        if source.get("matched_constraint_id") is not None:
+            raise ValueError("an inherited BLOCK cannot recursively seed another constraint")
+        proposal = source["proposal"]
         match = {key: proposal[key] for key in causal_keys if key in proposal}
         if not match:
             raise ValueError("causal attribution produced an empty match")
+        match_json = canonical_json(match)
+        reason = str(source["reason"])
+        source_receipt_hash = str(source["receipt_hash"])
         candidate_id = stable_hash({
             "schema": SCHEMA_VERSION,
             "source_event_id": event_id,
+            "source_receipt_hash": source_receipt_hash,
             "generator_id": generator_id,
-            "match": match,
+            "match_json": match_json,
             "reason": reason,
         })
-        return ConstraintCandidate(candidate_id, event_id, generator_id, match, reason)
+        return ConstraintCandidate(candidate_id, event_id, source_receipt_hash, generator_id, match_json, reason)
 
     def _validate_constraint(self, constraint: InheritedConstraint) -> None:
         core = {
             "candidate_id": constraint.candidate_id,
             "source_event_id": constraint.source_event_id,
+            "source_receipt_hash": constraint.source_receipt_hash,
             "generator_id": constraint.generator_id,
             "authorizer_id": constraint.authorizer_id,
-            "match": dict(constraint.match),
+            "match_json": constraint.match_json,
             "reason": constraint.reason,
             "constitutional_contract_hash": self.constitutional_contract_hash,
         }
@@ -216,12 +269,16 @@ class GovernedOrganism:
             raise ValueError("authorizer_id is required")
         if authorizer_id == candidate.generator_id:
             raise PermissionError("generator cannot authorize its own inherited constraint")
+        source = self._evaluation(candidate.source_event_id)
+        if source["decision"] != Decision.BLOCK.value or source["receipt_hash"] != candidate.source_receipt_hash:
+            raise ValueError("candidate is not bound to a verified local rejection")
         core = {
             "candidate_id": candidate.candidate_id,
             "source_event_id": candidate.source_event_id,
+            "source_receipt_hash": candidate.source_receipt_hash,
             "generator_id": candidate.generator_id,
             "authorizer_id": authorizer_id,
-            "match": dict(candidate.match),
+            "match_json": candidate.match_json,
             "reason": candidate.reason,
             "constitutional_contract_hash": self.constitutional_contract_hash,
         }
@@ -231,9 +288,10 @@ class GovernedOrganism:
             constraint_id=constraint_id,
             candidate_id=candidate.candidate_id,
             source_event_id=candidate.source_event_id,
+            source_receipt_hash=candidate.source_receipt_hash,
             generator_id=candidate.generator_id,
             authorizer_id=authorizer_id,
-            match=dict(candidate.match),
+            match_json=candidate.match_json,
             reason=candidate.reason,
             authority_receipt=authority_receipt,
         )
@@ -241,6 +299,7 @@ class GovernedOrganism:
         self._lineage.append({
             "type": "CONSTRAINT_PROMOTED",
             "source_event_id": candidate.source_event_id,
+            "source_receipt_hash": candidate.source_receipt_hash,
             "constraint_id": constraint.constraint_id,
             "authorizer_id": authorizer_id,
         })
@@ -258,7 +317,10 @@ class GovernedOrganism:
     ) -> LoopResult:
         if not event_id:
             raise ValueError("event_id is required")
-        matched = next((item for item in self._constraints.values() if _matches(item.match, proposal)), None)
+        if any(item.get("type") == "EVALUATION" and item.get("event_id") == event_id for item in self._lineage):
+            raise ValueError("event_id must be unique")
+        proposal_copy = _json_clone(dict(proposal))
+        matched = next((item for item in self._constraints.values() if _matches(item.match_json, proposal_copy)), None)
         if matched is not None:
             decision, reason = Decision.BLOCK, f"inherited constraint: {matched.reason}"
             matched_id = matched.constraint_id
@@ -266,7 +328,7 @@ class GovernedOrganism:
             hdb = evaluate_hdb(dict(human) if human is not None else None)
             decision, reason = omega_gate(
                 hdb=hdb,
-                action=str(proposal.get("action", "")),
+                action=str(proposal_copy.get("action", "")),
                 ontology_ok=ontology_ok,
                 signature_valid=signature_valid,
                 transition_valid=transition_valid,
@@ -276,7 +338,7 @@ class GovernedOrganism:
         event_core = {
             "event_id": event_id,
             "runtime_id": self.runtime_id,
-            "proposal": dict(proposal),
+            "proposal": proposal_copy,
             "decision": decision.value,
             "reason": reason,
             "matched_constraint_id": matched_id,
@@ -288,7 +350,9 @@ class GovernedOrganism:
             "type": "EVALUATION",
             "event_id": event_id,
             "runtime_id": self.runtime_id,
+            "proposal": proposal_copy,
             "decision": decision.value,
+            "reason": reason,
             "matched_constraint_id": matched_id,
             "receipt_hash": receipt["receipt_hash"],
         })
