@@ -8,6 +8,16 @@ from app.organism_loop import GovernedOrganism, constitutional_contract_hash, ga
 FROZEN = "a" * 64
 
 
+def _rejected_shell(organism: GovernedOrganism, event_id: str = "reject-1"):
+    result = organism.evaluate(
+        event_id=event_id,
+        proposal={"action": "EXECUTE", "tool": "shell"},
+        signature_valid=False,
+    )
+    assert result.decision is Decision.BLOCK
+    return result
+
+
 def test_gate_fingerprint_is_deterministic_and_bound():
     first = gate_fingerprint()
     second = gate_fingerprint()
@@ -18,29 +28,27 @@ def test_gate_fingerprint_is_deterministic_and_bound():
 
 def test_generator_cannot_self_promote_constraint():
     organism = GovernedOrganism(organism_id="org-1", frozen_contract_hash=FROZEN, runtime_id="runtime-a")
-    candidate = organism.observe_rejection(
-        event_id="e1",
-        generator_id="gen-a",
-        proposal={"action": "EXECUTE", "tool": "shell"},
-        reason="shell execution rejected",
-        causal_keys=["action", "tool"],
-    )
+    _rejected_shell(organism)
+    candidate = organism.observe_rejection(event_id="reject-1", generator_id="gen-a", causal_keys=["action", "tool"])
     with pytest.raises(PermissionError):
         organism.authorize_constraint(candidate, authorizer_id="gen-a")
+
+
+def test_unverified_or_pass_event_cannot_seed_constraint():
+    organism = GovernedOrganism(organism_id="org-1", frozen_contract_hash=FROZEN, runtime_id="model-a")
+    organism.evaluate(event_id="pass-1", proposal={"action": "READ", "tool": "shell"})
+    with pytest.raises(ValueError, match="not a verified BLOCK rejection"):
+        organism.observe_rejection(event_id="pass-1", generator_id="model-a", causal_keys=["action"])
+    with pytest.raises(ValueError, match="exactly one prior evaluation"):
+        organism.observe_rejection(event_id="missing", generator_id="model-a", causal_keys=["action"])
 
 
 def test_causal_inheritance_survives_context_flush_and_runtime_swap():
     organism = GovernedOrganism(organism_id="org-1", frozen_contract_hash=FROZEN, runtime_id="model-a")
     baseline = organism.evaluate(event_id="before", proposal={"action": "READ", "tool": "shell"})
     assert baseline.decision is Decision.PASS
-
-    candidate = organism.observe_rejection(
-        event_id="reject-1",
-        generator_id="model-a",
-        proposal={"action": "EXECUTE", "tool": "shell"},
-        reason="shell execution rejected after adverse effect",
-        causal_keys=["action", "tool"],
-    )
+    _rejected_shell(organism)
+    candidate = organism.observe_rejection(event_id="reject-1", generator_id="model-a", causal_keys=["action", "tool"])
     constraint = organism.authorize_constraint(candidate, authorizer_id="omega-authority")
 
     serialized = json.loads(json.dumps(organism.export_state(), sort_keys=True))
@@ -58,6 +66,18 @@ def test_causal_inheritance_survives_context_flush_and_runtime_swap():
     assert control.decision is Decision.PASS
 
 
+def test_returned_match_is_not_a_mutation_handle():
+    organism = GovernedOrganism(organism_id="org-1", frozen_contract_hash=FROZEN, runtime_id="model-a")
+    _rejected_shell(organism)
+    candidate = organism.observe_rejection(event_id="reject-1", generator_id="model-a", causal_keys=["action", "tool"])
+    constraint = organism.authorize_constraint(candidate, authorizer_id="omega-authority")
+    external = constraint.match
+    external["tool"] = "python"
+    assert constraint.match["tool"] == "shell"
+    assert organism.evaluate(event_id="shell", proposal={"action": "EXECUTE", "tool": "shell"}).decision is Decision.BLOCK
+    assert organism.evaluate(event_id="python", proposal={"action": "EXECUTE", "tool": "python"}).decision is Decision.PASS
+
+
 def test_lineage_tamper_fails_closed():
     organism = GovernedOrganism(organism_id="org-1", frozen_contract_hash=FROZEN, runtime_id="runtime-a")
     organism.evaluate(event_id="e1", proposal={"action": "READ"})
@@ -69,13 +89,8 @@ def test_lineage_tamper_fails_closed():
 
 def test_constraint_internal_tamper_fails_closed_even_if_root_is_recomputed():
     organism = GovernedOrganism(organism_id="org-1", frozen_contract_hash=FROZEN, runtime_id="model-a")
-    candidate = organism.observe_rejection(
-        event_id="reject-1",
-        generator_id="model-a",
-        proposal={"action": "EXECUTE", "tool": "shell"},
-        reason="adverse effect",
-        causal_keys=["action", "tool"],
-    )
+    _rejected_shell(organism)
+    candidate = organism.observe_rejection(event_id="reject-1", generator_id="model-a", causal_keys=["action", "tool"])
     organism.authorize_constraint(candidate, authorizer_id="omega-authority")
     state = organism.export_state()
     state["constraints"][0]["reason"] = "tampered reason"
