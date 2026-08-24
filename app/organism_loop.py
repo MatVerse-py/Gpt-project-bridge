@@ -31,6 +31,7 @@ class ConstraintCandidate:
 @dataclass(frozen=True)
 class InheritedConstraint:
     constraint_id: str
+    candidate_id: str
     source_event_id: str
     generator_id: str
     authorizer_id: str
@@ -138,6 +139,7 @@ class GovernedOrganism:
             raise ValueError("constraints must be a list")
         for raw in constraints:
             item = InheritedConstraint(**raw)
+            self._validate_constraint(item)
             self._constraints[item.constraint_id] = item
         lineage = state.get("lineage", [])
         if not isinstance(lineage, list):
@@ -158,9 +160,7 @@ class GovernedOrganism:
         }
 
     def state_root(self) -> str:
-        payload = self.state_payload()
-        payload.pop("lineage", None)
-        return stable_hash(payload)
+        return stable_hash(self.state_payload())
 
     def export_state(self) -> dict[str, Any]:
         payload = self.state_payload()
@@ -190,6 +190,27 @@ class GovernedOrganism:
         })
         return ConstraintCandidate(candidate_id, event_id, generator_id, match, reason)
 
+    def _validate_constraint(self, constraint: InheritedConstraint) -> None:
+        core = {
+            "candidate_id": constraint.candidate_id,
+            "source_event_id": constraint.source_event_id,
+            "generator_id": constraint.generator_id,
+            "authorizer_id": constraint.authorizer_id,
+            "match": dict(constraint.match),
+            "reason": constraint.reason,
+            "constitutional_contract_hash": self.constitutional_contract_hash,
+        }
+        expected_receipt = evidence_receipt(
+            "CONSTRAINT_AUTHORIZATION", core, {"decision": "PROMOTE"}
+        )["receipt_hash"]
+        if constraint.authority_receipt != expected_receipt:
+            raise ValueError("constraint authority receipt mismatch")
+        expected_id = stable_hash({**core, "authority_receipt": expected_receipt})
+        if constraint.constraint_id != expected_id:
+            raise ValueError("constraint id mismatch")
+        if constraint.authorizer_id == constraint.generator_id:
+            raise ValueError("constraint violates generator/authorizer separation")
+
     def authorize_constraint(self, candidate: ConstraintCandidate, *, authorizer_id: str) -> InheritedConstraint:
         if not authorizer_id:
             raise ValueError("authorizer_id is required")
@@ -208,6 +229,7 @@ class GovernedOrganism:
         constraint_id = stable_hash({**core, "authority_receipt": authority_receipt})
         constraint = InheritedConstraint(
             constraint_id=constraint_id,
+            candidate_id=candidate.candidate_id,
             source_event_id=candidate.source_event_id,
             generator_id=candidate.generator_id,
             authorizer_id=authorizer_id,
