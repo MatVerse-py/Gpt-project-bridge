@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from app.core import Decision
+from app.core import Decision, stable_hash
 from app.organism_loop import GovernedOrganism, constitutional_contract_hash, gate_fingerprint
 
 FROZEN = "a" * 64
@@ -58,12 +58,32 @@ def test_causal_inheritance_survives_context_flush_and_runtime_swap():
     assert control.decision is Decision.PASS
 
 
-def test_state_tamper_fails_closed():
+def test_lineage_tamper_fails_closed():
     organism = GovernedOrganism(organism_id="org-1", frozen_contract_hash=FROZEN, runtime_id="runtime-a")
+    organism.evaluate(event_id="e1", proposal={"action": "READ"})
     state = organism.export_state()
-    state["state_root"] = "0" * 64
+    state["lineage"][0]["decision"] = "BLOCK"
     with pytest.raises(ValueError, match="state root mismatch"):
         GovernedOrganism(organism_id="org-1", frozen_contract_hash=FROZEN, runtime_id="runtime-b", state=state)
+
+
+def test_constraint_internal_tamper_fails_closed_even_if_root_is_recomputed():
+    organism = GovernedOrganism(organism_id="org-1", frozen_contract_hash=FROZEN, runtime_id="model-a")
+    candidate = organism.observe_rejection(
+        event_id="reject-1",
+        generator_id="model-a",
+        proposal={"action": "EXECUTE", "tool": "shell"},
+        reason="adverse effect",
+        causal_keys=["action", "tool"],
+    )
+    organism.authorize_constraint(candidate, authorizer_id="omega-authority")
+    state = organism.export_state()
+    state["constraints"][0]["reason"] = "tampered reason"
+    body = dict(state)
+    body.pop("state_root")
+    state["state_root"] = stable_hash(body)
+    with pytest.raises(ValueError, match="constraint authority receipt mismatch"):
+        GovernedOrganism(organism_id="org-1", frozen_contract_hash=FROZEN, runtime_id="model-b", state=state)
 
 
 def test_hdb_and_omega_still_gate_noninherited_paths():
