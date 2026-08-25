@@ -5,7 +5,7 @@
   "description": "Read-only institutional projection of canonical MatVerse runtime state. This contract never grants authority to mutate constitutional runtime state.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "projection_policy", "source", "maturity", "artifacts", "claims", "experiments", "relations", "receipts", "projection"],
+  "required": ["schema_version", "projection_policy", "source", "subjects", "maturity", "artifacts", "claims", "experiments", "relations", "receipts", "projection"],
   "properties": {
     "schema_version": {"const": "matverse.institutional-surface.v1"},
     "projection_policy": {
@@ -20,6 +20,7 @@
       }
     },
     "source": {"$ref": "#/$defs/sourceBinding"},
+    "subjects": {"type": "array", "items": {"$ref": "#/$defs/subject"}},
     "maturity": {"type": "array", "items": {"$ref": "#/$defs/maturityState"}},
     "artifacts": {"type": "array", "items": {"$ref": "#/$defs/artifact"}},
     "claims": {"type": "array", "items": {"$ref": "#/$defs/claim"}},
@@ -50,6 +51,29 @@
       "additionalProperties": false,
       "required": ["evidence_id", "receipt_hash", "source_commit"],
       "properties": {"evidence_id": {"$ref": "#/$defs/identifier"}, "receipt_hash": {"$ref": "#/$defs/sha256"}, "source_commit": {"$ref": "#/$defs/sha256"}}
+    },
+    "verifiedIdentifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scheme", "value", "decision", "validator_id", "witness"],
+      "properties": {
+        "scheme": {"enum": ["ORCID", "GITHUB", "HUGGING_FACE", "ZENODO", "DOI", "EMAIL_DOMAIN", "OTHER"]},
+        "value": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "decision": {"$ref": "#/$defs/decision"},
+        "validator_id": {"$ref": "#/$defs/identifier"},
+        "witness": {"$ref": "#/$defs/evidencePointer"}
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject_id", "subject_type", "display_name", "identifiers"],
+      "properties": {
+        "subject_id": {"$ref": "#/$defs/identifier"},
+        "subject_type": {"enum": ["PERSON", "ORGANIZATION", "SYSTEM"]},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 512},
+        "identifiers": {"type": "array", "items": {"$ref": "#/$defs/verifiedIdentifier"}}
+      }
     },
     "maturityState": {
       "type": "object",
