@@ -95,14 +95,10 @@ def _validate_intent_shape(raw: Any) -> dict[str, Any]:
     if not isinstance(parameters, dict):
         raise HTTPException(status_code=422, detail="parameters must be an object")
     try:
-        # Reuse the established hidden/private-state boundary while allowing an
-        # arbitrary institutional parameter object under an allowed envelope.
         assert_transferable_state({"metadata": parameters})
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     try:
-        # This also enforces the v1 cross-language canonical JSON subset:
-        # no floats and only interoperable integer range.
         jcs_subset_hash(parameters)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -153,9 +149,8 @@ def _current_projection_or_503() -> dict[str, Any]:
 
 
 def _assert_current_source(intent_source: dict[str, Any], projection: dict[str, Any]) -> None:
-    current_source = projection["source"]
     expected = {
-        **current_source,
+        **projection["source"],
         "projection_hash": projection["projection"]["projection_hash"],
     }
     if intent_source != expected:
@@ -167,6 +162,16 @@ def _assert_current_source(intent_source: dict[str, Any], projection: dict[str, 
                 "current_projection_hash": projection["projection"]["projection_hash"],
             },
         )
+
+
+def _accepted_response(stored: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "acceptance_decision": "PASS",
+        "acceptance_reason": "authenticated, source-bound institutional intent accepted for canonical evaluation",
+        "execution_decision": "HOLD",
+        "execution_reason": "intent acceptance does not authorize or execute the requested operation",
+        **stored,
+    }
 
 
 @app.get("/health")
@@ -190,19 +195,25 @@ async def submit_institutional_intent(request: Request, principal: Principal = D
     intent = _validate_intent_shape(raw)
     if principal.principal_id != intent["actor_id"] and not principal.allows("institutional:intent:submit:any"):
         raise HTTPException(status_code=403, detail="authenticated principal does not match intent actor_id")
+
+    # Idempotent retries are checked before freshness. The original acceptance
+    # changes the Ledger/projection, so requiring the old projection to remain
+    # current would make a legitimate retry impossible. The stored principal
+    # and content hash still have to match exactly.
+    existing = get_intent(intent["intent_id"])
+    if existing is not None:
+        if existing["principal_id"] != principal.principal_id or existing["intent_hash"] != intent["intent_hash"]:
+            raise HTTPException(status_code=409, detail="intent_id collision or principal/content mismatch")
+        existing = {**existing, "idempotent": True}
+        return _accepted_response(existing)
+
     projection = _current_projection_or_503()
     _assert_current_source(intent["source"], projection)
     try:
         stored = persist_intent(intent=intent, principal_id=principal.principal_id)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return {
-        "acceptance_decision": "PASS",
-        "acceptance_reason": "authenticated, source-bound institutional intent accepted for canonical evaluation",
-        "execution_decision": "HOLD",
-        "execution_reason": "intent acceptance does not authorize or execute the requested operation",
-        **stored,
-    }
+    return _accepted_response(stored)
 
 
 @app.get("/institutional/intents/{intent_id}")
