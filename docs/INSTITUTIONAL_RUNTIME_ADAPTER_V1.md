@@ -28,7 +28,7 @@ Run the adapter as:
 uvicorn app.institutional_service:app --host 0.0.0.0 --port 8001
 ```
 
-The adapter may be deployed as a separate process for operational isolation, but it MUST share or securely access the canonical runtime state and MUST NOT become an independent authority.
+The adapter may be deployed as a separate process for operational isolation, but it MUST share or securely access canonical runtime state and MUST NOT become an independent authority.
 
 ## Required production configuration
 
@@ -98,9 +98,13 @@ projection_hash
 
 The projection is generated from canonical state. The adapter does not synthesize scientific claims, maturity promotions, identities or relations that are not canonically represented.
 
-Current projectable material includes canonical contract artifacts and Ledger receipts. Unmaterialized institutional domains remain empty rather than being fabricated.
+Current projectable material includes canonical Contract Registry artifacts and Ledger receipts. Unmaterialized institutional domains remain empty rather than being fabricated.
 
-If Ledger integrity fails or build/contract binding is unavailable, the endpoint returns a fail-closed unavailable/HOLD state rather than a cached optimistic PASS.
+An artifact projected as `PASS` in `contract-registry/...` scope means only that the exact content hash exists in the canonical Contract Registry and has a matching canonical registration receipt. It does not mean that the artifact's scientific, security or operational claims are independently validated.
+
+When the Ledger has no events, the projection contains an explicit deterministic `LEDGER_GENESIS_COMMITMENT` receipt rather than an invisible or fabricated event receipt.
+
+Before exposure, every generated projection is passed through the deterministic institutional semantic validator. If Ledger integrity, deployment binding or projection semantics fail, the endpoint fails closed instead of returning an optimistic `LIVE` state.
 
 ## Deterministic projection hashing
 
@@ -145,19 +149,22 @@ A successful submission means only:
 acceptance_decision = PASS
 execution_decision = HOLD
 status = PENDING_EVALUATION
+parameter_persistence = HASH_ONLY
 ```
 
 It does **not** mean the requested action passed Omega, executed, changed maturity, published anything, anchored anything, or modified canonical policy.
 
-The adapter atomically stores the intent and appends an `INSTITUTIONAL_INTENT_ACCEPTED` event to the canonical Ledger. The Ledger event stores a hash of submitted parameters, not their raw value.
+The adapter atomically persists an intent commitment and appends an `INSTITUTIONAL_INTENT_ACCEPTED` event to the canonical Ledger. Canonical persistence contains the JCS/SHA-256 parameter commitment, not the raw parameter object.
 
-A later canonical executor/validator must evaluate the intent under the appropriate authority, HDB/Omega and evidence rules.
+This is deliberate: receiving an authenticated intent is not sufficient authority to persist arbitrary operational or human-sensitive payloads before the relevant HDB/Omega/authorization stage.
+
+The institutional UI may retain the raw draft locally under its own privacy controls. A future canonical executor must require the payload to be resubmitted, verify that it reproduces `parameters_hash`, and then apply the operation-specific HDB, capability, Omega and evidence gates before execution or canonical persistence.
 
 ## Idempotency
 
 The same authenticated principal may retry the exact same `intent_id` + `intent_hash` after network failure.
 
-The first acceptance advances the Ledger and therefore changes the current projection. Exact retries are nevertheless returned idempotently from the stored acceptance record without creating a second Ledger event.
+The first acceptance advances the Ledger and therefore changes the current projection. Exact retries are nevertheless returned idempotently from the stored acceptance commitment without creating a second Ledger event.
 
 Mutating the content under an existing `intent_id` is rejected.
 
@@ -181,7 +188,7 @@ refresh_token
 password
 ```
 
-No institutional workflow requires transport of hidden reasoning or credentials as evidence.
+No institutional workflow requires transport of hidden reasoning or credentials as evidence. Raw credentials and secret material must never be placed inside an intent parameter object.
 
 ## Read endpoints
 
@@ -190,7 +197,7 @@ GET /institutional/intents
 GET /institutional/intents/{intent_id}
 ```
 
-By default a principal can read only its own intents. Cross-actor reads require explicit `institutional:intent:read:any` capability.
+By default a principal can read only its own intent commitments. Cross-actor reads require explicit `institutional:intent:read:any` capability. Read responses expose `parameters_hash`, not raw submitted parameters.
 
 ## Manus binding
 
