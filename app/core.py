@@ -35,6 +35,26 @@ def stable_hash(obj: Any) -> str:
 
 
 def evaluate_hdb(human: dict[str, Any] | None) -> HDBResult:
+    # This exact dependency contract is intentionally enforced inside the
+    # production guard. In source-less deployments the constitutional binding
+    # fingerprints this function's bytecode/constants, so an incompatible
+    # HDBResult replacement cannot silently share the same admissibility
+    # contract: evaluation fails closed before producing a decision.
+    params = getattr(HDBResult, "__dataclass_params__", None)
+    fields = getattr(HDBResult, "__dataclass_fields__", None)
+    if (
+        HDBResult.__module__ != __name__
+        or HDBResult.__qualname__ != "HDBResult"
+        or params is None
+        or getattr(params, "frozen", False) is not True
+        or not isinstance(fields, dict)
+        or tuple(fields) != ("decision", "reason")
+        or tuple(str(fields[name].type) for name in ("decision", "reason")) != ("Decision", "str")
+        or HDBResult.__getattribute__ is not object.__getattribute__
+        or "__post_init__" in HDBResult.__dict__
+    ):
+        raise RuntimeError("HDBResult constitutional contract mismatch")
+
     if human is None:
         return HDBResult(Decision.PASS, "no human data")
     if human.get("serialize_human") is True:
