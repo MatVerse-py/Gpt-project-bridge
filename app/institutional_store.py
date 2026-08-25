@@ -9,6 +9,7 @@ from .storage import _append_ledger_tx, _canonical_json, _connect, _now
 
 
 INTENT_STATUS = "PENDING_EVALUATION"
+PARAMETER_PERSISTENCE = "HASH_ONLY"
 
 
 def _ensure_table(conn: Any) -> None:
@@ -20,7 +21,6 @@ def _ensure_table(conn: Any) -> None:
             target_kind TEXT NOT NULL,
             target_id TEXT NOT NULL,
             parameters_hash TEXT NOT NULL,
-            parameters_json TEXT NOT NULL,
             source_json TEXT NOT NULL,
             intent_hash TEXT NOT NULL UNIQUE,
             status TEXT NOT NULL CHECK(status IN ('PENDING_EVALUATION')),
@@ -65,14 +65,15 @@ def _verify_internal_boundary(intent: dict[str, Any], principal_id: str) -> tupl
 
 
 def persist_intent(*, intent: dict[str, Any], principal_id: str) -> dict[str, Any]:
-    """Persist a validated non-canonical intent and ledger its acceptance atomically.
+    """Persist a non-canonical intent commitment and ledger its acceptance.
 
-    This records only acceptance of the intent envelope. It does not authorize or
-    execute the requested operation. Critical actor/hash/private-state checks are
-    repeated here so internal callers cannot bypass the HTTP adapter's boundary.
+    Raw intent parameters are deliberately NOT stored in canonical state. Only
+    their JCS/SHA-256 commitment is persisted. A future executor must obtain the
+    operation payload again, verify the same commitment, then apply the proper
+    HDB/Omega/authorization gates before any canonical mutation or execution.
     """
 
-    intent_id, intent_hash, target, parameters, source, parameters_hash = _verify_internal_boundary(intent, principal_id)
+    intent_id, intent_hash, target, _parameters, source, parameters_hash = _verify_internal_boundary(intent, principal_id)
     operation = str(intent["requested_operation"])
     created_at = str(intent["created_at"])
 
@@ -93,6 +94,7 @@ def persist_intent(*, intent: dict[str, Any], principal_id: str) -> dict[str, An
                 "requested_operation": existing["requested_operation"],
                 "target": {"kind": existing["target_kind"], "id": existing["target_id"]},
                 "parameters_hash": existing["parameters_hash"],
+                "parameter_persistence": PARAMETER_PERSISTENCE,
                 "created_at": existing["created_at"],
                 "receipt": json.loads(existing["receipt_json"]),
                 "idempotent": True,
@@ -111,17 +113,18 @@ def persist_intent(*, intent: dict[str, Any], principal_id: str) -> dict[str, An
             "target_kind": target["kind"],
             "target_id": target["id"],
             "parameters_hash": parameters_hash,
+            "parameter_persistence": PARAMETER_PERSISTENCE,
             "principal_id": principal_id,
             "projection_hash": source["projection_hash"],
             "source_commit": source["commit_sha"],
             "created_at": created_at,
             "accepted_at": _now(),
             "execution_decision": "HOLD",
-            "execution_reason": "intent accepted for canonical evaluation; requested operation not auto-authorized",
+            "execution_reason": "intent commitment accepted; raw parameters require later authorized resubmission and evaluation",
         }
         receipt = _append_ledger_tx(conn, event, "PASS")
         conn.execute(
-            "INSERT INTO institutional_intents(intent_id,principal_id,requested_operation,target_kind,target_id,parameters_hash,parameters_json,source_json,intent_hash,status,created_at,receipt_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO institutional_intents(intent_id,principal_id,requested_operation,target_kind,target_id,parameters_hash,source_json,intent_hash,status,created_at,receipt_json) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (
                 intent_id,
                 principal_id,
@@ -129,7 +132,6 @@ def persist_intent(*, intent: dict[str, Any], principal_id: str) -> dict[str, An
                 target["kind"],
                 target["id"],
                 parameters_hash,
-                _canonical_json(parameters),
                 _canonical_json(source),
                 intent_hash,
                 INTENT_STATUS,
@@ -146,6 +148,7 @@ def persist_intent(*, intent: dict[str, Any], principal_id: str) -> dict[str, An
             "requested_operation": operation,
             "target": dict(target),
             "parameters_hash": parameters_hash,
+            "parameter_persistence": PARAMETER_PERSISTENCE,
             "created_at": created_at,
             "receipt": receipt,
             "idempotent": False,
@@ -172,8 +175,8 @@ def get_intent(intent_id: str) -> dict[str, Any] | None:
             "principal_id": row["principal_id"],
             "requested_operation": row["requested_operation"],
             "target": {"kind": row["target_kind"], "id": row["target_id"]},
-            "parameters": json.loads(row["parameters_json"]),
             "parameters_hash": row["parameters_hash"],
+            "parameter_persistence": PARAMETER_PERSISTENCE,
             "source": json.loads(row["source_json"]),
             "created_at": row["created_at"],
             "receipt": json.loads(row["receipt_json"]),
