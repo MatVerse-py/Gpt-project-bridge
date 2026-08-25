@@ -34,7 +34,10 @@
         "id": {"type": "string", "minLength": 1, "maxLength": 256}
       }
     },
-    "parameters": {"type": "object"},
+    "parameters": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/jcsValue"}
+    },
     "created_at": {"type": "string", "format": "date-time"},
     "source": {"$ref": "#/$defs/sourceBinding"},
     "intent_hash": {"$ref": "#/$defs/sha256"},
@@ -46,6 +49,16 @@
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "gitObjectId": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
     "identifier": {"type": "string", "minLength": 1, "maxLength": 256},
+    "jcsValue": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "boolean"},
+        {"type": "string"},
+        {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991},
+        {"type": "array", "items": {"$ref": "#/$defs/jcsValue"}},
+        {"type": "object", "additionalProperties": {"$ref": "#/$defs/jcsValue"}}
+      ]
+    },
     "sourceBinding": {
       "type": "object",
       "additionalProperties": false,
