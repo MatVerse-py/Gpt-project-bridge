@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:matverse:schema:institutional-intent:v1",
+  "title": "MatVerse Institutional Intent v1",
+  "description": "Non-canonical mutation request emitted by an institutional surface. An intent is never a gate decision, execution result, ledger entry, maturity transition, or evidence receipt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "intent_id", "requested_operation", "actor_id", "target", "parameters", "created_at", "source", "intent_hash", "hash_algorithm", "canonicalization", "hash_excludes"],
+  "properties": {
+    "schema_version": {"const": "matverse.institutional-intent.v1"},
+    "intent_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "requested_operation": {
+      "enum": [
+        "REGISTER_ARTIFACT",
+        "REGISTER_CLAIM",
+        "REGISTER_EVIDENCE",
+        "REGISTER_RELATION",
+        "REQUEST_MATURITY_EVALUATION",
+        "REQUEST_EXTERNAL_REPRODUCTION",
+        "REQUEST_WORLD_REAL_EVALUATION",
+        "REQUEST_PUBLICATION",
+        "REQUEST_ANCHOR",
+        "REQUEST_AUTHORIZATION",
+        "OTHER"
+      ]
+    },
+    "actor_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {"enum": ["SYSTEM", "SUBJECT", "ARTIFACT", "CLAIM", "EXPERIMENT", "RELATION", "MATURITY", "OTHER"]},
+        "id": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "parameters": {"type": "object"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "source": {"$ref": "#/$defs/sourceBinding"},
+    "intent_hash": {"$ref": "#/$defs/sha256"},
+    "hash_algorithm": {"const": "SHA-256"},
+    "canonicalization": {"const": "RFC8785_JCS"},
+    "hash_excludes": {"const": ["intent_hash"]}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gitObjectId": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+    "identifier": {"type": "string", "minLength": 1, "maxLength": 256},
+    "sourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit_sha", "ref", "frozen_contract_hash", "gate_fingerprint", "constitutional_contract_hash", "projection_hash"],
+      "properties": {
+        "repository": {"const": "MatVerse-py/Gpt-project-bridge"},
+        "commit_sha": {"$ref": "#/$defs/gitObjectId"},
+        "ref": {"$ref": "#/$defs/identifier"},
+        "frozen_contract_hash": {"$ref": "#/$defs/sha256"},
+        "gate_fingerprint": {"$ref": "#/$defs/sha256"},
+        "constitutional_contract_hash": {"$ref": "#/$defs/sha256"},
+        "projection_hash": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
