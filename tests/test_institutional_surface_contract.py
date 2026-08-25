@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "contracts" / "institutional-surface-v1.schema.json"
 DOC = ROOT / "docs" / "MANUS_INSTITUTIONAL_SURFACE_CONTRACT_V1.md"
+UI_DOC = ROOT / "docs" / "MANUS_UI_BINDING_V1.md"
 
 
 def _schema() -> dict:
@@ -30,6 +31,15 @@ def test_institutional_surface_is_projection_only_and_has_no_write_authority():
         "ALTER_CONTRACT",
         "WRITE_CANONICAL_STATE",
     } <= forbidden
+
+
+def test_researcher_subject_identifiers_require_validator_and_witness():
+    schema = _schema()
+    assert "subjects" in schema["required"]
+    identifier = schema["$defs"]["verifiedIdentifier"]
+    assert {"scheme", "value", "decision", "validator_id", "witness"} <= set(identifier["required"])
+    assert identifier["properties"]["witness"] == {"$ref": "#/$defs/evidencePointer"}
+    assert {"ORCID", "GITHUB", "HUGGING_FACE", "ZENODO"} <= set(identifier["properties"]["scheme"]["enum"])
 
 
 def test_maturity_requires_validator_evidence_and_scientific_pass_is_explicit():
@@ -61,3 +71,11 @@ def test_document_forbids_local_ui_state_from_becoming_canonical_truth():
     assert "MUST NOT" in text
     assert "MaturityTransition requires ValidatorEvidence" in text
     assert "EntityIntegrity != RelationIntegrity" in text
+
+
+def test_ui_binding_demotes_badges_and_actions_to_projection_or_intent():
+    text = UI_DOC.read_text(encoding="utf-8")
+    assert "The presence of an identifier string or outbound URL is not equivalent to verification" in text
+    assert "A badge MUST NOT be generated from a local boolean" in text
+    assert "UI interaction -> CREATE_INTENT -> canonical runtime -> gate -> execution -> receipt -> refreshed projection" in text
+    assert "The UI does not need to be rebuilt. The authority model underneath it does." in text
