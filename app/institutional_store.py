@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .core import stable_hash
+from .institutional_projection import jcs_subset_hash
+from .model_bridge import assert_transferable_state
 from .storage import _append_ledger_tx, _canonical_json, _connect, _now
 
 
@@ -30,20 +31,49 @@ def _ensure_table(conn: Any) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_institutional_intents_actor ON institutional_intents(principal_id,created_at)")
 
 
+def _verify_internal_boundary(intent: dict[str, Any], principal_id: str) -> tuple[str, str, dict[str, Any], dict[str, Any], dict[str, Any], str]:
+    if intent.get("actor_id") != principal_id:
+        raise ValueError("intent actor_id must match authenticated principal")
+    intent_id = intent.get("intent_id")
+    intent_hash = intent.get("intent_hash")
+    operation = intent.get("requested_operation")
+    target = intent.get("target")
+    parameters = intent.get("parameters", {})
+    source = intent.get("source")
+    created_at = intent.get("created_at")
+    if not isinstance(intent_id, str) or not intent_id:
+        raise ValueError("intent_id missing")
+    if not isinstance(intent_hash, str):
+        raise ValueError("intent_hash missing")
+    if not isinstance(operation, str) or not operation:
+        raise ValueError("requested_operation missing")
+    if not isinstance(target, dict) or not isinstance(target.get("kind"), str) or not isinstance(target.get("id"), str):
+        raise ValueError("target invalid")
+    if not isinstance(parameters, dict):
+        raise ValueError("parameters invalid")
+    if not isinstance(source, dict):
+        raise ValueError("source binding invalid")
+    if not isinstance(created_at, str):
+        raise ValueError("created_at invalid")
+    assert_transferable_state({"metadata": parameters})
+    parameters_hash = jcs_subset_hash(parameters)
+    canonical_intent = dict(intent)
+    canonical_intent.pop("intent_hash", None)
+    if jcs_subset_hash(canonical_intent) != intent_hash:
+        raise ValueError("intent_hash mismatch")
+    return intent_id, intent_hash, target, parameters, source, parameters_hash
+
+
 def persist_intent(*, intent: dict[str, Any], principal_id: str) -> dict[str, Any]:
     """Persist a validated non-canonical intent and ledger its acceptance atomically.
 
     This records only acceptance of the intent envelope. It does not authorize or
-    execute the requested operation.
+    execute the requested operation. Critical actor/hash/private-state checks are
+    repeated here so internal callers cannot bypass the HTTP adapter's boundary.
     """
 
-    intent_id = str(intent["intent_id"])
-    intent_hash = str(intent["intent_hash"])
+    intent_id, intent_hash, target, parameters, source, parameters_hash = _verify_internal_boundary(intent, principal_id)
     operation = str(intent["requested_operation"])
-    target = intent["target"]
-    parameters = intent.get("parameters", {})
-    source = intent["source"]
-    parameters_hash = stable_hash(parameters)
     created_at = str(intent["created_at"])
 
     conn = _connect()
