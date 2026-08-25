@@ -8,6 +8,7 @@ import os
 import re
 from typing import Any
 
+from .institutional_contract import validate_projection_semantics
 from .organism_loop import constitutional_contract_hash, gate_fingerprint
 from .storage import _connect, read_ledger, verify_chain
 
@@ -62,8 +63,6 @@ def _assert_jcs_subset(value: Any, path: str = "$") -> None:
 
 
 def _jcs_string(value: str) -> str:
-    # Python's JSON string escaping matches JSON.stringify for the accepted
-    # Unicode subset. Object ordering is handled separately using UTF-16 units.
     return json.dumps(value, ensure_ascii=False, allow_nan=False)
 
 
@@ -97,6 +96,10 @@ def jcs_subset_bytes(value: Any) -> bytes:
 
 def jcs_subset_hash(value: Any) -> str:
     return hashlib.sha256(jcs_subset_bytes(value)).hexdigest()
+
+
+def _genesis_commitment() -> str:
+    return jcs_subset_hash({"ledger_head": "GENESIS", "events": 0})
 
 
 def _build_binding() -> dict[str, str]:
@@ -146,7 +149,7 @@ def _list_contract_artifacts(commit_sha: str, ledger: list[dict[str, Any]]) -> l
         projected.append(
             {
                 "artifact_id": f"contract:{row['artifact_hash']}",
-                "kind": f"contract/{row['kind']}/{row['version']}",
+                "kind": f"contract-registry/{row['kind']}/{row['version']}",
                 "content_hash": row["artifact_hash"],
                 "source_commit": commit_sha,
                 "status": "PASS" if evidence is not None else "HOLD",
@@ -157,6 +160,15 @@ def _list_contract_artifacts(commit_sha: str, ledger: list[dict[str, Any]]) -> l
 
 
 def _project_receipts(commit_sha: str, ledger: list[dict[str, Any]]) -> list[dict[str, str]]:
+    if not ledger:
+        return [
+            {
+                "receipt_id": "ledger:GENESIS",
+                "receipt_hash": _genesis_commitment(),
+                "receipt_type": "LEDGER_GENESIS_COMMITMENT",
+                "source_commit": commit_sha,
+            }
+        ]
     output: list[dict[str, str]] = []
     for row in ledger:
         receipt_type = "LEDGER_EVENT"
@@ -210,7 +222,7 @@ def build_institutional_projection() -> dict[str, Any]:
     ledger = read_ledger()
     source_receipt = chain.get("head")
     if not isinstance(source_receipt, str) or _SHA256.fullmatch(source_receipt) is None:
-        source_receipt = jcs_subset_hash({"ledger_head": "GENESIS", "events": 0})
+        source_receipt = _genesis_commitment()
 
     projection: dict[str, Any] = {
         "schema_version": "matverse.institutional-surface.v1",
@@ -243,4 +255,8 @@ def build_institutional_projection() -> dict[str, Any]:
     payload = deepcopy(projection)
     payload["projection"].pop("projection_hash")
     projection["projection"]["projection_hash"] = jcs_subset_hash(payload)
+
+    validation = validate_projection_semantics(projection)
+    if not validation.ok:
+        raise ProjectionUnavailable("generated projection failed semantic validation: " + "; ".join(validation.errors))
     return projection
