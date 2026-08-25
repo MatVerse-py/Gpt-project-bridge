@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:matverse:schema:institutional-surface:v1",
+  "title": "MatVerse Institutional Surface Projection v1",
+  "description": "Read-only institutional projection of canonical MatVerse runtime state. This contract never grants authority to mutate constitutional runtime state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "projection_policy", "source", "subjects", "authority_traces", "maturity", "artifacts", "claims", "experiments", "relations", "receipts", "projection"],
+  "properties": {
+    "schema_version": {"const": "matverse.institutional-surface.v1"},
+    "projection_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projection_only", "write_authority", "allowed_operations", "forbidden_operations"],
+      "properties": {
+        "projection_only": {"const": true},
+        "write_authority": {"const": "NONE"},
+        "allowed_operations": {"const": ["READ", "LIST", "FILTER", "SEARCH", "RENDER", "EXPORT_PROJECTION", "CREATE_INTENT"]},
+        "forbidden_operations": {"const": ["MUTATE_OMEGA", "APPEND_LEDGER", "FORGE_RECEIPT", "AUTHORIZE_CONSTRAINT", "PROMOTE_MATURITY", "ALTER_CONSTITUTION", "ALTER_CONTRACT", "WRITE_CANONICAL_STATE"]}
+      }
+    },
+    "source": {"$ref": "#/$defs/sourceBinding"},
+    "subjects": {"type": "array", "items": {"$ref": "#/$defs/subject"}},
+    "authority_traces": {"type": "array", "items": {"$ref": "#/$defs/authorityTrace"}},
+    "maturity": {"type": "array", "items": {"$ref": "#/$defs/maturityState"}},
+    "artifacts": {"type": "array", "items": {"$ref": "#/$defs/artifact"}},
+    "claims": {"type": "array", "items": {"$ref": "#/$defs/claim"}},
+    "experiments": {"type": "array", "items": {"$ref": "#/$defs/experiment"}},
+    "relations": {"type": "array", "items": {"$ref": "#/$defs/relation"}},
+    "receipts": {"type": "array", "items": {"$ref": "#/$defs/receipt"}},
+    "projection": {"$ref": "#/$defs/projectionMeta"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gitObjectId": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+    "identifier": {"type": "string", "minLength": 1, "maxLength": 256},
+    "decision": {"enum": ["PASS", "HOLD", "BLOCK", "ESCALATE"]},
+    "evidenceArray": {"type": "array", "items": {"$ref": "#/$defs/evidencePointer"}},
+    "sourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit_sha", "ref", "frozen_contract_hash", "gate_fingerprint", "constitutional_contract_hash"],
+      "properties": {
+        "repository": {"const": "MatVerse-py/Gpt-project-bridge"},
+        "commit_sha": {"$ref": "#/$defs/gitObjectId"},
+        "ref": {"$ref": "#/$defs/identifier"},
+        "frozen_contract_hash": {"$ref": "#/$defs/sha256"},
+        "gate_fingerprint": {"$ref": "#/$defs/sha256"},
+        "constitutional_contract_hash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "evidencePointer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_id", "receipt_hash", "source_commit"],
+      "properties": {
+        "evidence_id": {"$ref": "#/$defs/identifier"},
+        "receipt_hash": {"$ref": "#/$defs/sha256"},
+        "source_commit": {"$ref": "#/$defs/gitObjectId"}
+      }
+    },
+    "verifiedIdentifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scheme", "value", "decision", "validator_id"],
+      "properties": {
+        "scheme": {"enum": ["ORCID", "GITHUB", "HUGGING_FACE", "ZENODO", "DOI", "EMAIL_DOMAIN", "OTHER"]},
+        "value": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "decision": {"$ref": "#/$defs/decision"},
+        "validator_id": {"$ref": "#/$defs/identifier"},
+        "witness": {"$ref": "#/$defs/evidencePointer"}
+      },
+      "allOf": [{"if": {"properties": {"decision": {"const": "PASS"}}, "required": ["decision"]}, "then": {"required": ["witness"]}}]
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject_id", "subject_type", "display_name", "identifiers"],
+      "properties": {
+        "subject_id": {"$ref": "#/$defs/identifier"},
+        "subject_type": {"enum": ["PERSON", "ORGANIZATION", "SYSTEM"]},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 512},
+        "identifiers": {"type": "array", "items": {"$ref": "#/$defs/verifiedIdentifier"}}
+      }
+    },
+    "authorityTrace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trace_id", "proposer_id", "final_validator_id", "decision", "evidence"],
+      "properties": {
+        "trace_id": {"$ref": "#/$defs/identifier"},
+        "proposer_id": {"$ref": "#/$defs/identifier"},
+        "executor_id": {"$ref": "#/$defs/identifier"},
+        "generator_id": {"$ref": "#/$defs/identifier"},
+        "authorizer_id": {"$ref": "#/$defs/identifier"},
+        "evidence_producer_id": {"$ref": "#/$defs/identifier"},
+        "final_validator_id": {"$ref": "#/$defs/identifier"},
+        "promoter_id": {"$ref": "#/$defs/identifier"},
+        "decision": {"$ref": "#/$defs/decision"},
+        "evidence": {"$ref": "#/$defs/evidenceArray"}
+      },
+      "allOf": [{"if": {"properties": {"decision": {"const": "PASS"}}, "required": ["decision"]}, "then": {"properties": {"evidence": {"minItems": 1}}}}]
+    },
+    "maturityState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_kind", "object_id", "gate", "decision", "validator_id", "authority_trace_id", "evidence"],
+      "properties": {
+        "target_kind": {"enum": ["SYSTEM", "ARTIFACT", "CLAIM", "EXPERIMENT"]},
+        "object_id": {"$ref": "#/$defs/identifier"},
+        "gate": {"enum": ["CONCEPT", "SPEC_PASS", "BUILD_PASS", "IMPLEMENTATION_PASS", "REPRODUCTION_PASS", "EXTERNAL_PASS", "WORLD_REAL_PASS", "SCIENTIFIC_PASS", "INDEPENDENT_REPLICATION_PASS"]},
+        "decision": {"$ref": "#/$defs/decision"},
+        "validator_id": {"$ref": "#/$defs/identifier"},
+        "authority_trace_id": {"$ref": "#/$defs/identifier"},
+        "evidence": {"$ref": "#/$defs/evidenceArray"},
+        "reason": {"type": "string", "maxLength": 4096}
+      },
+      "allOf": [
+        {"if": {"properties": {"decision": {"const": "PASS"}}, "required": ["decision"]}, "then": {"properties": {"evidence": {"minItems": 1}}}},
+        {"if": {"properties": {"gate": {"const": "SCIENTIFIC_PASS"}}, "required": ["gate"]}, "then": {"properties": {"target_kind": {"const": "CLAIM"}}}}
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "kind", "content_hash", "source_commit", "status", "evidence"],
+      "properties": {
+        "artifact_id": {"$ref": "#/$defs/identifier"},
+        "kind": {"$ref": "#/$defs/identifier"},
+        "content_hash": {"$ref": "#/$defs/sha256"},
+        "source_commit": {"$ref": "#/$defs/gitObjectId"},
+        "status": {"$ref": "#/$defs/decision"},
+        "evidence": {"$ref": "#/$defs/evidenceArray"},
+        "uri": {"type": "string", "format": "uri"}
+      },
+      "allOf": [{"if": {"properties": {"status": {"const": "PASS"}}, "required": ["status"]}, "then": {"properties": {"evidence": {"minItems": 1}}}}]
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_id", "statement", "claim_type", "decision", "evidence", "scope"],
+      "properties": {
+        "claim_id": {"$ref": "#/$defs/identifier"},
+        "statement": {"type": "string", "minLength": 1, "maxLength": 16384},
+        "claim_type": {"enum": ["ENGINEERING", "OPERATIONAL", "SECURITY", "REPRODUCIBILITY", "EXTERNAL_REPRODUCTION", "SCIENTIFIC", "INSTITUTIONAL"]},
+        "decision": {"$ref": "#/$defs/decision"},
+        "scope": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "evidence": {"$ref": "#/$defs/evidenceArray"},
+        "limitations": {"type": "array", "items": {"type": "string", "maxLength": 4096}}
+      },
+      "allOf": [{"if": {"properties": {"decision": {"const": "PASS"}}, "required": ["decision"]}, "then": {"properties": {"evidence": {"minItems": 1}}}}]
+    },
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["experiment_id", "protocol_hash", "status", "evidence"],
+      "properties": {
+        "experiment_id": {"$ref": "#/$defs/identifier"},
+        "protocol_hash": {"$ref": "#/$defs/sha256"},
+        "status": {"$ref": "#/$defs/decision"},
+        "evidence": {"$ref": "#/$defs/evidenceArray"},
+        "external_domain_id": {"$ref": "#/$defs/identifier"}
+      },
+      "allOf": [{"if": {"properties": {"status": {"const": "PASS"}}, "required": ["status"]}, "then": {"properties": {"evidence": {"minItems": 1}}}}]
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relation_id", "subject_id", "predicate", "object_id", "decision"],
+      "properties": {
+        "relation_id": {"$ref": "#/$defs/identifier"},
+        "subject_id": {"$ref": "#/$defs/identifier"},
+        "predicate": {"enum": ["MEMBER_OF", "AUTHORED_BY", "DERIVED_FROM", "VALIDATES", "SUPERSEDES", "DEPENDS_ON", "REPRODUCES", "IMPLEMENTS"]},
+        "object_id": {"$ref": "#/$defs/identifier"},
+        "decision": {"$ref": "#/$defs/decision"},
+        "witness": {"$ref": "#/$defs/evidencePointer"}
+      },
+      "allOf": [{"if": {"properties": {"decision": {"const": "PASS"}}, "required": ["decision"]}, "then": {"required": ["witness"]}}]
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt_id", "receipt_hash", "receipt_type", "source_commit"],
+      "properties": {
+        "receipt_id": {"$ref": "#/$defs/identifier"},
+        "receipt_hash": {"$ref": "#/$defs/sha256"},
+        "receipt_type": {"$ref": "#/$defs/identifier"},
+        "source_commit": {"$ref": "#/$defs/gitObjectId"}
+      }
+    },
+    "projectionMeta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generated_at", "projection_hash", "source_receipt", "freshness", "hash_algorithm", "canonicalization", "hash_excludes"],
+      "properties": {
+        "generated_at": {"type": "string", "format": "date-time"},
+        "projection_hash": {"$ref": "#/$defs/sha256"},
+        "source_receipt": {"$ref": "#/$defs/sha256"},
+        "freshness": {"enum": ["LIVE", "CACHED", "SOURCE_UNAVAILABLE"]},
+        "hash_algorithm": {"const": "SHA-256"},
+        "canonicalization": {"const": "RFC8785_JCS"},
+        "hash_excludes": {"const": ["projection.projection_hash"]}
+      }
+    }
+  }
+}
