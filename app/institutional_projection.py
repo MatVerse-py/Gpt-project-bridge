@@ -22,16 +22,24 @@ class ProjectionUnavailable(RuntimeError):
     pass
 
 
-def _assert_jcs_subset(value: Any, path: str = "$") -> None:
-    """Restrict v1 payloads to a subset with unambiguous RFC 8785 encoding.
+def _valid_unicode_string(value: str, path: str) -> None:
+    if any(0xD800 <= ord(ch) <= 0xDFFF for ch in value):
+        raise ValueError(f"lone UTF-16 surrogate is not valid JCS input at {path}")
 
-    Floating point values are intentionally rejected in v1 institutional
-    projections/intents. Integers are restricted to the interoperable IEEE-754
-    safe range. Strings, booleans, null, arrays and string-keyed objects remain
-    fully supported.
+
+def _assert_jcs_subset(value: Any, path: str = "$") -> None:
+    """Restrict v1 payloads to an interoperable RFC 8785 subset.
+
+    Floating point values are intentionally rejected. Integers are restricted
+    to the IEEE-754 interoperable safe range. Unicode strings may not contain
+    lone UTF-16 surrogates. These restrictions remove cross-runtime ambiguity
+    while preserving normal institutional JSON data.
     """
 
-    if value is None or isinstance(value, (str, bool)):
+    if value is None or isinstance(value, bool):
+        return
+    if isinstance(value, str):
+        _valid_unicode_string(value, path)
         return
     if isinstance(value, int):
         if abs(value) > _SAFE_INTEGER:
@@ -47,14 +55,44 @@ def _assert_jcs_subset(value: Any, path: str = "$") -> None:
         for key, item in value.items():
             if not isinstance(key, str):
                 raise ValueError(f"non-string object key at {path}")
+            _valid_unicode_string(key, f"{path}.<key>")
             _assert_jcs_subset(item, f"{path}.{key}")
         return
     raise ValueError(f"unsupported canonical JSON type at {path}: {type(value).__qualname__}")
 
 
+def _jcs_string(value: str) -> str:
+    # Python's JSON string escaping matches JSON.stringify for the accepted
+    # Unicode subset. Object ordering is handled separately using UTF-16 units.
+    return json.dumps(value, ensure_ascii=False, allow_nan=False)
+
+
+def _utf16_sort_key(value: str) -> bytes:
+    return value.encode("utf-16be")
+
+
+def _jcs_subset_text(value: Any) -> str:
+    if value is None:
+        return "null"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if isinstance(value, str):
+        return _jcs_string(value)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return str(value)
+    if isinstance(value, list):
+        return "[" + ",".join(_jcs_subset_text(item) for item in value) + "]"
+    if isinstance(value, dict):
+        keys = sorted(value, key=_utf16_sort_key)
+        return "{" + ",".join(_jcs_string(key) + ":" + _jcs_subset_text(value[key]) for key in keys) + "}"
+    raise TypeError(f"value left validated JCS subset: {type(value).__qualname__}")
+
+
 def jcs_subset_bytes(value: Any) -> bytes:
     _assert_jcs_subset(value)
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+    return _jcs_subset_text(value).encode("utf-8")
 
 
 def jcs_subset_hash(value: Any) -> str:
