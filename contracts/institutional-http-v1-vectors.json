@@ -1,0 +1,48 @@
+{
+  "schema_version": "matverse.institutional-http-v1-vectors.v1",
+  "jcs": {
+    "input": {"": 1, "😀": 2},
+    "canonical_utf8_text": "{\"😀\":2,\"\":1}",
+    "sha256": "28c95d1bbb2209223307e62f489020e8f9e0cfa16adf2daf6d88127a1e8dd22a"
+  },
+  "hmac_request": {
+    "fixture_secret": "interop-test-secret-0000000000000001",
+    "method": "GET",
+    "path": "/institutional/runtime",
+    "timestamp": "1787698860",
+    "nonce": "0123456789abcdef0123456789abcdef",
+    "body_utf8": "",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "signing_payload": "GET\n/institutional/runtime\n1787698860\n0123456789abcdef0123456789abcdef\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "signature": "0fd758ccedff00b137a8d6f0be0d2192931fdb22ba37cef7f2accf08f12f97c5"
+  },
+  "intent": {
+    "payload_without_intent_hash": {
+      "schema_version": "matverse.institutional-intent.v1",
+      "intent_id": "interop-intent-001",
+      "requested_operation": "REGISTER_TWIN_FINDING",
+      "actor_id": "surface",
+      "target": {"kind": "TWIN", "id": "TWIN-GATE-001"},
+      "parameters": {
+        "challengeClass": "COUNTEREXAMPLE",
+        "livingUnitId": "LTA-GATE-001",
+        "severity": "HIGH",
+        "statement": "interop vector"
+      },
+      "created_at": "2026-08-25T21:30:00Z",
+      "source": {
+        "repository": "MatVerse-py/Gpt-project-bridge",
+        "commit_sha": "e975b2794f3f17402d0dd97b1a7cffd55bfcbaa2",
+        "ref": "main",
+        "frozen_contract_hash": "67743cbe1f4d65983348401d2061e46dec22d57e232854ff263e1d646f600b26",
+        "gate_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "constitutional_contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "projection_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "hash_algorithm": "SHA-256",
+      "canonicalization": "RFC8785_JCS",
+      "hash_excludes": ["intent_hash"]
+    },
+    "intent_hash": "799d0402e981f589bb4cd57cc0733c844528bd67003fd955652605af7b2d76e1"
+  }
+}
