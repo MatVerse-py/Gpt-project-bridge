@@ -11,26 +11,17 @@ from .institutional_projection import (
     build_institutional_projection,
     jcs_subset_hash,
 )
+from .institutional_protocol import INTENT_OPERATIONS, TARGET_KINDS
+from .institutional_runtime_endpoint import runtime_router
 from .institutional_store import get_intent, list_intents_for_principal, persist_intent
 from .model_bridge import assert_transferable_state
 
 
 app = FastAPI(title="MatVerse Institutional Adapter v1", version="1.0.0")
+app.include_router(runtime_router)
 
-_ALLOWED_INTENT_OPERATIONS = {
-    "REGISTER_ARTIFACT",
-    "REGISTER_CLAIM",
-    "REGISTER_EVIDENCE",
-    "REGISTER_RELATION",
-    "REQUEST_MATURITY_EVALUATION",
-    "REQUEST_EXTERNAL_REPRODUCTION",
-    "REQUEST_WORLD_REAL_EVALUATION",
-    "REQUEST_PUBLICATION",
-    "REQUEST_ANCHOR",
-    "REQUEST_AUTHORIZATION",
-    "OTHER",
-}
-_ALLOWED_TARGET_KINDS = {"SYSTEM", "SUBJECT", "ARTIFACT", "CLAIM", "EXPERIMENT", "RELATION", "MATURITY", "OTHER"}
+_ALLOWED_INTENT_OPERATIONS = INTENT_OPERATIONS
+_ALLOWED_TARGET_KINDS = TARGET_KINDS
 _REQUIRED_INTENT_KEYS = {
     "schema_version",
     "intent_id",
