@@ -27,6 +27,7 @@ class QuantumModality(str, Enum):
 class ComparisonStatus(str, Enum):
     EXACT = "EXACT"
     FUNCTIONALLY_EQUIVALENT = "FUNCTIONALLY_EQUIVALENT"
+    WITHIN_TOLERANCE = "WITHIN_TOLERANCE"
     STATISTICALLY_EQUIVALENT = "STATISTICALLY_EQUIVALENT"
     DIVERGENT = "DIVERGENT"
     INCOMPARABLE = "INCOMPARABLE"
@@ -117,7 +118,6 @@ def assess_candidate(contract: ExperimentContract, profile: CapabilityProfile) -
     if reasons:
         return CandidateAssessment(profile.backend_id, Decision.BLOCK, tuple(reasons), None)
 
-    # Preference is only evaluated after hard admissibility. Lower is better.
     score = 0.0
     score += profile.estimated_cost or 0.0
     score += (profile.estimated_latency_ms or 0.0) / 1000.0
@@ -166,7 +166,13 @@ def select_substrate(
         )
         return SelectionResult(contract.contract_hash, None, assessments, receipt)
 
-    selected = min(admissible, key=lambda a: (a.preference_score if a.preference_score is not None else float("inf"), a.backend_id)) if admissible else None
+    selected = min(
+        admissible,
+        key=lambda a: (
+            a.preference_score if a.preference_score is not None else float("inf"),
+            a.backend_id,
+        ),
+    ) if admissible else None
     receipt = evidence_receipt(
         "QEX_SUBSTRATE_SELECTION",
         {"contract_hash": contract.contract_hash, "profile_hashes": [p.profile_hash for p in profiles]},
@@ -182,6 +188,12 @@ def compare_substrate_results(
     hard_invariants: tuple[str, ...],
     numeric_tolerances: Mapping[str, float] | None = None,
 ) -> ComparisonStatus:
+    """Compare canonical results without overstating statistical evidence.
+
+    Numeric tolerance checks can establish WITHIN_TOLERANCE, not statistical
+    equivalence. STATISTICALLY_EQUIVALENT is reserved for a future comparator
+    that consumes repeated samples and an explicit statistical test contract.
+    """
     numeric_tolerances = numeric_tolerances or {}
     for key in hard_invariants:
         if key not in left or key not in right:
@@ -191,8 +203,10 @@ def compare_substrate_results(
 
     shared = set(left) & set(right)
     compared = False
-    statistically_equal = False
+    nonzero_delta = False
     for key, tolerance in numeric_tolerances.items():
+        if tolerance < 0:
+            return ComparisonStatus.INCOMPARABLE
         if key not in shared:
             return ComparisonStatus.INCOMPARABLE
         try:
@@ -203,10 +217,10 @@ def compare_substrate_results(
         if delta > tolerance:
             return ComparisonStatus.DIVERGENT
         if delta > 0:
-            statistically_equal = True
+            nonzero_delta = True
 
     if left == right:
         return ComparisonStatus.EXACT
-    if compared and statistically_equal:
-        return ComparisonStatus.STATISTICALLY_EQUIVALENT
+    if compared and nonzero_delta:
+        return ComparisonStatus.WITHIN_TOLERANCE
     return ComparisonStatus.FUNCTIONALLY_EQUIVALENT
