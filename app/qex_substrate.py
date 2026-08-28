@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from enum import Enum
+from math import isclose
 from typing import Any, Iterable, Mapping
 
 from app.core import Decision, evaluate_hdb, omega_gate, stable_hash
@@ -214,7 +215,8 @@ def compare_substrate_results(
         except (TypeError, ValueError):
             return ComparisonStatus.INCOMPARABLE
         compared = True
-        if delta > tolerance:
+        at_boundary = isclose(delta, tolerance, rel_tol=0.0, abs_tol=1e-12)
+        if delta > tolerance and not at_boundary:
             return ComparisonStatus.DIVERGENT
         if delta > 0:
             nonzero_delta = True
