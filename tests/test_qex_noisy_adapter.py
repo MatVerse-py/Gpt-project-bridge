@@ -37,7 +37,7 @@ def test_noise_preserves_hard_identity_but_changes_distribution():
         hard_invariants=hard,
         numeric_tolerances={"probability_0": 0.05, "probability_1": 0.05},
     )
-    assert status is ComparisonStatus.STATISTICALLY_EQUIVALENT
+    assert status is ComparisonStatus.WITHIN_TOLERANCE
     assert abs(total_variation_distance(ideal.canonical_observable(), noisy.canonical_observable()) - 0.05) < 1e-12
 
 
