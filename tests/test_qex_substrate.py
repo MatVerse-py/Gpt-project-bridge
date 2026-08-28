@@ -69,13 +69,13 @@ def test_omega_gate_precedes_preference_routing():
     assert result.assessments[0].decision is Decision.BLOCK
 
 
-def test_substrate_invariance_exact_and_statistical():
+def test_substrate_invariance_exact_and_within_tolerance():
     left = {"problem_hash": "p", "metric_schema_hash": "m", "quality": 0.91, "runtime": 10}
     exact = dict(left)
     near = {**left, "quality": 0.905, "runtime": 12}
     hard = ("problem_hash", "metric_schema_hash")
     assert compare_substrate_results(left, exact, hard_invariants=hard, numeric_tolerances={"quality": 0.01}) is ComparisonStatus.EXACT
-    assert compare_substrate_results(left, near, hard_invariants=hard, numeric_tolerances={"quality": 0.01}) is ComparisonStatus.STATISTICALLY_EQUIVALENT
+    assert compare_substrate_results(left, near, hard_invariants=hard, numeric_tolerances={"quality": 0.01}) is ComparisonStatus.WITHIN_TOLERANCE
 
 
 def test_substrate_invariance_divergent_and_incomparable():
