@@ -5,11 +5,15 @@ import json
 import pytest
 
 from app import storage
-from app.institutional_projection import jcs_subset_hash
+from app.institutional_projection import build_institutional_projection, jcs_subset_hash
 from app.institutional_store import get_intent, persist_intent
 
 
-def _intent(parameters=None) -> dict:
+BUILD_COMMIT = "a" * 40
+FROZEN_CONTRACT = "b" * 64
+
+
+def _intent(parameters=None, *, source: dict | None = None) -> dict:
     payload = {
         "schema_version": "matverse.institutional-intent.v1",
         "intent_id": "commitment-1",
@@ -18,7 +22,8 @@ def _intent(parameters=None) -> dict:
         "target": {"kind": "OTHER", "id": "target-1"},
         "parameters": {"message": "not persisted raw"} if parameters is None else parameters,
         "created_at": "2026-08-25T21:45:00Z",
-        "source": {
+        "source": source
+        or {
             "repository": "MatVerse-py/Gpt-project-bridge",
             "commit_sha": "a" * 40,
             "ref": "main",
@@ -35,8 +40,17 @@ def _intent(parameters=None) -> dict:
     return payload
 
 
-def test_canonical_intent_store_persists_only_parameter_commitment():
-    intent = _intent()
+def _canonical_source(monkeypatch) -> dict:
+    monkeypatch.setenv("MATVERSE_BUILD_COMMIT", BUILD_COMMIT)
+    monkeypatch.setenv("MATVERSE_BUILD_REF", "main")
+    monkeypatch.setenv("MATVERSE_FROZEN_CONTRACT_HASH", FROZEN_CONTRACT)
+    monkeypatch.setenv("MATVERSE_BUILD_TIMESTAMP", "2026-08-25T21:45:00Z")
+    projection = build_institutional_projection()
+    return {**projection["source"], "projection_hash": projection["projection"]["projection_hash"]}
+
+
+def test_canonical_intent_store_persists_only_parameter_commitment(monkeypatch):
+    intent = _intent(source=_canonical_source(monkeypatch))
     result = persist_intent(intent=intent, principal_id="admin")
     assert result["parameter_persistence"] == "HASH_ONLY"
     assert result["parameters_hash"] == jcs_subset_hash(intent["parameters"])
