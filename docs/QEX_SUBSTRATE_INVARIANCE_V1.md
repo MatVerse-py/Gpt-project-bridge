@@ -1,6 +1,6 @@
 # QeX Computational Substrate Invariance v1
 
-Status: IMPLEMENTED_AND_OBSERVED_THROUGH_L2 / L3_IMPLEMENTED_HOLD_NO_LIVE_BACKEND
+Status: IMPLEMENTED_AND_OBSERVED_THROUGH_L2 / L3_AND_L4_BOUNDARIES_IMPLEMENTED_HOLD_NO_LIVE_QPU
 
 ## Canonical placement
 
@@ -10,7 +10,7 @@ QeX remains a specialized quantum-classical experimentation bench under URANO. T
 
 `Experiment Identity != Computational Substrate`
 
-The same frozen experiment contract may be evaluated against classical, hybrid, gate-model quantum, annealing, controlled-noise, hardware-derived noise, and live-calibration replay substrates. Backend choice is capability-based and occurs only after constitutional admissibility.
+The same frozen experiment contract may be evaluated against classical, hybrid, gate-model quantum, annealing, controlled-noise, hardware-derived noise, live-calibration replay, and physical-QPU execution substrates. Backend choice is capability-based and occurs only after constitutional admissibility.
 
 ## Flow
 
@@ -18,40 +18,11 @@ The same frozen experiment contract may be evaluated against classical, hybrid, 
 
 ## QEX-SUBSTRATE-01
 
-The benchmark freezes:
+The benchmark freezes experiment identity, problem hash, objective, metric schema, observable schema, evidence policy, required capabilities, and budget/latency limits. The canonical contract is materialized by `app/qex_experiment.py`. Derived adjudication metrics such as total variation distance (TVD) remain outside the contract hash.
 
-- experiment_id
-- problem_hash
-- objective
-- metric_schema_hash
-- observable_schema_hash
-- evidence_policy_hash
-- required capabilities
-- budget/latency limits
+Comparison states are `EXACT`, `FUNCTIONALLY_EQUIVALENT`, `WITHIN_TOLERANCE`, `STATISTICALLY_EQUIVALENT` (reserved for a future repeated-sample statistical-test contract), `DIVERGENT`, and `INCOMPARABLE`. `WITHIN_TOLERANCE` means numerical tolerance only.
 
-The canonical contract is materialized by `app/qex_experiment.py`. Derived adjudication metrics such as total variation distance (TVD) are intentionally outside the contract hash. They describe the comparison between executions; they do not silently redefine the experiment being compared.
-
-Observed or implemented execution classes include:
-
-- CPU classical reference
-- MatVerse dependency-free ideal statevector simulator
-- Qiskit statevector SDK adapter
-- controlled bit-flip/readout noise proxy
-- Qiskit Aer noise model derived from the bundled `FakeSherbrooke` historical hardware snapshot
-- fail-closed live-calibration Aer replay adapter
-
-Comparison states:
-
-- EXACT
-- FUNCTIONALLY_EQUIVALENT
-- WITHIN_TOLERANCE
-- STATISTICALLY_EQUIVALENT (reserved for a future repeated-sample statistical-test contract)
-- DIVERGENT
-- INCOMPARABLE
-
-`WITHIN_TOLERANCE` means only that declared numeric deltas remain inside configured tolerances. It must not be interpreted as statistical equivalence.
-
-## Noise realism ladder
+## Noise and execution realism ladder
 
 ### L0 — ideal
 
@@ -59,54 +30,80 @@ CPU, internal statevector, and Qiskit statevector establish substrate-independen
 
 ### L1 — controlled synthetic noise
 
-The controlled-noise adapter perturbs the binary outcome distribution by a configured symmetric error probability. TVD is measured explicitly. In the controlled tests, error probability 0.05 yields TVD 0.05 and is inside a 0.05 tolerance; error probability 0.10 yields TVD 0.10 and is DIVERGENT under that tolerance.
+A controlled bit-flip/readout proxy perturbs the outcome distribution and TVD is measured explicitly. This validates tolerance/divergence semantics without a hardware claim.
 
 ### L2 — hardware-derived historical snapshot
 
-`AerHardwareSnapshotNotAdapter` constructs a Qiskit Aer noise model from Qiskit Runtime's `FakeSherbrooke` backend snapshot. Execution uses finite shots and fixed simulator/transpiler seeds. The evidence receipt binds backend metadata, package versions, seed, shot count, source backend identity, and noise-model basis gates into `backend_metadata_hash`.
-
-This level is materially stronger than a scalar synthetic error model because the noise model is derived from a hardware snapshot. It remains a historical/mock snapshot bundled with the pinned runtime package. It is **not** current device calibration and **not** execution on a physical QPU.
+`AerHardwareSnapshotNotAdapter` builds a Qiskit Aer noise model from the bundled `FakeSherbrooke` historical hardware snapshot. Finite shots, deterministic seeds, backend identity, SDK versions, and noise basis gates are bound into execution evidence. It remains simulation, not current calibration and not physical execution.
 
 ### L3 — current calibration replay
 
-`prepare_live_calibration(backend)` is the L3 admissibility boundary. It requires a non-simulator, non-fake, operational backend and explicitly refreshes dynamic calibration data through `backend.properties(refresh=True)`.
+`prepare_live_calibration(backend)` requires a non-simulator, non-fake, operational backend and refreshes dynamic calibration data through `backend.properties(refresh=True)`. The normalized `BackendProperties.to_dict()` representation, backend identity, and optional `calibration_id` are frozen into `calibration_snapshot_hash`. The simulator binding occurs in the same preparation step so later calibration drift cannot silently alter the recorded replay substrate.
 
-The refreshed `BackendProperties.to_dict()` representation is normalized and hashed together with backend identity and optional `calibration_id`. The resulting `calibration_snapshot_hash` becomes evidence metadata and the local Aer simulator is bound immediately during the same preparation step. This prevents a later calibration refresh from silently changing the simulated substrate after the snapshot identity was recorded.
+Missing authentication/backend, fake/simulator sources, unavailable/non-operational status, absent properties, refresh failure, or Aer binding failure returns `Decision.HOLD`. A PASS preparation may execute locally through `LiveCalibrationAerAdapter`; this is still local Aer replay, not physical QPU execution.
 
-If no authenticated backend is supplied, the backend is fake/simulated, status is unavailable/non-operational, properties cannot be refreshed, or Aer cannot bind the snapshot, preparation returns `Decision.HOLD`. `LiveCalibrationAerAdapter` refuses to execute from a HOLD preparation.
-
-When preparation is PASS, `LiveCalibrationAerAdapter` executes **locally in Aer**, not on the QPU, with finite shots and deterministic seeds. Evidence includes backend name, calibration id, calibration snapshot hash, properties last-update timestamp, SDK versions, shots, and seed.
-
-CI covers the fail-closed path and a dependency-injected local replay path. This validates L3 architecture and evidence semantics without pretending that CI possesses authenticated live QPU credentials. Therefore the current epistemic state is:
+Current epistemic state:
 
 - L3 architecture: IMPLEMENTED
 - L3 fail-closed behavior: PASS_OBSERVED
-- L3 deterministic local replay contract: PASS_OBSERVED when supplied an admissible test preparation
+- L3 dependency-injected local replay contract: PASS_OBSERVED
 - authenticated live-device calibration capture: HOLD / NOT_OBSERVED
 
-### L4 — physical QPU execution (future gate)
+### L4 — physical QPU execution
 
-The same frozen QEX-SUBSTRATE-01 contract is submitted to a physical backend. Hardware execution must preserve experiment identity while recording queue, shots, backend, compilation, calibration context, and raw measurement evidence.
+`prepare_physical_qpu(backend, authorization)` is the physical execution admissibility boundary. It requires:
+
+- explicit `PhysicalExecutionAuthorization`
+- named authority and purpose
+- positive maximum shot budget
+- explicit permission for resource consumption
+- authenticated non-fake, non-simulator backend
+- operational backend status
+- refreshed pre-execution calibration properties
+
+The preparation step records backend identity, queue depth when available, `calibration_id`, `properties_last_update`, `calibration_snapshot_hash`, `authorization_hash`, and the authorized maximum shot count. PASS means only that an L4 attempt is admissible. It does not mean a physical job was submitted or observed.
+
+`PhysicalQPUAdapter` refuses HOLD preparations and refuses requested shots above the authorized maximum. For the default IBM path it:
+
+1. builds the frozen QEX-SUBSTRATE-01 circuit;
+2. compiles it into an ISA circuit with `generate_preset_pass_manager(backend=..., optimization_level=1)`;
+3. hashes the serialized ISA circuit through QPY;
+4. submits through `SamplerV2(mode=backend)` in job mode;
+5. records the provider `job_id`;
+6. obtains raw counts from `result[0].data.meas.get_counts()`;
+7. validates that counts contain only the expected one-bit outcomes and sum exactly to requested shots;
+8. records raw counts, raw-count hash, job metrics/usage hashes, calibration/authorization hashes, backend identity, and SDK versions into execution evidence.
+
+Any submission/result exception or malformed counts fails closed through `PhysicalQPUExecutionFailed`; there is no fallback to simulator execution.
+
+CI uses dependency-injected compiler and Sampler/job doubles. Therefore it can prove L4 authorization, validation, evidence-binding, and fail-closed semantics without consuming QPU resources. It cannot prove a physical job actually ran.
+
+Current epistemic state:
+
+- L4 architecture: IMPLEMENTED
+- L4 explicit resource authorization: IMPLEMENTED
+- L4 calibration/authorization evidence binding: IMPLEMENTED
+- L4 dependency-injected submission/result contract: subject to CI gate
+- authenticated physical QPU job: HOLD / NOT_OBSERVED
+- physical job ID from a real provider: NOT_OBSERVED
 
 ## Scientific boundary
 
 `QUANTUM_USED` never implies `QUANTUM_ADVANTAGE`.
 
-A classical baseline is required by default. A quantum backend may be selected only when it is admissible and its declared, instrumented capability profile justifies the choice. Unknown or missing required measurements fail closed when the experiment contract depends on them.
+A classical baseline is required by default. The Qiskit statevector path remains ideal simulation; L1 is synthetic noise; L2 is a historical hardware-derived simulation; L3 can replay a current calibration locally when an authenticated backend is supplied; L4 is the only layer allowed to assert physical execution, and only after a real provider job ID and physical result are observed and recorded.
 
-The Qiskit adapter proves execution through an independent external SDK, but remains ideal simulation. The controlled-noise adapter proves tolerance/divergence handling, but remains synthetic. The FakeSherbrooke/Aer path exercises a hardware-derived historical snapshot, but remains simulation. The L3 adapter can bind a current calibration to a local simulator, but until an authenticated real backend is actually supplied and observed it remains HOLD for the live-capture claim. None establishes physical QPU execution, fault tolerance, or quantum advantage.
-
-Topological hardware remains treated as experimental/contested unless the registered capability profile explicitly carries a verified/production maturity state.
+No layer in this PR establishes fault tolerance, error correction, or quantum advantage. `STATISTICALLY_EQUIVALENT` remains reserved until a repeated-sample statistical test contract exists.
 
 ## Pinned SDK stack
 
-The hardware-snapshot and L3 gates intentionally use a stack compatible with the repository's frozen application dependencies:
+The QeX hardware-realism gates use the repository-compatible stack:
 
 - qiskit 2.5.1
 - qiskit-aer 0.17.2
 - qiskit-ibm-runtime 0.47.0
 
-`qiskit-ibm-runtime 0.49.0` requires a newer Pydantic line than this repository freezes. QeX therefore fails closed on that dependency conflict instead of silently upgrading the application stack.
+The newer Runtime client line currently conflicts with the repository's frozen Pydantic dependency, so QeX keeps the compatible pinned stack rather than silently upgrading the application.
 
 ## Current implementation scope
 
@@ -124,9 +121,11 @@ Implemented:
 - Qiskit statevector SDK adapter
 - controlled-noise adapter
 - hardware-snapshot Aer adapter
-- live-calibration preparation gate
-- live-calibration local Aer replay adapter
-- calibration snapshot hashing
+- live-calibration preparation and local replay adapter
+- physical-QPU preparation boundary
+- explicit physical resource authorization object
+- physical SamplerV2 adapter with ISA-circuit hashing
+- raw-count/job/usage evidence binding
 - TVD divergence metric
 - cross-substrate canonical comparator
 - dedicated GitHub Actions gate
@@ -134,7 +133,8 @@ Implemented:
 Not yet claimed:
 
 - observed authenticated live-device calibration capture
-- physical QPU execution
+- observed physical QPU execution
+- real provider job ID in corpus evidence
 - error correction
 - quantum advantage
 - statistical equivalence from repeated hardware samples
