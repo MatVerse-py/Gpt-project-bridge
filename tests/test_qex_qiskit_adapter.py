@@ -1,7 +1,7 @@
 from app.qex_adapters import ClassicalNotAdapter, IdealStatevectorNotAdapter
+from app.qex_experiment import qex_substrate_01_contract
 from app.qex_qiskit_adapter import QiskitStatevectorNotAdapter
 from app.qex_substrate import ComparisonStatus, compare_substrate_results
-from tests.test_qex_adapters import contract
 
 
 HARD = (
@@ -16,7 +16,7 @@ HARD = (
 
 
 def test_cpu_internal_statevector_and_qiskit_preserve_contract_for_both_bits():
-    c = contract()
+    c = qex_substrate_01_contract()
     adapters = (ClassicalNotAdapter(), IdealStatevectorNotAdapter(), QiskitStatevectorNotAdapter())
 
     for bit in (0, 1):
@@ -35,6 +35,6 @@ def test_cpu_internal_statevector_and_qiskit_preserve_contract_for_both_bits():
 
 
 def test_qiskit_adapter_is_explicitly_simulated_quantum_regime():
-    result = QiskitStatevectorNotAdapter().execute(contract(), {"bit": 0})
+    result = QiskitStatevectorNotAdapter().execute(qex_substrate_01_contract(), {"bit": 0})
     assert result.backend_id.startswith("qiskit-2.5-statevector")
     assert result.regime.value == "QUANTUM_GATE"
