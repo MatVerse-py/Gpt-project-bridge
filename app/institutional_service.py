@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+import re
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 
 from .auth import Principal, authenticate
 from .institutional_projection import (
@@ -22,6 +23,7 @@ app.include_router(runtime_router)
 
 _ALLOWED_INTENT_OPERATIONS = INTENT_OPERATIONS
 _ALLOWED_TARGET_KINDS = TARGET_KINDS
+_RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 _REQUIRED_INTENT_KEYS = {
     "schema_version",
     "intent_id",
@@ -61,6 +63,18 @@ def _nonempty_string(value: Any, field: str, *, max_length: int = 256) -> str:
     return value
 
 
+def _validate_rfc3339(value: Any, field: str) -> str:
+    if not isinstance(value, str) or _RFC3339.fullmatch(value) is None:
+        raise HTTPException(status_code=422, detail=f"{field} must be RFC 3339 date-time with explicit timezone")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"{field} must be a valid RFC 3339 date-time") from exc
+    if parsed.tzinfo is None:
+        raise HTTPException(status_code=422, detail=f"{field} must include an explicit timezone")
+    return value
+
+
 def _validate_intent_shape(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise HTTPException(status_code=422, detail="intent payload must be an object")
@@ -93,15 +107,7 @@ def _validate_intent_shape(raw: Any) -> dict[str, Any]:
         jcs_subset_hash(parameters)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    created_at = raw.get("created_at")
-    if not isinstance(created_at, str):
-        raise HTTPException(status_code=422, detail="created_at must be an ISO-8601 string")
-    try:
-        parsed = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail="created_at must be ISO-8601") from exc
-    if parsed.tzinfo is None:
-        raise HTTPException(status_code=422, detail="created_at must include an explicit timezone")
+    _validate_rfc3339(raw.get("created_at"), "created_at")
     source = raw.get("source")
     if not isinstance(source, dict) or set(source) != _REQUIRED_SOURCE_KEYS:
         raise HTTPException(status_code=422, detail="source must contain the complete institutional source binding")
@@ -184,26 +190,43 @@ async def submit_institutional_intent(request: Request, principal: Principal = D
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="request body must be valid JSON") from exc
     intent = _validate_intent_shape(raw)
-    if principal.principal_id != intent["actor_id"] and not principal.allows("institutional:intent:submit:any"):
+    delegated = principal.principal_id != intent["actor_id"]
+    if delegated and not principal.allows("institutional:intent:submit:any"):
         raise HTTPException(status_code=403, detail="authenticated principal does not match intent actor_id")
 
     # Idempotent retries are checked before freshness. The original acceptance
     # changes the Ledger/projection, so requiring the old projection to remain
-    # current would make a legitimate retry impossible. The stored principal
-    # and content hash still have to match exactly.
+    # current would make a legitimate retry impossible. The stored principal,
+    # actor and content hash still have to match exactly.
     existing = get_intent(intent["intent_id"])
     if existing is not None:
-        if existing["principal_id"] != principal.principal_id or existing["intent_hash"] != intent["intent_hash"]:
-            raise HTTPException(status_code=409, detail="intent_id collision or principal/content mismatch")
+        if (
+            existing["principal_id"] != principal.principal_id
+            or existing.get("actor_id") != intent["actor_id"]
+            or existing["intent_hash"] != intent["intent_hash"]
+        ):
+            raise HTTPException(status_code=409, detail="intent_id collision or principal/actor/content mismatch")
         existing = {**existing, "idempotent": True}
         return _accepted_response(existing)
 
     projection = _current_projection_or_503()
     _assert_current_source(intent["source"], projection)
     try:
-        stored = persist_intent(intent=intent, principal_id=principal.principal_id)
+        stored = persist_intent(
+            intent=intent,
+            principal_id=principal.principal_id,
+            allow_delegated_actor=principal.allows("institutional:intent:submit:any"),
+        )
+    except ProjectionUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"decision": "HOLD", "freshness": "SOURCE_UNAVAILABLE", "reason": str(exc)},
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        detail: Any = str(exc)
+        if "stale" in str(exc):
+            detail = {"decision": "HOLD", "reason": str(exc)}
+        raise HTTPException(status_code=409, detail=detail) from exc
     return _accepted_response(stored)
 
 
@@ -213,12 +236,24 @@ def read_institutional_intent(intent_id: str, principal: Principal = Depends(aut
     item = get_intent(intent_id)
     if item is None:
         raise HTTPException(status_code=404, detail="institutional intent not found")
-    if item["principal_id"] != principal.principal_id and not principal.allows("institutional:intent:read:any"):
+    if (
+        principal.principal_id not in {item["principal_id"], item.get("actor_id")}
+        and not principal.allows("institutional:intent:read:any")
+    ):
         raise HTTPException(status_code=403, detail="principal may not read another actor's intent")
     return item
 
 
 @app.get("/institutional/intents")
-def list_institutional_intents(principal: Principal = Depends(authenticate)) -> dict[str, Any]:
+def list_institutional_intents(
+    principal: Principal = Depends(authenticate),
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, Any]:
     _requires(principal, "institutional:intent:read")
-    return {"principal_id": principal.principal_id, "intents": list_intents_for_principal(principal.principal_id)}
+    return {
+        "principal_id": principal.principal_id,
+        "limit": limit,
+        "offset": offset,
+        "intents": list_intents_for_principal(principal.principal_id, limit=limit, offset=offset),
+    }
