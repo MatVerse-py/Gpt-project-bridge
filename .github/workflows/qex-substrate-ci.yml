@@ -8,6 +8,7 @@ on:
     paths:
       - 'app/qex_*.py'
       - 'tests/test_qex_*.py'
+      - 'requirements-qex-sdk.txt'
       - 'docs/QEX_SUBSTRATE_INVARIANCE_V1.md'
       - '.github/workflows/qex-substrate-ci.yml'
 
@@ -19,5 +20,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install -r requirements.txt
-      - run: pytest -q tests/test_qex_substrate.py tests/test_qex_adapters.py
+      - run: pip install -r requirements-qex-sdk.txt
+      - run: pytest -q tests/test_qex_substrate.py tests/test_qex_adapters.py tests/test_qex_qiskit_adapter.py
