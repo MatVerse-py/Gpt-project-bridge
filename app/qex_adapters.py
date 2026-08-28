@@ -23,6 +23,7 @@ class ExecutionResult:
     probability_0: float
     probability_1: float
     backend_payload_hash: str
+    backend_metadata_hash: str
     receipt: Mapping[str, Any]
 
     def canonical_observable(self) -> dict[str, Any]:
@@ -64,7 +65,6 @@ class IdealStatevectorNotAdapter:
 
     def execute(self, contract: ExperimentContract, payload: Mapping[str, Any]) -> ExecutionResult:
         bit = _validated_bit(payload)
-        # |0> = [1,0], |1> = [0,1]. X = [[0,1],[1,0]].
         state = (1.0 + 0.0j, 0.0 + 0.0j) if bit == 0 else (0.0 + 0.0j, 1.0 + 0.0j)
         after_x = (state[1], state[0])
         p0 = abs(after_x[0]) ** 2
@@ -92,7 +92,10 @@ def _build_result(
     result: int,
     p0: float,
     p1: float,
+    *,
+    backend_metadata: Mapping[str, Any] | None = None,
 ) -> ExecutionResult:
+    metadata = dict(backend_metadata or {})
     backend_payload = {
         "backend_id": backend_id,
         "regime": regime.value,
@@ -100,6 +103,7 @@ def _build_result(
         "result": result,
         "probability_0": p0,
         "probability_1": p1,
+        "backend_metadata": metadata,
     }
     receipt = evidence_receipt(
         "QEX_SUBSTRATE_EXECUTION",
@@ -109,6 +113,7 @@ def _build_result(
             "problem_hash": contract.problem_hash,
             "payload": dict(payload),
             "backend_id": backend_id,
+            "backend_metadata_hash": stable_hash(metadata),
         },
         backend_payload,
     )
@@ -125,5 +130,6 @@ def _build_result(
         probability_0=p0,
         probability_1=p1,
         backend_payload_hash=stable_hash(backend_payload),
+        backend_metadata_hash=stable_hash(metadata),
         receipt=receipt,
     )
