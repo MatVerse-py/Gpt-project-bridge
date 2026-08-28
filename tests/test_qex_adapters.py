@@ -1,19 +1,10 @@
-from app.core import stable_hash
 from app.qex_adapters import ClassicalNotAdapter, IdealStatevectorNotAdapter
-from app.qex_substrate import ComparisonStatus, ExperimentContract, compare_substrate_results
+from app.qex_experiment import qex_substrate_01_contract
+from app.qex_substrate import ComparisonStatus, compare_substrate_results
 
 
-def contract() -> ExperimentContract:
-    return ExperimentContract(
-        experiment_id="QEX-SUBSTRATE-01",
-        problem_hash=stable_hash({"problem": "NOT", "domain": "bit"}),
-        objective="preserve experiment identity while changing computational substrate",
-        required_capabilities=("bit_not",),
-        metric_schema_hash=stable_hash({"metrics": ["probability_0", "probability_1"]}),
-        observable_schema_hash=stable_hash({"observables": ["result"]}),
-        evidence_policy_hash=stable_hash({"policy": "evidence-v1"}),
-        require_classical_baseline=True,
-    )
+def contract():
+    return qex_substrate_01_contract()
 
 
 def test_cpu_and_ideal_statevector_preserve_hard_invariants_for_zero():
