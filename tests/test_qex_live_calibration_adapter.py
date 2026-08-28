@@ -42,8 +42,10 @@ class StubLiveBackend:
         return StubProperties()
 
 
-def local_snapshot_simulator(_backend):
-    return AerSimulator.from_backend(FakeSherbrooke())
+def local_replay_simulator(_backend):
+    # L2 already integration-tests a hardware-derived FakeSherbrooke simulator.
+    # L3 tests isolate the live-calibration governance/binding contract.
+    return AerSimulator()
 
 
 def test_missing_live_backend_is_hold_and_cannot_execute():
@@ -66,7 +68,7 @@ def test_fake_backend_cannot_be_promoted_to_live_calibration():
 
 def test_live_calibration_refresh_is_hashed_and_bound_before_execution():
     backend = StubLiveBackend()
-    preparation = prepare_live_calibration(backend, simulator_factory=local_snapshot_simulator)
+    preparation = prepare_live_calibration(backend, simulator_factory=local_replay_simulator)
 
     assert preparation.decision is Decision.PASS
     assert backend.refresh_values == [True]
@@ -75,12 +77,12 @@ def test_live_calibration_refresh_is_hashed_and_bound_before_execution():
     assert preparation.properties_last_update == "2026-08-28T23:00:00+00:00"
     assert len(preparation.calibration_snapshot_hash or "") == 64
 
-    replay = prepare_live_calibration(StubLiveBackend(), simulator_factory=local_snapshot_simulator)
+    replay = prepare_live_calibration(StubLiveBackend(), simulator_factory=local_replay_simulator)
     assert replay.calibration_snapshot_hash == preparation.calibration_snapshot_hash
 
 
 def test_local_aer_replay_preserves_frozen_contract_and_is_seed_replayable():
-    preparation = prepare_live_calibration(StubLiveBackend(), simulator_factory=local_snapshot_simulator)
+    preparation = prepare_live_calibration(StubLiveBackend(), simulator_factory=local_replay_simulator)
     adapter = LiveCalibrationAerAdapter(preparation, shots=1024, seed=369)
     contract = qex_substrate_01_contract()
 
