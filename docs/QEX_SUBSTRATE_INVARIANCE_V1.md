@@ -86,11 +86,13 @@ Topological hardware remains treated as experimental/contested unless the regist
 
 ## Pinned SDK stack
 
-The QeX SDK gate pins:
+The hardware-snapshot gate intentionally pins the documented compatible stack used by IBM's current noise-model guide rather than the newest runtime client in isolation:
 
-- qiskit 2.5.2
+- qiskit 2.5.1
 - qiskit-aer 0.17.2
-- qiskit-ibm-runtime 0.49.0
+- qiskit-ibm-runtime 0.47.0
+
+`qiskit-ibm-runtime 0.49.0` currently requires `pydantic>=2.13.0`, while this repository freezes `pydantic==2.11.7`. The QeX gate therefore fails closed on that dependency conflict instead of silently upgrading the application stack.
 
 ## Current implementation scope
 
