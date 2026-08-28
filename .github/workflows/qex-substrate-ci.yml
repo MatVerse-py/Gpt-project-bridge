@@ -1,0 +1,23 @@
+name: QeX Substrate Invariance CI
+
+on:
+  push:
+    branches: [qex/substrate-invariance-v1]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/qex_*.py'
+      - 'tests/test_qex_*.py'
+      - 'docs/QEX_SUBSTRATE_INVARIANCE_V1.md'
+      - '.github/workflows/qex-substrate-ci.yml'
+
+jobs:
+  qex-substrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: pytest -q tests/test_qex_substrate.py tests/test_qex_adapters.py
