@@ -4,13 +4,14 @@ from copy import deepcopy
 from datetime import datetime
 import hashlib
 import json
+import math
 import os
 import re
 from typing import Any
 
 from .institutional_contract import validate_projection_semantics
 from .organism_loop import constitutional_contract_hash, gate_fingerprint
-from .storage import _connect, read_ledger, verify_chain
+from .storage import _connect
 
 
 _REPOSITORY = "MatVerse-py/Gpt-project-bridge"
@@ -29,12 +30,13 @@ def _valid_unicode_string(value: str, path: str) -> None:
 
 
 def _assert_jcs_subset(value: Any, path: str = "$") -> None:
-    """Restrict v1 payloads to an interoperable RFC 8785 subset.
+    """Restrict v1 payloads to a deterministic RFC 8785-compatible subset.
 
-    Floating point values are intentionally rejected. Integers are restricted
-    to the IEEE-754 interoperable safe range. Unicode strings may not contain
-    lone UTF-16 surrogates. These restrictions remove cross-runtime ambiguity
-    while preserving normal institutional JSON data.
+    Integers are restricted to the IEEE-754 interoperable safe range. JSON
+    numbers parsed as Python floats are accepted only when finite, integral and
+    inside that same range; they canonicalize to the corresponding integer.
+    Non-integral floats remain forbidden. Unicode strings may not contain lone
+    UTF-16 surrogates.
     """
 
     if value is None or isinstance(value, bool):
@@ -47,7 +49,9 @@ def _assert_jcs_subset(value: Any, path: str = "$") -> None:
             raise ValueError(f"integer outside JCS interoperable range at {path}")
         return
     if isinstance(value, float):
-        raise ValueError(f"floating point values are not allowed in institutional v1 canonical payloads at {path}")
+        if not math.isfinite(value) or not value.is_integer() or abs(value) > _SAFE_INTEGER:
+            raise ValueError(f"non-integral or non-interoperable floating point value at {path}")
+        return
     if isinstance(value, list):
         for index, item in enumerate(value):
             _assert_jcs_subset(item, f"{path}[{index}]")
@@ -81,6 +85,8 @@ def _jcs_subset_text(value: Any) -> str:
         return _jcs_string(value)
     if isinstance(value, int) and not isinstance(value, bool):
         return str(value)
+    if isinstance(value, float):
+        return str(int(value))
     if isinstance(value, list):
         return "[" + ",".join(_jcs_subset_text(item) for item in value) + "]"
     if isinstance(value, dict):
@@ -109,18 +115,45 @@ def _build_binding() -> dict[str, str]:
     frozen_contract_hash = os.environ.get("MATVERSE_FROZEN_CONTRACT_HASH", "").lower()
     if _SHA256.fullmatch(frozen_contract_hash) is None:
         raise ProjectionUnavailable("MATVERSE_FROZEN_CONTRACT_HASH must be a lowercase SHA-256 digest")
+    build_ref = os.environ.get("MATVERSE_BUILD_REF", "main")
+    if not isinstance(build_ref, str) or not build_ref or len(build_ref) > 256:
+        raise ProjectionUnavailable("MATVERSE_BUILD_REF must be a non-empty identifier <= 256 characters")
+    _valid_unicode_string(build_ref, "MATVERSE_BUILD_REF")
     fingerprint = gate_fingerprint()
     return {
         "repository": _REPOSITORY,
         "commit_sha": commit_sha,
-        "ref": os.environ.get("MATVERSE_BUILD_REF", "main"),
+        "ref": build_ref,
         "frozen_contract_hash": frozen_contract_hash,
         "gate_fingerprint": fingerprint,
         "constitutional_contract_hash": constitutional_contract_hash(frozen_contract_hash=frozen_contract_hash),
     }
 
 
-def _list_contract_artifacts(commit_sha: str, ledger: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _read_ledger_from_connection(conn: Any) -> list[dict[str, Any]]:
+    return [dict(row) for row in conn.execute("SELECT * FROM ledger ORDER BY seq").fetchall()]
+
+
+def _verify_ledger_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    prev = "GENESIS"
+    for row in rows:
+        expected = hashlib.sha256((prev + row["event_json"] + row["decision"]).encode("utf-8")).hexdigest()
+        if row["prev_hash"] != prev or row["event_hash"] != expected:
+            return {"ok": False, "failed_seq": row["seq"]}
+        prev = row["event_hash"]
+    return {"ok": True, "events": len(rows), "head": prev}
+
+
+def _event_source_commit(event: dict[str, Any], seq: int) -> str:
+    source_commit = event.get("source_commit")
+    if not isinstance(source_commit, str) or _GIT_OBJECT_ID.fullmatch(source_commit.lower()) is None:
+        raise ProjectionUnavailable(
+            f"ledger event seq={seq} lacks immutable originating source_commit; provenance migration required"
+        )
+    return source_commit.lower()
+
+
+def _list_contract_artifacts(conn: Any, current_commit: str, ledger: list[dict[str, Any]]) -> list[dict[str, Any]]:
     receipts_by_artifact: dict[str, dict[str, str]] = {}
     for row in ledger:
         try:
@@ -131,17 +164,14 @@ def _list_contract_artifacts(commit_sha: str, ledger: list[dict[str, Any]]) -> l
             continue
         artifact_hash = event.get("artifact_hash")
         if isinstance(artifact_hash, str):
+            source_commit = _event_source_commit(event, int(row["seq"]))
             receipts_by_artifact[artifact_hash] = {
                 "evidence_id": f"ledger:{row['seq']}",
                 "receipt_hash": row["event_hash"],
-                "source_commit": commit_sha,
+                "source_commit": source_commit,
             }
 
-    conn = _connect()
-    try:
-        rows = conn.execute("SELECT artifact_hash,kind,version FROM contract_artifacts ORDER BY artifact_hash").fetchall()
-    finally:
-        conn.close()
+    rows = conn.execute("SELECT artifact_hash,kind,version FROM contract_artifacts ORDER BY artifact_hash").fetchall()
 
     projected: list[dict[str, Any]] = []
     for row in rows:
@@ -151,7 +181,7 @@ def _list_contract_artifacts(commit_sha: str, ledger: list[dict[str, Any]]) -> l
                 "artifact_id": f"contract:{row['artifact_hash']}",
                 "kind": f"contract-registry/{row['kind']}/{row['version']}",
                 "content_hash": row["artifact_hash"],
-                "source_commit": commit_sha,
+                "source_commit": evidence["source_commit"] if evidence is not None else current_commit,
                 "status": "PASS" if evidence is not None else "HOLD",
                 "evidence": [evidence] if evidence is not None else [],
             }
@@ -159,14 +189,14 @@ def _list_contract_artifacts(commit_sha: str, ledger: list[dict[str, Any]]) -> l
     return projected
 
 
-def _project_receipts(commit_sha: str, ledger: list[dict[str, Any]]) -> list[dict[str, str]]:
+def _project_receipts(current_commit: str, ledger: list[dict[str, Any]]) -> list[dict[str, str]]:
     if not ledger:
         return [
             {
                 "receipt_id": "ledger:GENESIS",
                 "receipt_hash": _genesis_commitment(),
                 "receipt_type": "LEDGER_GENESIS_COMMITMENT",
-                "source_commit": commit_sha,
+                "source_commit": current_commit,
             }
         ]
     output: list[dict[str, str]] = []
@@ -176,14 +206,14 @@ def _project_receipts(commit_sha: str, ledger: list[dict[str, Any]]) -> list[dic
             event = json.loads(row["event_json"])
             if isinstance(event.get("event_type"), str):
                 receipt_type = event["event_type"]
-        except (TypeError, json.JSONDecodeError):
-            receipt_type = "LEDGER_EVENT_UNPARSEABLE"
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ProjectionUnavailable(f"ledger event seq={row['seq']} is not parseable JSON") from exc
         output.append(
             {
                 "receipt_id": f"ledger:{row['seq']}",
                 "receipt_hash": row["event_hash"],
                 "receipt_type": receipt_type,
-                "source_commit": commit_sha,
+                "source_commit": _event_source_commit(event, int(row["seq"])),
             }
         )
     return output
@@ -195,7 +225,7 @@ def _projection_time(ledger: list[dict[str, Any]]) -> str:
             event = json.loads(row["event_json"])
         except (TypeError, json.JSONDecodeError):
             continue
-        for field in ("accepted_at", "acked_at", "created_at"):
+        for field in ("ledger_at", "accepted_at", "acked_at", "created_at"):
             value = event.get(field)
             if isinstance(value, str):
                 try:
@@ -213,13 +243,15 @@ def _projection_time(ledger: list[dict[str, Any]]) -> str:
     return "1970-01-01T00:00:00+00:00"
 
 
-def build_institutional_projection() -> dict[str, Any]:
-    chain = verify_chain()
+def build_institutional_projection_from_connection(conn: Any) -> dict[str, Any]:
+    """Build a projection from one caller-owned SQLite snapshot/transaction."""
+
+    ledger = _read_ledger_from_connection(conn)
+    chain = _verify_ledger_rows(ledger)
     if not chain.get("ok"):
         raise ProjectionUnavailable(f"canonical ledger integrity failure at seq={chain.get('failed_seq')}")
 
     source = _build_binding()
-    ledger = read_ledger()
     source_receipt = chain.get("head")
     if not isinstance(source_receipt, str) or _SHA256.fullmatch(source_receipt) is None:
         source_receipt = _genesis_commitment()
@@ -236,7 +268,7 @@ def build_institutional_projection() -> dict[str, Any]:
         "subjects": [],
         "authority_traces": [],
         "maturity": [],
-        "artifacts": _list_contract_artifacts(source["commit_sha"], ledger),
+        "artifacts": _list_contract_artifacts(conn, source["commit_sha"], ledger),
         "claims": [],
         "experiments": [],
         "relations": [],
@@ -260,3 +292,15 @@ def build_institutional_projection() -> dict[str, Any]:
     if not validation.ok:
         raise ProjectionUnavailable("generated projection failed semantic validation: " + "; ".join(validation.errors))
     return projection
+
+
+def build_institutional_projection() -> dict[str, Any]:
+    conn = _connect()
+    try:
+        # One read transaction guarantees Ledger, registry artifacts, source
+        # receipt and projection hash are observed from the same WAL snapshot.
+        conn.execute("BEGIN")
+        return build_institutional_projection_from_connection(conn)
+    finally:
+        conn.rollback()
+        conn.close()
