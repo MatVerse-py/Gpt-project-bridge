@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .institutional_projection import jcs_subset_hash
+from .institutional_projection import build_institutional_projection_from_connection, jcs_subset_hash
 from .model_bridge import assert_transferable_state
 from .storage import _append_ledger_tx, _canonical_json, _connect, _now
 
@@ -17,6 +17,7 @@ def _ensure_table(conn: Any) -> None:
         """CREATE TABLE IF NOT EXISTS institutional_intents (
             intent_id TEXT PRIMARY KEY,
             principal_id TEXT NOT NULL,
+            actor_id TEXT NOT NULL,
             requested_operation TEXT NOT NULL,
             target_kind TEXT NOT NULL,
             target_id TEXT NOT NULL,
@@ -28,12 +29,25 @@ def _ensure_table(conn: Any) -> None:
             receipt_json TEXT NOT NULL
         )"""
     )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_institutional_intents_actor ON institutional_intents(principal_id,created_at)")
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(institutional_intents)").fetchall()}
+    if "actor_id" not in columns:
+        conn.execute("ALTER TABLE institutional_intents ADD COLUMN actor_id TEXT")
+        conn.execute("UPDATE institutional_intents SET actor_id=principal_id WHERE actor_id IS NULL")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_institutional_intents_principal ON institutional_intents(principal_id,created_at,intent_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_institutional_intents_actor ON institutional_intents(actor_id,created_at,intent_id)")
 
 
-def _verify_internal_boundary(intent: dict[str, Any], principal_id: str) -> tuple[str, str, dict[str, Any], dict[str, Any], dict[str, Any], str]:
-    if intent.get("actor_id") != principal_id:
-        raise ValueError("intent actor_id must match authenticated principal")
+def _verify_internal_boundary(
+    intent: dict[str, Any],
+    principal_id: str,
+    *,
+    allow_delegated_actor: bool,
+) -> tuple[str, str, str, dict[str, Any], dict[str, Any], dict[str, Any], str]:
+    actor_id = intent.get("actor_id")
+    if not isinstance(actor_id, str) or not actor_id:
+        raise ValueError("intent actor_id missing")
+    if actor_id != principal_id and not allow_delegated_actor:
+        raise ValueError("intent actor_id must match authenticated principal unless delegated submit is authorized")
     intent_id = intent.get("intent_id")
     intent_hash = intent.get("intent_hash")
     operation = intent.get("requested_operation")
@@ -61,19 +75,46 @@ def _verify_internal_boundary(intent: dict[str, Any], principal_id: str) -> tupl
     canonical_intent.pop("intent_hash", None)
     if jcs_subset_hash(canonical_intent) != intent_hash:
         raise ValueError("intent_hash mismatch")
-    return intent_id, intent_hash, target, parameters, source, parameters_hash
+    return intent_id, intent_hash, actor_id, target, parameters, source, parameters_hash
 
 
-def persist_intent(*, intent: dict[str, Any], principal_id: str) -> dict[str, Any]:
+def _row_to_intent(row: Any) -> dict[str, Any]:
+    return {
+        "intent_id": row["intent_id"],
+        "intent_hash": row["intent_hash"],
+        "status": row["status"],
+        "principal_id": row["principal_id"],
+        "actor_id": row["actor_id"] or row["principal_id"],
+        "requested_operation": row["requested_operation"],
+        "target": {"kind": row["target_kind"], "id": row["target_id"]},
+        "parameters_hash": row["parameters_hash"],
+        "parameter_persistence": PARAMETER_PERSISTENCE,
+        "source": json.loads(row["source_json"]),
+        "created_at": row["created_at"],
+        "receipt": json.loads(row["receipt_json"]),
+        "execution_decision": "HOLD",
+    }
+
+
+def persist_intent(
+    *,
+    intent: dict[str, Any],
+    principal_id: str,
+    allow_delegated_actor: bool = False,
+) -> dict[str, Any]:
     """Persist a non-canonical intent commitment and ledger its acceptance.
 
-    Raw intent parameters are deliberately NOT stored in canonical state. Only
-    their JCS/SHA-256 commitment is persisted. A future executor must obtain the
-    operation payload again, verify the same commitment, then apply the proper
-    HDB/Omega/authorization gates before any canonical mutation or execution.
+    Freshness is revalidated *inside the same BEGIN IMMEDIATE transaction* that
+    appends the acceptance receipt. This prevents two writers from accepting
+    different intents against the same stale projection. Raw parameters are
+    never persisted; only their canonical JCS/SHA-256 commitment is retained.
     """
 
-    intent_id, intent_hash, target, _parameters, source, parameters_hash = _verify_internal_boundary(intent, principal_id)
+    intent_id, intent_hash, actor_id, target, _parameters, source, parameters_hash = _verify_internal_boundary(
+        intent,
+        principal_id,
+        allow_delegated_actor=allow_delegated_actor,
+    )
     operation = str(intent["requested_operation"])
     created_at = str(intent["created_at"])
 
@@ -83,27 +124,31 @@ def persist_intent(*, intent: dict[str, Any], principal_id: str) -> dict[str, An
         _ensure_table(conn)
         existing = conn.execute("SELECT * FROM institutional_intents WHERE intent_id=?", (intent_id,)).fetchone()
         if existing is not None:
-            if existing["intent_hash"] != intent_hash or existing["principal_id"] != principal_id:
-                raise ValueError("intent_id collision or principal mismatch")
+            if (
+                existing["intent_hash"] != intent_hash
+                or existing["principal_id"] != principal_id
+                or (existing["actor_id"] or existing["principal_id"]) != actor_id
+            ):
+                raise ValueError("intent_id collision or principal/actor mismatch")
             conn.commit()
-            return {
-                "intent_id": intent_id,
-                "intent_hash": existing["intent_hash"],
-                "status": existing["status"],
-                "principal_id": existing["principal_id"],
-                "requested_operation": existing["requested_operation"],
-                "target": {"kind": existing["target_kind"], "id": existing["target_id"]},
-                "parameters_hash": existing["parameters_hash"],
-                "parameter_persistence": PARAMETER_PERSISTENCE,
-                "created_at": existing["created_at"],
-                "receipt": json.loads(existing["receipt_json"]),
-                "idempotent": True,
-                "execution_decision": "HOLD",
-            }
+            result = _row_to_intent(existing)
+            result["idempotent"] = True
+            return result
 
         collision = conn.execute("SELECT intent_id FROM institutional_intents WHERE intent_hash=?", (intent_hash,)).fetchone()
         if collision is not None:
             raise ValueError("intent_hash already registered under a different intent_id")
+
+        current_projection = build_institutional_projection_from_connection(conn)
+        expected_source = {
+            **current_projection["source"],
+            "projection_hash": current_projection["projection"]["projection_hash"],
+        }
+        if source != expected_source:
+            raise ValueError(
+                "intent source binding became stale before persistence; "
+                f"current_projection_hash={current_projection['projection']['projection_hash']}"
+            )
 
         event = {
             "event_type": "INSTITUTIONAL_INTENT_ACCEPTED",
@@ -115,6 +160,7 @@ def persist_intent(*, intent: dict[str, Any], principal_id: str) -> dict[str, An
             "parameters_hash": parameters_hash,
             "parameter_persistence": PARAMETER_PERSISTENCE,
             "principal_id": principal_id,
+            "actor_id": actor_id,
             "projection_hash": source["projection_hash"],
             "source_commit": source["commit_sha"],
             "created_at": created_at,
@@ -124,10 +170,11 @@ def persist_intent(*, intent: dict[str, Any], principal_id: str) -> dict[str, An
         }
         receipt = _append_ledger_tx(conn, event, "PASS")
         conn.execute(
-            "INSERT INTO institutional_intents(intent_id,principal_id,requested_operation,target_kind,target_id,parameters_hash,source_json,intent_hash,status,created_at,receipt_json) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO institutional_intents(intent_id,principal_id,actor_id,requested_operation,target_kind,target_id,parameters_hash,source_json,intent_hash,status,created_at,receipt_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 intent_id,
                 principal_id,
+                actor_id,
                 operation,
                 target["kind"],
                 target["id"],
@@ -145,10 +192,12 @@ def persist_intent(*, intent: dict[str, Any], principal_id: str) -> dict[str, An
             "intent_hash": intent_hash,
             "status": INTENT_STATUS,
             "principal_id": principal_id,
+            "actor_id": actor_id,
             "requested_operation": operation,
             "target": dict(target),
             "parameters_hash": parameters_hash,
             "parameter_persistence": PARAMETER_PERSISTENCE,
+            "source": dict(source),
             "created_at": created_at,
             "receipt": receipt,
             "idempotent": False,
@@ -168,29 +217,26 @@ def get_intent(intent_id: str) -> dict[str, Any] | None:
         row = conn.execute("SELECT * FROM institutional_intents WHERE intent_id=?", (intent_id,)).fetchone()
         if row is None:
             return None
-        return {
-            "intent_id": row["intent_id"],
-            "intent_hash": row["intent_hash"],
-            "status": row["status"],
-            "principal_id": row["principal_id"],
-            "requested_operation": row["requested_operation"],
-            "target": {"kind": row["target_kind"], "id": row["target_id"]},
-            "parameters_hash": row["parameters_hash"],
-            "parameter_persistence": PARAMETER_PERSISTENCE,
-            "source": json.loads(row["source_json"]),
-            "created_at": row["created_at"],
-            "receipt": json.loads(row["receipt_json"]),
-            "execution_decision": "HOLD",
-        }
+        return _row_to_intent(row)
     finally:
         conn.close()
 
 
-def list_intents_for_principal(principal_id: str) -> list[dict[str, Any]]:
+def list_intents_for_principal(principal_id: str, *, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+    if not 1 <= limit <= 200:
+        raise ValueError("limit must be between 1 and 200")
+    if offset < 0:
+        raise ValueError("offset must be >= 0")
     conn = _connect()
     try:
         _ensure_table(conn)
-        rows = conn.execute("SELECT intent_id FROM institutional_intents WHERE principal_id=? ORDER BY created_at,intent_id", (principal_id,)).fetchall()
+        rows = conn.execute(
+            """SELECT * FROM institutional_intents
+               WHERE principal_id=? OR actor_id=?
+               ORDER BY created_at,intent_id
+               LIMIT ? OFFSET ?""",
+            (principal_id, principal_id, limit, offset),
+        ).fetchall()
+        return [_row_to_intent(row) for row in rows]
     finally:
         conn.close()
-    return [item for row in rows if (item := get_intent(row["intent_id"])) is not None]
