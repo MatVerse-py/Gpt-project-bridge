@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -13,6 +14,7 @@ from .model_bridge import build_handoff_digest
 
 DB_PATH = Path(os.environ.get("MATVERSE_DB", "matverse.db"))
 CONTRACT_KINDS = {"ontology", "policy", "task", "rubric", "memory_policy"}
+_GIT_OBJECT_ID = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 
 
 def _now() -> str:
@@ -67,9 +69,29 @@ def consume_auth_nonce(principal_id: str, nonce: str, expires_at: int) -> bool:
 
 
 def _append_ledger_tx(conn: sqlite3.Connection, event: dict[str, Any], decision: str) -> dict[str, Any]:
+    """Append one hash-chained event with immutable operational provenance.
+
+    `ledger_at` is injected into the hashed event so every canonical append has
+    a monotonic observation timestamp for projections. When a real deployment
+    commit is provisioned, `source_commit` is also injected into the hashed
+    event. A caller-supplied source commit must itself be a valid Git object id.
+    """
+
+    event_to_store = dict(event)
+    event_to_store.setdefault("ledger_at", _now())
+
+    configured_commit = os.environ.get("MATVERSE_BUILD_COMMIT", "").lower()
+    supplied_commit = event_to_store.get("source_commit")
+    if supplied_commit is not None:
+        if not isinstance(supplied_commit, str) or _GIT_OBJECT_ID.fullmatch(supplied_commit.lower()) is None:
+            raise ValueError("event source_commit must be a 40- or 64-character Git object id")
+        event_to_store["source_commit"] = supplied_commit.lower()
+    elif _GIT_OBJECT_ID.fullmatch(configured_commit) is not None:
+        event_to_store["source_commit"] = configured_commit
+
     last = conn.execute("SELECT event_hash FROM ledger ORDER BY seq DESC LIMIT 1").fetchone()
     prev_hash = last["event_hash"] if last else "GENESIS"
-    payload = _canonical_json(event)
+    payload = _canonical_json(event_to_store)
     event_hash = sha256((prev_hash + payload + decision).encode("utf-8")).hexdigest()
     cur = conn.execute("INSERT INTO ledger(prev_hash,event_hash,event_json,decision) VALUES (?,?,?,?)", (prev_hash, event_hash, payload, decision))
     return {"seq": cur.lastrowid, "prev_hash": prev_hash, "event_hash": event_hash, "decision": decision}

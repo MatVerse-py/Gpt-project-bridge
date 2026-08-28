@@ -1,0 +1,74 @@
+{
+  "schema_version": "matverse.institutional-http-contract.v1",
+  "protocol_version": "matverse.institutional-http.v1",
+  "authentication": {
+    "method": "HMAC-SHA256",
+    "request_headers": [
+      "X-MatVerse-Principal",
+      "X-MatVerse-Timestamp",
+      "X-MatVerse-Nonce",
+      "X-MatVerse-Content-SHA256",
+      "X-MatVerse-Signature"
+    ],
+    "signing_payload": "METHOD\\nPATH\\nTIMESTAMP\\nNONCE\\nCONTENT_SHA256",
+    "body_hash": "SHA-256 over exact HTTP request body bytes",
+    "timestamp_window_seconds": 300,
+    "nonce_replay": "REJECT"
+  },
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/institutional/runtime",
+      "capability": "institutional:projection:read",
+      "purpose": "observable runtimeId, authenticated principal and canonical source binding"
+    },
+    {
+      "method": "GET",
+      "path": "/institutional/projection",
+      "capability": "institutional:projection:read",
+      "response_schema": "matverse.institutional-surface.v1"
+    },
+    {
+      "method": "POST",
+      "path": "/institutional/intents",
+      "capability": "institutional:intent:submit",
+      "request_schema": "matverse.institutional-intent.v1",
+      "acceptance_boundary": {
+        "acceptance_decision": "PASS",
+        "execution_decision": "HOLD",
+        "status": "PENDING_EVALUATION"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/institutional/intents/{intent_id}",
+      "capability": "institutional:intent:read"
+    },
+    {
+      "method": "GET",
+      "path": "/institutional/intents",
+      "capability": "institutional:intent:read"
+    }
+  ],
+  "canonicalization": {
+    "name": "RFC8785_JCS",
+    "subset": "null,bool,unicode-string-without-lone-surrogates,safe-integer,array,object",
+    "object_key_order": "UTF-16 code units",
+    "floats": "REJECT",
+    "integer_range": [-9007199254740991, 9007199254740991]
+  },
+  "authority": {
+    "surface_write_authority": "NONE",
+    "intent_acceptance_is_execution": false,
+    "callback_receipt_endpoint": null,
+    "result_observation": "poll canonical projection and actor-scoped intent state until an operation-specific executor exists"
+  },
+  "deployment_requirements": [
+    "MATVERSE_RUNTIME_ID",
+    "MATVERSE_DB",
+    "MATVERSE_PRINCIPALS_JSON",
+    "MATVERSE_BUILD_COMMIT",
+    "MATVERSE_BUILD_REF",
+    "MATVERSE_FROZEN_CONTRACT_HASH"
+  ]
+}

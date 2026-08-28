@@ -14,7 +14,23 @@
         "REGISTER_ARTIFACT",
         "REGISTER_CLAIM",
         "REGISTER_EVIDENCE",
+        "VALIDATE_EVIDENCE",
         "REGISTER_RELATION",
+        "REGISTER_ACTOR",
+        "ASSIGN_AUTHORITY",
+        "REGISTER_METRIC",
+        "REGISTER_INVENTORY_ITEM",
+        "REGISTER_GAP",
+        "EVALUATE_MATURITY_GATE",
+        "VERIFY_IDENTIFIER",
+        "REGISTER_TWIN_FINDING",
+        "REGISTER_COUNTEREXAMPLE",
+        "REQUEST_REPRODUCTION",
+        "REQUEST_POLICY_REVIEW",
+        "REQUEST_REPLAY_CHECK",
+        "REQUEST_REGRESSION_FORMALIZATION",
+        "REQUEST_BENCHMARK",
+        "RESOLVE_FINDING",
         "REQUEST_MATURITY_EVALUATION",
         "REQUEST_EXTERNAL_REPRODUCTION",
         "REQUEST_WORLD_REAL_EVALUATION",
@@ -30,11 +46,14 @@
       "additionalProperties": false,
       "required": ["kind", "id"],
       "properties": {
-        "kind": {"enum": ["SYSTEM", "SUBJECT", "ARTIFACT", "CLAIM", "EXPERIMENT", "RELATION", "MATURITY", "OTHER"]},
+        "kind": {"enum": ["SYSTEM", "SUBJECT", "ACTOR", "ARTIFACT", "CLAIM", "EVIDENCE", "EXPERIMENT", "RELATION", "METRIC", "GAP", "TWIN", "LIVING_UNIT", "MATURITY", "OTHER"]},
         "id": {"type": "string", "minLength": 1, "maxLength": 256}
       }
     },
-    "parameters": {"type": "object"},
+    "parameters": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/jcsValue"}
+    },
     "created_at": {"type": "string", "format": "date-time"},
     "source": {"$ref": "#/$defs/sourceBinding"},
     "intent_hash": {"$ref": "#/$defs/sha256"},
@@ -46,6 +65,16 @@
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "gitObjectId": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
     "identifier": {"type": "string", "minLength": 1, "maxLength": 256},
+    "jcsValue": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "boolean"},
+        {"type": "string"},
+        {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991},
+        {"type": "array", "items": {"$ref": "#/$defs/jcsValue"}},
+        {"type": "object", "additionalProperties": {"$ref": "#/$defs/jcsValue"}}
+      ]
+    },
     "sourceBinding": {
       "type": "object",
       "additionalProperties": false,
