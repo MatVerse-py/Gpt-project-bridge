@@ -81,11 +81,39 @@ CI uses dependency-injected compiler and Sampler/job doubles. Therefore it can p
 Current epistemic state:
 
 - L4 architecture: IMPLEMENTED
-- L4 explicit resource authorization: IMPLEMENTED
-- L4 calibration/authorization evidence binding: IMPLEMENTED
-- L4 dependency-injected submission/result contract: subject to CI gate
+- L4 explicit resource authorization: PASS_OBSERVED
+- L4 calibration/authorization evidence binding: PASS_OBSERVED
+- L4 dependency-injected submission/result contract: PASS_OBSERVED
 - authenticated physical QPU job: HOLD / NOT_OBSERVED
 - physical job ID from a real provider: NOT_OBSERVED
+
+## Governed IBM Runtime entrypoint
+
+`app/qex_ibm_runtime_entrypoint.py` is the operational boundary for a real provider account. It resolves either a named backend through `QiskitRuntimeService.backend(...)` or the least-busy operational non-simulator backend through `least_busy(min_num_qubits=1, operational=True, simulator=False)`.
+
+Credential handling is deliberately external to the repository:
+
+- an already saved Qiskit Runtime account may be used;
+- `IBM_QUANTUM_API_KEY` may be supplied in the process environment;
+- `IBM_QUANTUM_INSTANCE`, `IBM_QUANTUM_BACKEND`, and `IBM_QUANTUM_CHANNEL` may optionally select instance/backend/channel;
+- no token is accepted as a CLI flag and no token is included in public output/evidence.
+
+The default channel is `ibm_quantum_platform`, matching the pinned Runtime 0.47 API. A real resource-consuming execution requires two independent operator signals: `--execute` and `--allow-resource-consumption`. Omitting either leaves the run in HOLD and no sampler job is submitted.
+
+Example invocation after authentication is configured outside the repository:
+
+```bash
+python -m app.qex_ibm_runtime_entrypoint \
+  --authority MATVERSE_OPERATOR \
+  --purpose "QEX-SUBSTRATE-01 governed physical validation" \
+  --backend <physical-backend-name> \
+  --shots 128 \
+  --bit 0 \
+  --execute \
+  --allow-resource-consumption
+```
+
+A PASS at `PHYSICAL_RESULT_OBSERVED` is allowed only after the adapter receives a provider result and records `job_id`, raw counts, calibration snapshot hash, ISA-circuit hash, authorization hash, receipt hash, and usage/job-metric hashes. Before that point the physical claim remains HOLD / NOT_OBSERVED.
 
 ## Scientific boundary
 
@@ -126,6 +154,9 @@ Implemented:
 - explicit physical resource authorization object
 - physical SamplerV2 adapter with ISA-circuit hashing
 - raw-count/job/usage evidence binding
+- governed IBM Runtime backend resolver/CLI entrypoint
+- dual physical-consumption gate (`--execute` + `--allow-resource-consumption`)
+- token exclusion from CLI/public output
 - TVD divergence metric
 - cross-substrate canonical comparator
 - dedicated GitHub Actions gate
