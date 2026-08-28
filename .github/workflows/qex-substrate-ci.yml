@@ -21,4 +21,4 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements-qex-sdk.txt
-      - run: pytest -q tests/test_qex_substrate.py tests/test_qex_adapters.py tests/test_qex_qiskit_adapter.py tests/test_qex_noisy_adapter.py tests/test_qex_hardware_noise_adapter.py tests/test_qex_live_calibration_adapter.py tests/test_qex_physical_qpu_adapter.py
+      - run: pytest -q tests/test_qex_substrate.py tests/test_qex_adapters.py tests/test_qex_qiskit_adapter.py tests/test_qex_noisy_adapter.py tests/test_qex_hardware_noise_adapter.py tests/test_qex_live_calibration_adapter.py tests/test_qex_physical_qpu_adapter.py tests/test_qex_ibm_runtime_entrypoint.py
