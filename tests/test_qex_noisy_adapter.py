@@ -1,24 +1,11 @@
-from app.core import stable_hash
 from app.qex_adapters import IdealStatevectorNotAdapter
+from app.qex_experiment import qex_substrate_01_contract
 from app.qex_noisy_adapter import ControlledBitFlipNoiseNotAdapter, total_variation_distance
-from app.qex_substrate import ComparisonStatus, ExperimentContract, compare_substrate_results
+from app.qex_substrate import ComparisonStatus, compare_substrate_results
 
 
-def contract() -> ExperimentContract:
-    return ExperimentContract(
-        experiment_id="QEX-SUBSTRATE-01",
-        problem_hash=stable_hash({"problem": "NOT", "domain": "bit"}),
-        objective="preserve experiment identity while changing computational substrate",
-        required_capabilities=("bit_not",),
-        metric_schema_hash=stable_hash({"metrics": ["probability_0", "probability_1", "tvd"]}),
-        observable_schema_hash=stable_hash({"observables": ["result"]}),
-        evidence_policy_hash=stable_hash({"policy": "evidence-v1"}),
-        require_classical_baseline=True,
-    )
-
-
-def test_noise_preserves_hard_identity_but_changes_distribution():
-    c = contract()
+def test_noise_preserves_frozen_contract_but_changes_distribution():
+    c = qex_substrate_01_contract()
     ideal = IdealStatevectorNotAdapter().execute(c, {"bit": 0})
     noisy = ControlledBitFlipNoiseNotAdapter(0.05).execute(c, {"bit": 0})
 
@@ -38,11 +25,12 @@ def test_noise_preserves_hard_identity_but_changes_distribution():
         numeric_tolerances={"probability_0": 0.05, "probability_1": 0.05},
     )
     assert status is ComparisonStatus.WITHIN_TOLERANCE
+    assert ideal.contract_hash == noisy.contract_hash == c.contract_hash
     assert abs(total_variation_distance(ideal.canonical_observable(), noisy.canonical_observable()) - 0.05) < 1e-12
 
 
 def test_noise_exceeding_tolerance_is_divergent():
-    c = contract()
+    c = qex_substrate_01_contract()
     ideal = IdealStatevectorNotAdapter().execute(c, {"bit": 1})
     noisy = ControlledBitFlipNoiseNotAdapter(0.10).execute(c, {"bit": 1})
 
