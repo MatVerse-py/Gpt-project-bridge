@@ -1,0 +1,244 @@
+name: Live HTTPS controlled-pilot demo
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/live-https-demo.yml'
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  live-https-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      IMAGE: ghcr.io/matverse-py/matverse-trust-runtime@sha256:81019266a6bd2df3149a3c7e4e1f080904c2d1bee2d38dab4813b20d868078a3
+      IMAGE_SOURCE_COMMIT: 0668a1ace8cdb7ce1ec05d3f08047ba728f3dc54
+      FROZEN_CONTRACT_HASH: 67743cbe1f4d65983348401d2061e46dec22d57e232854ff263e1d646f600b26
+      DEMO_PRINCIPAL: live-https-demo-principal
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run public HTTPS signed-call demo
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/matverse-live-demo" evidence/live-https-demo
+
+          DEMO_SECRET="$(openssl rand -hex 32)"
+          echo "::add-mask::$DEMO_SECRET"
+          export DEMO_SECRET
+          PRINCIPALS_JSON="$(python - <<'PY'
+          import json, os
+          print(json.dumps({os.environ['DEMO_PRINCIPAL']:{
+              'secret': os.environ['DEMO_SECRET'],
+              'capabilities': [
+                  'institutional:projection:read',
+                  'institutional:intent:submit',
+                  'institutional:intent:read'
+              ]
+          }}, separators=(',', ':')))
+          PY
+          )"
+
+          docker pull "$IMAGE"
+          docker run -d --name matverse-live-demo \
+            -p 127.0.0.1:8000:8000 \
+            -v "$RUNNER_TEMP/matverse-live-demo:/data" \
+            -e MATVERSE_RUNTIME_ID="matverse-live-https-demo-${GITHUB_RUN_ID}" \
+            -e MATVERSE_BUILD_COMMIT="$IMAGE_SOURCE_COMMIT" \
+            -e MATVERSE_BUILD_REF="main@$IMAGE_SOURCE_COMMIT" \
+            -e MATVERSE_FROZEN_CONTRACT_HASH="$FROZEN_CONTRACT_HASH" \
+            -e MATVERSE_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -e MATVERSE_PRINCIPALS_JSON="$PRINCIPALS_JSON" \
+            -e MATVERSE_DB=/data/live-https-demo.db \
+            "$IMAGE"
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health >/tmp/matverse-health.json; then break; fi
+            sleep 1
+          done
+          cat /tmp/matverse-health.json
+
+          docker run -d --name matverse-cloudflared --network host \
+            cloudflare/cloudflared:latest tunnel --no-autoupdate --url http://127.0.0.1:8000
+
+          TUNNEL_URL=""
+          for i in $(seq 1 60); do
+            TUNNEL_URL="$(docker logs matverse-cloudflared 2>&1 | grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' | tail -n1 || true)"
+            if [ -n "$TUNNEL_URL" ]; then break; fi
+            sleep 1
+          done
+          if [ -z "$TUNNEL_URL" ]; then
+            docker logs matverse-cloudflared
+            echo 'No public HTTPS tunnel URL obtained' >&2
+            exit 1
+          fi
+          echo "Public HTTPS tunnel established for synthetic demo"
+          export TUNNEL_URL
+
+          python - <<'PY'
+          from __future__ import annotations
+          from datetime import datetime, timezone
+          import hashlib, hmac, json, os, secrets, time
+          from pathlib import Path
+          from urllib.request import Request, urlopen
+
+          base = os.environ['TUNNEL_URL'].rstrip('/')
+          principal = os.environ['DEMO_PRINCIPAL']
+          secret = os.environ['DEMO_SECRET']
+
+          def jcs_text(value):
+              if value is None: return 'null'
+              if value is True: return 'true'
+              if value is False: return 'false'
+              if isinstance(value, str): return json.dumps(value, ensure_ascii=False, allow_nan=False)
+              if isinstance(value, int) and not isinstance(value, bool): return str(value)
+              if isinstance(value, list): return '[' + ','.join(jcs_text(v) for v in value) + ']'
+              if isinstance(value, dict):
+                  keys = sorted(value, key=lambda k: k.encode('utf-16be'))
+                  return '{' + ','.join(json.dumps(k, ensure_ascii=False) + ':' + jcs_text(value[k]) for k in keys) + '}'
+              raise TypeError(type(value).__name__)
+
+          def jcs_hash(value):
+              return hashlib.sha256(jcs_text(value).encode('utf-8')).hexdigest()
+
+          def call(method, path, payload=None):
+              body = b'' if payload is None else json.dumps(payload, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
+              ts = str(int(time.time()))
+              nonce = secrets.token_hex(16)
+              content_hash = hashlib.sha256(body).hexdigest()
+              signing = '\n'.join([method.upper(), path, ts, nonce, content_hash]).encode('utf-8')
+              sig = hmac.new(secret.encode('utf-8'), signing, hashlib.sha256).hexdigest()
+              headers = {
+                  'X-MatVerse-Principal': principal,
+                  'X-MatVerse-Timestamp': ts,
+                  'X-MatVerse-Nonce': nonce,
+                  'X-MatVerse-Content-SHA256': content_hash,
+                  'X-MatVerse-Signature': sig,
+              }
+              if payload is not None:
+                  headers['Content-Type'] = 'application/json'
+              req = Request(base + path, data=(body if payload is not None else None), headers=headers, method=method)
+              with urlopen(req, timeout=30) as res:
+                  return res.status, json.loads(res.read().decode('utf-8'))
+
+          health_req = Request(base + '/health', method='GET')
+          with urlopen(health_req, timeout=30) as res:
+              health_status = res.status
+              health = json.loads(res.read().decode('utf-8'))
+
+          runtime_status, runtime = call('GET', '/institutional/runtime')
+          projection_status, projection = call('GET', '/institutional/projection')
+          source = {**projection['source'], 'projection_hash': projection['projection']['projection_hash']}
+          intent = {
+              'schema_version': 'matverse.institutional-intent.v1',
+              'intent_id': f'live-https-demo-{os.environ["GITHUB_RUN_ID"]}',
+              'requested_operation': 'REQUEST_AUTHORIZATION',
+              'actor_id': principal,
+              'target': {'kind': 'SYSTEM', 'id': 'public-https-demo-agent'},
+              'parameters': {
+                  'action_class': 'DOCUMENT_EXPORT',
+                  'approval_mode': 'HUMAN_REQUIRED',
+                  'resource': 'synthetic-demo/document-001',
+                  'scope': 'SANDBOX_ONLY',
+              },
+              'created_at': datetime.now(timezone.utc).isoformat(),
+              'source': source,
+              'hash_algorithm': 'SHA-256',
+              'canonicalization': 'RFC8785_JCS',
+              'hash_excludes': ['intent_hash'],
+          }
+          intent['intent_hash'] = jcs_hash(intent)
+          intent_status, accepted = call('POST', '/institutional/intents', intent)
+
+          observed = (accepted.get('acceptance_decision'), accepted.get('execution_decision'), accepted.get('status'))
+          expected = ('PASS', 'HOLD', 'PENDING_EVALUATION')
+          if health_status != 200 or runtime_status != 200 or projection_status != 200 or intent_status != 200 or observed != expected:
+              raise SystemExit(f'live HTTPS demo gate failed: statuses={(health_status,runtime_status,projection_status,intent_status)} observed={observed}')
+
+          pack = {
+              'schema_version': 'matverse.live-https-demo-evidence.v1',
+              'scope': 'PUBLIC_HTTPS_EPHEMERAL_SYNTHETIC_NOT_CUSTOMER_NOT_PERSISTENT_HOST',
+              'generated_at': datetime.now(timezone.utc).isoformat(),
+              'network': {
+                  'transport': 'HTTPS',
+                  'public_tunnel_provider': 'Cloudflare Quick Tunnel',
+                  'public_url_ephemeral': base,
+                  'health_status': health_status,
+              },
+              'image': {
+                  'reference': os.environ['IMAGE'],
+                  'source_commit': os.environ['IMAGE_SOURCE_COMMIT'],
+              },
+              'runtime': {
+                  'http_status': runtime_status,
+                  'runtime_id': runtime.get('runtime_id'),
+                  'protocol_version': runtime.get('protocol_version'),
+                  'authenticated_principal_id': runtime.get('authenticated_principal_id'),
+                  'status': runtime.get('status'),
+                  'intent_execution': runtime.get('intent_execution'),
+                  'source': runtime.get('source'),
+                  'projection_hash': runtime.get('projection_hash'),
+              },
+              'intent': {
+                  'http_status': intent_status,
+                  'intent_id': intent['intent_id'],
+                  'intent_hash': intent['intent_hash'],
+                  'acceptance_decision': accepted.get('acceptance_decision'),
+                  'execution_decision': accepted.get('execution_decision'),
+                  'status': accepted.get('status'),
+                  'parameters_hash': accepted.get('parameters_hash'),
+                  'receipt': accepted.get('receipt'),
+              },
+              'promotion': {
+                  'CONTAINER_DISTRIBUTION': 'PASS',
+                  'PUBLIC_HTTPS_NETWORK_PATH': 'PASS',
+                  'SIGNED_EXTERNAL_URL_ROUNDTRIP': 'PASS',
+                  'LIVE_HTTPS_DEMO': 'PASS',
+                  'PAID_PERSISTENT_PILOT': 'HOLD',
+                  'EXTERNAL_PASS': 'HOLD',
+                  'WORLD_REAL_PASS': 'HOLD',
+              },
+              'holds': [
+                  'Quick Tunnel is ephemeral and not a production host.',
+                  'Storage exists only for the GitHub Actions job lifetime.',
+                  'Principal and secret are synthetic and destroyed after the job.',
+                  'This is not an independent external-domain reproduction.',
+                  'This does not establish unrestricted production readiness.',
+              ],
+          }
+          out = Path('evidence/live-https-demo/EVIDENCE_PACK.json')
+          out.write_text(json.dumps(pack, indent=2, sort_keys=True, ensure_ascii=False) + '\n', encoding='utf-8')
+          digest = hashlib.sha256(out.read_bytes()).hexdigest()
+          Path('evidence/live-https-demo/EVIDENCE_PACK.sha256').write_text(digest + '  EVIDENCE_PACK.json\n', encoding='utf-8')
+          print(json.dumps(pack['promotion'], sort_keys=True))
+          print('evidence_sha256=' + digest)
+          PY
+
+      - name: Upload live HTTPS demo evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matverse-live-https-demo-evidence
+          path: evidence/live-https-demo/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f matverse-cloudflared >/dev/null 2>&1 || true
+          docker rm -f matverse-live-demo >/dev/null 2>&1 || true
