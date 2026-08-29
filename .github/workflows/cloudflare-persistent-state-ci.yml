@@ -1,0 +1,48 @@
+name: Cloudflare persistent institutional state CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/auth.py'
+      - 'app/institutional_projection.py'
+      - 'app/institutional_state_client.py'
+      - 'app/institutional_store.py'
+      - 'deploy/cloudflare/**'
+      - 'tests/test_institutional_state_client.py'
+      - '.github/workflows/cloudflare-persistent-state-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+
+  cloudflare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: deploy/cloudflare
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: deploy/cloudflare/package-lock.json
+      - run: npm install --package-lock-only
+      - run: npm ci
+      - run: npm run check
+      - run: npx wrangler deploy --dry-run
