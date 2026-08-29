@@ -134,7 +134,7 @@ def phase_create(checkpoint_path: Path, evidence_path: Path) -> None:
             {
                 "gate": "CLOUDFLARE_DURABLE_RESTART_LOCAL",
                 "phase": "PRE_RESTART",
-                "status": "PASS",
+                "status": "PENDING_RESTART_VERIFICATION",
                 **checkpoint,
             },
             sort_keys=True,
