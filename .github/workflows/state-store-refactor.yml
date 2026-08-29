@@ -1,0 +1,126 @@
+name: State store refactor
+
+on:
+  push:
+    branches: [production/state-store-v1]
+    paths:
+      - '.github/workflows/state-store-refactor.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: production/state-store-v1
+
+      - name: Introduce transactional state-store boundary
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          state_store = '''from __future__ import annotations
+
+import os
+import sqlite3
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Protocol
+
+
+class StateStoreConfigurationError(RuntimeError):
+    pass
+
+
+class TransactionalStateStore(Protocol):
+    backend_name: str
+    transaction_model: str
+    persistence_scope: str
+
+    def connect(self) -> sqlite3.Connection: ...
+
+
+@dataclass(frozen=True)
+class SQLiteStateStore:
+    path: Path
+    backend_name: str = "sqlite"
+    transaction_model: str = "SQLITE_BEGIN_IMMEDIATE"
+    persistence_scope: str = "HOST_FILESYSTEM_BOUND"
+
+    def connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.path, timeout=30.0)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("PRAGMA busy_timeout=30000")
+        conn.execute("CREATE TABLE IF NOT EXISTS ledger (seq INTEGER PRIMARY KEY AUTOINCREMENT, prev_hash TEXT NOT NULL, event_hash TEXT NOT NULL UNIQUE, event_json TEXT NOT NULL, decision TEXT NOT NULL)")
+        conn.execute("CREATE TABLE IF NOT EXISTS auth_nonces (principal_id TEXT NOT NULL, nonce TEXT NOT NULL, expires_at INTEGER NOT NULL, PRIMARY KEY(principal_id,nonce))")
+        conn.execute("CREATE TABLE IF NOT EXISTS contract_artifacts (artifact_hash TEXT PRIMARY KEY, kind TEXT NOT NULL, version TEXT NOT NULL, content_json TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL)")
+        conn.execute("CREATE TABLE IF NOT EXISTS model_sessions (session_id TEXT PRIMARY KEY, protocol_version TEXT NOT NULL, contract_json TEXT NOT NULL, contract_hash TEXT NOT NULL, participants_json TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL)")
+        session_columns = {row[1] for row in conn.execute("PRAGMA table_info(model_sessions)").fetchall()}
+        if "created_by" not in session_columns:
+            conn.execute("ALTER TABLE model_sessions ADD COLUMN created_by TEXT NOT NULL DEFAULT 'legacy'")
+        conn.execute("""CREATE TABLE IF NOT EXISTS model_handoffs (
+            handoff_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, session_seq INTEGER NOT NULL,
+            from_participant TEXT NOT NULL, to_participant TEXT NOT NULL, parent_handoff_id TEXT,
+            payload_json TEXT NOT NULL, payload_hash TEXT NOT NULL, contract_hash TEXT NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('PENDING','ACKED')), created_at TEXT NOT NULL, acked_at TEXT,
+            FOREIGN KEY(session_id) REFERENCES model_sessions(session_id),
+            FOREIGN KEY(parent_handoff_id) REFERENCES model_handoffs(handoff_id),
+            UNIQUE(session_id,session_seq), UNIQUE(session_id,payload_hash)
+        )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_model_handoffs_inbox ON model_handoffs(session_id,to_participant,status,session_seq)")
+        conn.commit()
+        return conn
+
+
+def resolve_transactional_state_store(path: Path) -> TransactionalStateStore:
+    backend = os.environ.get("MATVERSE_STATE_BACKEND", "sqlite").strip().lower()
+    if backend == "sqlite":
+        return SQLiteStateStore(Path(path))
+    raise StateStoreConfigurationError(
+        f"unsupported MATVERSE_STATE_BACKEND={backend!r}; fail-closed until an atomic compatible backend is implemented"
+    )
+
+
+def describe_state_store(path: Path) -> dict[str, str]:
+    store = resolve_transactional_state_store(path)
+    return {
+        "backend": store.backend_name,
+        "transaction_model": store.transaction_model,
+        "persistence_scope": store.persistence_scope,
+    }
+'''
+          Path('app/state_store.py').write_text(state_store, encoding='utf-8')
+
+          p = Path('app/storage.py')
+          text = p.read_text(encoding='utf-8')
+          import_anchor = 'from .model_bridge import build_handoff_digest\n'
+          if 'from .state_store import resolve_transactional_state_store' not in text:
+              text = text.replace(import_anchor, import_anchor + 'from .state_store import resolve_transactional_state_store\n', 1)
+          start = text.index('def _connect() -> sqlite3.Connection:\n')
+          end = text.index('\n\ndef consume_auth_nonce', start)
+          replacement = '''def _connect() -> sqlite3.Connection:\n    # All canonical SQL users share one selected transactional backend.\n    # Backend selection is fail-closed so production cannot silently fall back\n    # to an ephemeral store. DB_PATH remains injectable for existing tests.\n    return resolve_transactional_state_store(DB_PATH).connect()\n'''
+          text = text[:start] + replacement + text[end:]
+          p.write_text(text, encoding='utf-8')
+
+          tests = '''from pathlib import Path\n\nimport pytest\n\nfrom app import storage\nfrom app.state_store import (\n    SQLiteStateStore,\n    StateStoreConfigurationError,\n    describe_state_store,\n    resolve_transactional_state_store,\n)\n\n\ndef test_default_backend_is_sqlite_and_filesystem_bound(tmp_path, monkeypatch):\n    monkeypatch.delenv("MATVERSE_STATE_BACKEND", raising=False)\n    db = tmp_path / "state.db"\n    store = resolve_transactional_state_store(db)\n    assert isinstance(store, SQLiteStateStore)\n    assert store.path == db\n    assert describe_state_store(db) == {\n        "backend": "sqlite",\n        "transaction_model": "SQLITE_BEGIN_IMMEDIATE",\n        "persistence_scope": "HOST_FILESYSTEM_BOUND",\n    }\n\n\ndef test_unknown_backend_fails_closed(tmp_path, monkeypatch):\n    monkeypatch.setenv("MATVERSE_STATE_BACKEND", "durable-object")\n    with pytest.raises(StateStoreConfigurationError, match="fail-closed"):\n        resolve_transactional_state_store(tmp_path / "state.db")\n\n\ndef test_storage_db_path_injection_is_preserved(tmp_path, monkeypatch):\n    monkeypatch.delenv("MATVERSE_STATE_BACKEND", raising=False)\n    db = tmp_path / "injected.db"\n    monkeypatch.setattr(storage, "DB_PATH", db)\n    conn = storage._connect()\n    try:\n        row = conn.execute("PRAGMA database_list").fetchone()\n        assert Path(row[2]) == db\n        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}\n        assert {"ledger", "auth_nonces", "contract_artifacts", "model_sessions", "model_handoffs"} <= tables\n    finally:\n        conn.close()\n'''
+          Path('tests/test_state_store.py').write_text(tests, encoding='utf-8')
+          PY
+
+      - name: Run full regression
+        run: pytest -q
+
+      - name: Commit refactor only after green suite
+        shell: bash
+        run: |
+          git config user.name "MatVerse CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add app/state_store.py app/storage.py tests/test_state_store.py
+          git commit -m "Introduce fail-closed transactional state store boundary"
+          git push origin HEAD:production/state-store-v1
