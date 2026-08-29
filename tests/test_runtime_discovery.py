@@ -5,7 +5,7 @@ from typing import Any
 from app.runtime_discovery import DiscoveryConfig, RuntimeState, discover_runtime_capabilities
 
 
-def _binary_map(mapping: dict[str, tuple[str, str]]) :
+def _binary_map(mapping: dict[str, tuple[str, str]]):
     def probe(candidates: tuple[str, ...]) -> tuple[str | None, str | None, str]:
         for candidate in candidates:
             if candidate in mapping:
@@ -34,7 +34,10 @@ def test_ollama_api_and_model_digest_are_discovered() -> None:
             }
         raise ConnectionError("not running")
 
-    report = discover_runtime_capabilities(getter=getter, binary_probe=_binary_map({"ollama": ("/usr/bin/ollama", "ollama 0.11.0")}))
+    report = discover_runtime_capabilities(
+        getter=getter,
+        binary_probe=_binary_map({"ollama": ("/usr/bin/ollama", "ollama 0.11.0")}),
+    )
 
     assert report["selector"]["decision"] == "PASS"
     assert report["selector"]["runtime_id"] == "ollama"
@@ -64,7 +67,7 @@ def test_llama_cpp_is_failover_when_ollama_is_degraded() -> None:
     assert report["selector"] == {
         "decision": "PASS",
         "runtime_id": "llama_cpp",
-        "reason": "binary_ready_server_not_running",
+        "reason": "server_binary_ready_not_running",
     }
 
 
@@ -110,7 +113,12 @@ def test_report_is_deterministic_for_same_observed_state() -> None:
             return {"models": []}
         raise ConnectionError("not running")
 
-    binary_probe = _binary_map({"ollama": ("/opt/ollama", "ollama 1.0.0"), "git": ("/usr/bin/git", "git version 2")})
+    binary_probe = _binary_map(
+        {
+            "ollama": ("/opt/ollama", "ollama 1.0.0"),
+            "git": ("/usr/bin/git", "git version 2"),
+        }
+    )
     left = discover_runtime_capabilities(getter=getter, binary_probe=binary_probe)
     right = discover_runtime_capabilities(getter=getter, binary_probe=binary_probe)
 
