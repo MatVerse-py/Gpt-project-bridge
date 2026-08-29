@@ -1,0 +1,22 @@
+{
+  "protocol_version": "matverse.runtime-discovery.v1",
+  "purpose": "Discover local execution capabilities without installing software or probing remote endpoints by default.",
+  "states": ["AVAILABLE", "DEGRADED", "ABSENT", "UNKNOWN"],
+  "llm_runtime_preference": ["ollama", "llama_cpp"],
+  "required_semantics": {
+    "missing_runtime": "HOLD",
+    "remote_probe_without_explicit_permission": "UNKNOWN",
+    "auto_install": false,
+    "trusted_upstreams_only": true,
+    "runtime_identity": ["runtime_id", "version", "executable", "endpoint"],
+    "model_identity": ["name", "digest", "size"]
+  },
+  "trusted_upstreams": {
+    "ollama": "https://github.com/ollama/ollama",
+    "llama_cpp": "https://github.com/ggml-org/llama.cpp",
+    "docker": "https://github.com/docker/cli",
+    "podman": "https://github.com/containers/podman",
+    "git": "https://github.com/git/git",
+    "python": "https://github.com/python/cpython"
+  }
+}
