@@ -1,0 +1,193 @@
+name: Cloudflare remote controlled-pilot gate v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cloudflare-remote-pilot.yml'
+      - 'deploy/cloudflare/REMOTE_DEPLOY_TRIGGER'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  remote-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      MATVERSE_PILOT_HMAC_SECRET: ${{ secrets.MATVERSE_PILOT_HMAC_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail-closed Cloudflare credential preflight
+        id: preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          missing=()
+          [[ -n "${CLOUDFLARE_API_TOKEN:-}" ]] || missing+=("CLOUDFLARE_API_TOKEN")
+          [[ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ]] || missing+=("CLOUDFLARE_ACCOUNT_ID")
+          [[ -n "${MATVERSE_PILOT_HMAC_SECRET:-}" ]] || missing+=("MATVERSE_PILOT_HMAC_SECRET")
+          if (( ${#missing[@]} > 0 )); then
+            printf 'ready=false\n' >> "$GITHUB_OUTPUT"
+            MISSING="$(IFS=,; echo "${missing[*]}")" python - <<'PY'
+          import json, os
+          from pathlib import Path
+          Path("evidence/cloudflare_remote_preflight.json").write_text(
+              json.dumps(
+                  {
+                      "gate": "REMOTE_CLOUDFLARE_CONTROLLED_PILOT_ENDPOINT",
+                      "status": "HOLD",
+                      "reason": "required GitHub Actions secrets are not provisioned",
+                      "missing_secret_names": os.environ["MISSING"].split(","),
+                      "commit_sha": os.environ["GITHUB_SHA"],
+                  },
+                  sort_keys=True,
+                  indent=2,
+              ),
+              encoding="utf-8",
+          )
+          PY
+            exit 0
+          fi
+          printf 'ready=true\n' >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        if: steps.preflight.outputs.ready == 'true'
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        if: steps.preflight.outputs.ready == 'true'
+        with:
+          node-version: '22'
+
+      - name: Install runtime and Cloudflare dependencies
+        if: steps.preflight.outputs.ready == 'true'
+        run: |
+          pip install -r requirements.txt
+          cd deploy/cloudflare
+          npm install
+
+      - name: Build remote config and encrypted Worker secret payload
+        if: steps.preflight.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          config_path = Path("deploy/cloudflare/wrangler.jsonc")
+          config = json.loads(config_path.read_text(encoding="utf-8"))
+          config.setdefault("vars", {})["MATVERSE_BUILD_COMMIT"] = os.environ["GITHUB_SHA"]
+          config["vars"]["MATVERSE_BUILD_REF"] = "main"
+          config["vars"]["MATVERSE_BUILD_TIMESTAMP"] = datetime.now(timezone.utc).isoformat()
+          Path("deploy/cloudflare/wrangler.remote.jsonc").write_text(
+              json.dumps(config, sort_keys=True, indent=2) + "\n",
+              encoding="utf-8",
+          )
+
+          registry = {
+              "pilot-remote": {
+                  "secret": os.environ["MATVERSE_PILOT_HMAC_SECRET"],
+                  "capabilities": [
+                      "institutional:projection:read",
+                      "institutional:intent:submit",
+                      "institutional:intent:read",
+                  ],
+              }
+          }
+          secret_payload = {
+              "MATVERSE_PRINCIPALS_JSON": json.dumps(registry, separators=(",", ":"))
+          }
+          secret_path = Path(os.environ["RUNNER_TEMP"]) / "matverse-cloudflare-secrets.json"
+          secret_path.write_text(json.dumps(secret_payload), encoding="utf-8")
+          secret_path.chmod(0o600)
+          PY
+
+      - name: Deploy Worker + Container + Durable Object
+        id: deploy
+        if: steps.preflight.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          cd deploy/cloudflare
+          npx wrangler deploy \
+            --config wrangler.remote.jsonc \
+            --secrets-file "$RUNNER_TEMP/matverse-cloudflare-secrets.json" \
+            --containers-rollout=immediate \
+            2>&1 | tee "$GITHUB_WORKSPACE/evidence/cloudflare-deploy.log"
+          cd "$GITHUB_WORKSPACE"
+          python - <<'PY'
+          import os, re
+          from pathlib import Path
+          text = Path("evidence/cloudflare-deploy.log").read_text(encoding="utf-8", errors="replace")
+          urls = re.findall(r"https://[A-Za-z0-9.-]+\.workers\.dev", text)
+          if not urls:
+              raise SystemExit("wrangler deploy completed but no workers.dev URL was found")
+          url = urls[-1].rstrip("/")
+          Path("evidence/cloudflare-worker-url.txt").write_text(url + "\n", encoding="utf-8")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"worker_url={url}\n")
+          PY
+
+      - name: Wait for remote Container health
+        if: steps.preflight.outputs.ready == 'true'
+        shell: bash
+        env:
+          WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 180); do
+            if curl -fsS --max-time 5 "$WORKER_URL/health" | tee evidence/remote-health.json >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "remote Cloudflare container did not become healthy within 6 minutes" >&2
+          exit 1
+
+      - name: Execute signed remote controlled-pilot probe
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          MATVERSE_PROBE_BASE_URL: ${{ steps.deploy.outputs.worker_url }}
+          MATVERSE_PROBE_PRINCIPAL: pilot-remote
+          MATVERSE_PROBE_SECRET: ${{ secrets.MATVERSE_PILOT_HMAC_SECRET }}
+          MATVERSE_EXPECTED_COMMIT: ${{ github.sha }}
+          MATVERSE_REMOTE_EVIDENCE_PATH: evidence/cloudflare_remote_pilot.json
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          python scripts/run_cloudflare_remote_pilot_probe.py | tee evidence/cloudflare-remote-probe.log
+          sha256sum evidence/cloudflare_remote_pilot.json | tee evidence/cloudflare_remote_pilot.sha256
+
+      - name: Capture Cloudflare deployment metadata
+        if: steps.preflight.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd deploy/cloudflare
+          npx wrangler deployments status --config wrangler.remote.jsonc --json > "$GITHUB_WORKSPACE/evidence/cloudflare-deployment-status.json"
+          npx wrangler containers list --json > "$GITHUB_WORKSPACE/evidence/cloudflare-containers.json" || true
+
+      - name: Remove transient secret/config files
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/matverse-cloudflare-secrets.json"
+          rm -f deploy/cloudflare/wrangler.remote.jsonc
+
+      - name: Upload remote Cloudflare evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-remote-controlled-pilot-evidence
+          path: evidence/
+          if-no-files-found: warn
