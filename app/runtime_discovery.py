@@ -11,7 +11,7 @@ from ipaddress import ip_address
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from .core import stable_hash
 
@@ -90,12 +90,7 @@ TcpProbe = Callable[[str, int, float], bool]
 
 
 class _NoRedirectHandler(HTTPRedirectHandler):
-    """Discovery probes never follow redirects.
-
-    Loopback-only authorization applies to the full network action, not merely
-    the first URL. A legitimate local runtime API does not require redirects,
-    so fail-closed rejection is simpler and safer than cross-origin validation.
-    """
+    """Fail closed on every redirect during runtime discovery."""
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
         raise HTTPError(req.full_url, code, "runtime discovery redirect denied", headers, fp)
@@ -115,12 +110,7 @@ def _is_loopback_url(url: str) -> bool:
 
 
 def _probe_binary(candidates: tuple[str, ...]) -> tuple[str | None, str | None, str]:
-    """Locate trusted binary names without executing them.
-
-    Discovery is observational. Version-command execution belongs to an
-    authorized executor, not to capability discovery. This also prevents PATH
-    contents from gaining code execution merely because a preflight is run.
-    """
+    """Locate allowlisted binary names without executing them."""
 
     for candidate in candidates:
         if candidate not in TRUSTED_BINARY_NAMES:
@@ -134,7 +124,9 @@ def _probe_binary(candidates: tuple[str, ...]) -> tuple[str | None, str | None, 
 
 def _json_get(url: str, timeout: float) -> dict[str, Any]:
     request = Request(url, headers={"Accept": "application/json", "User-Agent": "matverse-runtime-discovery/1"})
-    opener = build_opener(_NoRedirectHandler())
+    # Explicitly disable environment proxies as well as redirects. A loopback
+    # probe must never leave the host because HTTP_PROXY/HTTPS_PROXY is set.
+    opener = build_opener(ProxyHandler({}), _NoRedirectHandler())
     try:
         with opener.open(request, timeout=timeout) as response:  # noqa: S310 - endpoint is policy-restricted before invocation
             payload = response.read(4 * 1024 * 1024)
@@ -163,6 +155,39 @@ def _safe_json_get(url: str, config: DiscoveryConfig, getter: JsonGet) -> tuple[
         return None, f"probe_failed:{type(exc).__name__}"
 
 
+def _valid_ollama_version(payload: dict[str, Any] | None) -> str | None:
+    if payload is None:
+        return None
+    version = payload.get("version")
+    if not isinstance(version, str) or not version.strip():
+        return None
+    return version.strip()[:256]
+
+
+def _parse_ollama_models(payload: dict[str, Any] | None) -> tuple[dict[str, Any], ...] | None:
+    if payload is None:
+        return None
+    raw_models = payload.get("models")
+    if not isinstance(raw_models, list):
+        return None
+    models: list[dict[str, Any]] = []
+    for item in raw_models:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name") or item.get("model")
+        if not isinstance(name, str) or not name:
+            continue
+        models.append(
+            {
+                "name": name,
+                "digest": item.get("digest") if isinstance(item.get("digest"), str) else None,
+                "size": item.get("size") if isinstance(item.get("size"), int) else None,
+            }
+        )
+    models.sort(key=lambda item: item["name"])
+    return tuple(models)
+
+
 def _discover_ollama(config: DiscoveryConfig, binary_probe: BinaryProbe, getter: JsonGet) -> RuntimeCapability:
     meta = UPSTREAMS["ollama"]
     executable, binary_version, binary_reason = binary_probe(meta["binaries"])
@@ -170,36 +195,28 @@ def _discover_ollama(config: DiscoveryConfig, binary_probe: BinaryProbe, getter:
     version_payload, version_reason = _safe_json_get(f"{base}/api/version", config, getter)
     tags_payload, tags_reason = _safe_json_get(f"{base}/api/tags", config, getter)
 
-    models: list[dict[str, Any]] = []
-    if tags_payload is not None:
-        raw_models = tags_payload.get("models", [])
-        if isinstance(raw_models, list):
-            for item in raw_models:
-                if not isinstance(item, dict):
-                    continue
-                name = item.get("name") or item.get("model")
-                if not isinstance(name, str) or not name:
-                    continue
-                models.append(
-                    {
-                        "name": name,
-                        "digest": item.get("digest") if isinstance(item.get("digest"), str) else None,
-                        "size": item.get("size") if isinstance(item.get("size"), int) else None,
-                    }
-                )
-    models.sort(key=lambda item: item["name"])
+    api_version = _valid_ollama_version(version_payload)
+    models = _parse_ollama_models(tags_payload)
+    valid_version = api_version is not None
+    valid_tags = models is not None
+    version = api_version or binary_version
 
-    api_version = version_payload.get("version") if isinstance(version_payload, dict) else None
-    version = str(api_version)[:256] if api_version is not None else binary_version
-    if version_payload is not None and tags_payload is not None:
+    if valid_version and valid_tags:
         state = RuntimeState.AVAILABLE
         reason = "api_ready"
     elif version_reason == "remote_probe_denied" or tags_reason == "remote_probe_denied":
         state = RuntimeState.UNKNOWN
         reason = "remote_probe_denied"
-    elif executable is not None:
+    elif valid_version or valid_tags or executable is not None:
         state = RuntimeState.DEGRADED
-        reason = f"installed_but_api_unavailable:{version_reason}:{tags_reason}"
+        evidence: list[str] = []
+        if valid_version:
+            evidence.append("version_api")
+        if valid_tags:
+            evidence.append("tags_api")
+        if executable is not None:
+            evidence.append("binary")
+        reason = "partial_or_unready:" + ",".join(evidence)
     else:
         state = RuntimeState.ABSENT
         reason = binary_reason
@@ -212,10 +229,24 @@ def _discover_ollama(config: DiscoveryConfig, binary_probe: BinaryProbe, getter:
         executable=executable,
         endpoint=base,
         capabilities=meta["capabilities"],
-        models=tuple(models),
+        models=models or (),
         upstream_repo=meta["repo"],
         reason=reason,
     )
+
+
+def _parse_openai_models(payload: dict[str, Any] | None) -> tuple[dict[str, Any], ...] | None:
+    if payload is None:
+        return None
+    raw_models = payload.get("data")
+    if not isinstance(raw_models, list):
+        return None
+    models: list[dict[str, Any]] = []
+    for item in raw_models:
+        if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"]:
+            models.append({"name": item["id"], "digest": None, "size": None})
+    models.sort(key=lambda item: item["name"])
+    return tuple(models)
 
 
 def _discover_llama_cpp(config: DiscoveryConfig, binary_probe: BinaryProbe, getter: JsonGet) -> RuntimeCapability:
@@ -223,23 +254,18 @@ def _discover_llama_cpp(config: DiscoveryConfig, binary_probe: BinaryProbe, gett
     executable, version, binary_reason = binary_probe(meta["binaries"])
     base = config.llama_cpp_url.rstrip("/")
     models_payload, probe_reason = _safe_json_get(f"{base}/v1/models", config, getter)
-    models: list[dict[str, Any]] = []
-    if models_payload is not None and isinstance(models_payload.get("data"), list):
-        for item in models_payload["data"]:
-            if isinstance(item, dict) and isinstance(item.get("id"), str):
-                models.append({"name": item["id"], "digest": None, "size": None})
-    models.sort(key=lambda item: item["name"])
-
+    models = _parse_openai_models(models_payload)
     executable_name = os.path.basename(executable) if executable is not None else None
-    if models_payload is not None:
+
+    if models is not None:
         state = RuntimeState.AVAILABLE
         reason = "openai_compatible_api_ready"
     elif probe_reason == "remote_probe_denied":
         state = RuntimeState.UNKNOWN
         reason = "remote_probe_denied"
     elif executable_name == "llama-server":
-        state = RuntimeState.AVAILABLE
-        reason = "server_binary_ready_not_running"
+        state = RuntimeState.DEGRADED
+        reason = "server_binary_present_api_unavailable"
     elif executable is not None:
         state = RuntimeState.DEGRADED
         reason = "llama_cli_present_server_absent"
@@ -255,7 +281,7 @@ def _discover_llama_cpp(config: DiscoveryConfig, binary_probe: BinaryProbe, gett
         executable=executable,
         endpoint=base,
         capabilities=meta["capabilities"],
-        models=tuple(models),
+        models=models or (),
         upstream_repo=meta["repo"],
         reason=reason,
     )
@@ -316,8 +342,7 @@ def discover_runtime_capabilities(
     getter: JsonGet = _json_get,
     tcp_probe: TcpProbe = _probe_tcp,
 ) -> dict[str, Any]:
-    # tcp_probe is intentionally injectable for future service capabilities; v1
-    # does not infer semantic readiness from an open port alone.
+    # v1 deliberately avoids inferring semantic readiness from an open port.
     del tcp_probe
     cfg = config or DiscoveryConfig()
     capabilities = [
@@ -337,6 +362,7 @@ def discover_runtime_capabilities(
             "discovery_only": True,
             "executes_discovered_binaries": False,
             "follows_http_redirects": False,
+            "uses_environment_proxies": False,
             "remote_endpoints_allowed": cfg.allow_remote_endpoints,
             "trusted_upstreams_only": True,
         },
