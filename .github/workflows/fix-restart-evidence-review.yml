@@ -1,0 +1,84 @@
+name: Guard restart evidence review fixes
+
+on:
+  push:
+    branches: [production/cloudflare-restart-evidence-v1]
+    paths:
+      - '.github/workflows/fix-restart-evidence-review.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: production/cloudflare-restart-evidence-v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply review fixes exactly
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          probe = Path('scripts/run_cloudflare_persistence_probe.py')
+          text = probe.read_text(encoding='utf-8')
+          old = '"phase": "PRE_RESTART",\n                "status": "PASS",'
+          new = '"phase": "PRE_RESTART",\n                "status": "PENDING_RESTART_VERIFICATION",'
+          if old not in text:
+              raise SystemExit('pre-restart PASS marker not found')
+          probe.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          workflow = Path('.github/workflows/cloudflare-restart-persistence-evidence.yml')
+          text = workflow.read_text(encoding='utf-8')
+          trigger_anchor = "      - 'deploy/cloudflare/**'\n      - 'app/**'"
+          trigger_replacement = "      - 'deploy/cloudflare/**'\n      - 'Dockerfile.institutional'\n      - 'requirements.txt'\n      - 'app/**'"
+          if trigger_anchor not in text:
+              raise SystemExit('trigger anchor not found')
+          text = text.replace(trigger_anchor, trigger_replacement, 1)
+
+          cleanup_anchor = '''          cleanup() {
+            if [[ -n "${WRANGLER_PID:-}" ]]; then
+'''
+          cleanup_replacement = '''          cleanup() {
+            mkdir -p evidence
+            [[ -f "$LOG1" ]] && cp "$LOG1" evidence/wrangler-before-restart.log || true
+            [[ -f "$LOG2" ]] && cp "$LOG2" evidence/wrangler-after-restart.log || true
+            if [[ -n "${WRANGLER_PID:-}" ]]; then
+'''
+          if cleanup_anchor not in text:
+              raise SystemExit('cleanup anchor not found')
+          text = text.replace(cleanup_anchor, cleanup_replacement, 1)
+          workflow.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Verify review invariants
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          probe = Path('scripts/run_cloudflare_persistence_probe.py').read_text(encoding='utf-8')
+          workflow = Path('.github/workflows/cloudflare-restart-persistence-evidence.yml').read_text(encoding='utf-8')
+          assert '"status": "PENDING_RESTART_VERIFICATION"' in probe
+          assert "- 'Dockerfile.institutional'" in workflow
+          assert "- 'requirements.txt'" in workflow
+          assert 'cp "$LOG1" evidence/wrangler-before-restart.log' in workflow
+          assert 'cp "$LOG2" evidence/wrangler-after-restart.log' in workflow
+          assert 'export PYTHONPATH="$GITHUB_WORKSPACE"' in workflow
+          PY
+
+      - name: Python regression
+        run: |
+          pip install -r requirements.txt
+          pytest -q
+
+      - name: Commit only after gates pass
+        run: |
+          git config user.name "MatVerse CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add scripts/run_cloudflare_persistence_probe.py .github/workflows/cloudflare-restart-persistence-evidence.yml
+          git commit -m "Harden Cloudflare restart evidence gate"
+          git push origin HEAD:production/cloudflare-restart-evidence-v1
