@@ -1,0 +1,139 @@
+name: Cloudflare restart persistence evidence v1
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/run_cloudflare_persistence_probe.py'
+      - '.github/workflows/cloudflare-restart-persistence-evidence.yml'
+      - 'deploy/cloudflare/**'
+      - 'app/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  restart-persistence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install runtime and Cloudflare dependencies
+        run: |
+          pip install -r requirements.txt
+          cd deploy/cloudflare
+          npm install
+
+      - name: Prove Durable Object state survives Container and Wrangler restart
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          PERSIST_DIR="$RUNNER_TEMP/matverse-cloudflare-state"
+          CHECKPOINT="$RUNNER_TEMP/cloudflare-persistence-checkpoint.json"
+          EVIDENCE="$GITHUB_WORKSPACE/evidence/cloudflare_persistence_restart.json"
+          LOG1="$RUNNER_TEMP/wrangler-before-restart.log"
+          LOG2="$RUNNER_TEMP/wrangler-after-restart.log"
+          PILOT_SECRET="$(openssl rand -hex 32)"
+          export MATVERSE_PROBE_SECRET="$PILOT_SECRET"
+          export MATVERSE_PROBE_PRINCIPAL="pilot-local"
+          export MATVERSE_PROBE_BASE_URL="http://127.0.0.1:8787"
+
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          capabilities = [
+              "institutional:projection:read",
+              "institutional:intent:submit",
+              "institutional:intent:read",
+          ]
+          registry = {
+              "pilot-local": {
+                  "secret": os.environ["MATVERSE_PROBE_SECRET"],
+                  "capabilities": capabilities,
+              }
+          }
+          values = {
+              "MATVERSE_PRINCIPALS_JSON": json.dumps(registry, separators=(",", ":")),
+              "MATVERSE_BUILD_COMMIT": os.environ["GITHUB_SHA"],
+              "MATVERSE_BUILD_TIMESTAMP": datetime.now(timezone.utc).isoformat(),
+          }
+          lines = []
+          for key, value in values.items():
+              escaped = value.replace("'", "\\'")
+              lines.append(f"{key}='{escaped}'")
+          Path("deploy/cloudflare/.dev.vars").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+          WRANGLER_PID=""
+          cleanup() {
+            if [[ -n "${WRANGLER_PID:-}" ]]; then
+              kill -TERM -- "-$WRANGLER_PID" 2>/dev/null || true
+              wait "$WRANGLER_PID" 2>/dev/null || true
+            fi
+            docker ps -q | xargs -r docker stop >/dev/null 2>&1 || true
+            rm -f deploy/cloudflare/.dev.vars
+          }
+          trap cleanup EXIT
+
+          start_wrangler() {
+            local log="$1"
+            (
+              cd deploy/cloudflare
+              exec setsid npx wrangler dev --local --ip 127.0.0.1 --port 8787 --persist-to "$PERSIST_DIR"
+            ) >"$log" 2>&1 &
+            WRANGLER_PID=$!
+            for attempt in $(seq 1 120); do
+              if curl -fsS --max-time 2 http://127.0.0.1:8787/health >/dev/null 2>&1; then
+                return 0
+              fi
+              if ! kill -0 "$WRANGLER_PID" 2>/dev/null; then
+                echo "wrangler exited before health became ready" >&2
+                cat "$log" >&2
+                return 1
+              fi
+              sleep 1
+            done
+            echo "timed out waiting for wrangler/container health" >&2
+            cat "$log" >&2
+            return 1
+          }
+
+          stop_wrangler() {
+            kill -TERM -- "-$WRANGLER_PID" 2>/dev/null || true
+            wait "$WRANGLER_PID" 2>/dev/null || true
+            WRANGLER_PID=""
+            docker ps -q | xargs -r docker stop >/dev/null 2>&1 || true
+            sleep 2
+          }
+
+          start_wrangler "$LOG1"
+          python scripts/run_cloudflare_persistence_probe.py create --checkpoint "$CHECKPOINT" --evidence "$EVIDENCE"
+          stop_wrangler
+
+          test -d "$PERSIST_DIR"
+          start_wrangler "$LOG2"
+          python scripts/run_cloudflare_persistence_probe.py verify --checkpoint "$CHECKPOINT" --evidence "$EVIDENCE"
+          stop_wrangler
+
+          sha256sum "$EVIDENCE" | tee evidence/cloudflare_persistence_restart.sha256
+          cp "$LOG1" evidence/wrangler-before-restart.log
+          cp "$LOG2" evidence/wrangler-after-restart.log
+
+      - name: Upload restart persistence evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-restart-persistence-evidence
+          path: evidence/
+          if-no-files-found: warn
