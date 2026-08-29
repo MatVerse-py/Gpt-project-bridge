@@ -4,7 +4,6 @@ import json
 import os
 import shutil
 import socket
-import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from enum import Enum
@@ -12,7 +11,7 @@ from ipaddress import ip_address
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .core import stable_hash
 
@@ -81,9 +80,25 @@ UPSTREAMS: dict[str, dict[str, Any]] = {
     },
 }
 
+TRUSTED_BINARY_NAMES = frozenset(
+    name for metadata in UPSTREAMS.values() for name in metadata["binaries"]
+)
+
 BinaryProbe = Callable[[tuple[str, ...]], tuple[str | None, str | None, str]]
 JsonGet = Callable[[str, float], dict[str, Any]]
 TcpProbe = Callable[[str, int, float], bool]
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Discovery probes never follow redirects.
+
+    Loopback-only authorization applies to the full network action, not merely
+    the first URL. A legitimate local runtime API does not require redirects,
+    so fail-closed rejection is simpler and safer than cross-origin validation.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        raise HTTPError(req.full_url, code, "runtime discovery redirect denied", headers, fp)
 
 
 def _is_loopback_url(url: str) -> bool:
@@ -100,31 +115,28 @@ def _is_loopback_url(url: str) -> bool:
 
 
 def _probe_binary(candidates: tuple[str, ...]) -> tuple[str | None, str | None, str]:
+    """Locate trusted binary names without executing them.
+
+    Discovery is observational. Version-command execution belongs to an
+    authorized executor, not to capability discovery. This also prevents PATH
+    contents from gaining code execution merely because a preflight is run.
+    """
+
     for candidate in candidates:
+        if candidate not in TRUSTED_BINARY_NAMES:
+            continue
         path = shutil.which(candidate)
         if path is None:
             continue
-        try:
-            completed = subprocess.run(
-                [path, "--version"],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=1.5,
-                env={**os.environ, "NO_COLOR": "1"},
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            return path, None, f"binary_present_version_probe_failed:{type(exc).__name__}"
-        output = (completed.stdout or completed.stderr).strip().splitlines()
-        version = output[0][:256] if output else None
-        return path, version, "binary_present"
+        return os.path.realpath(path), None, "binary_present_not_executed"
     return None, None, "binary_not_found"
 
 
 def _json_get(url: str, timeout: float) -> dict[str, Any]:
     request = Request(url, headers={"Accept": "application/json", "User-Agent": "matverse-runtime-discovery/1"})
+    opener = build_opener(_NoRedirectHandler())
     try:
-        with urlopen(request, timeout=timeout) as response:  # noqa: S310 - endpoint is policy-restricted below
+        with opener.open(request, timeout=timeout) as response:  # noqa: S310 - endpoint is policy-restricted before invocation
             payload = response.read(4 * 1024 * 1024)
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         raise ConnectionError(type(exc).__name__) from exc
@@ -182,12 +194,12 @@ def _discover_ollama(config: DiscoveryConfig, binary_probe: BinaryProbe, getter:
     if version_payload is not None and tags_payload is not None:
         state = RuntimeState.AVAILABLE
         reason = "api_ready"
-    elif executable is not None:
-        state = RuntimeState.DEGRADED
-        reason = f"installed_but_api_unavailable:{version_reason}:{tags_reason}"
     elif version_reason == "remote_probe_denied" or tags_reason == "remote_probe_denied":
         state = RuntimeState.UNKNOWN
         reason = "remote_probe_denied"
+    elif executable is not None:
+        state = RuntimeState.DEGRADED
+        reason = f"installed_but_api_unavailable:{version_reason}:{tags_reason}"
     else:
         state = RuntimeState.ABSENT
         reason = binary_reason
@@ -222,15 +234,15 @@ def _discover_llama_cpp(config: DiscoveryConfig, binary_probe: BinaryProbe, gett
     if models_payload is not None:
         state = RuntimeState.AVAILABLE
         reason = "openai_compatible_api_ready"
+    elif probe_reason == "remote_probe_denied":
+        state = RuntimeState.UNKNOWN
+        reason = "remote_probe_denied"
     elif executable_name == "llama-server":
         state = RuntimeState.AVAILABLE
         reason = "server_binary_ready_not_running"
     elif executable is not None:
         state = RuntimeState.DEGRADED
         reason = "llama_cli_present_server_absent"
-    elif probe_reason == "remote_probe_denied":
-        state = RuntimeState.UNKNOWN
-        reason = "remote_probe_denied"
     else:
         state = RuntimeState.ABSENT
         reason = binary_reason
@@ -323,6 +335,8 @@ def discover_runtime_capabilities(
         "policy": {
             "auto_install": False,
             "discovery_only": True,
+            "executes_discovered_binaries": False,
+            "follows_http_redirects": False,
             "remote_endpoints_allowed": cfg.allow_remote_endpoints,
             "trusted_upstreams_only": True,
         },
