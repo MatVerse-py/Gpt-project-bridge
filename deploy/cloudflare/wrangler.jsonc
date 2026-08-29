@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "matverse-trust-runtime-pilot",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-28",
+  "containers": [
+    {
+      "class_name": "MatVerseContainer",
+      "image": "../../Dockerfile.institutional",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MATVERSE_CONTAINER",
+        "class_name": "MatVerseContainer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["MatVerseContainer"]
+    }
+  ],
+  "vars": {
+    "MATVERSE_RUNTIME_ID": "matverse-cloudflare-pilot-v1",
+    "MATVERSE_BUILD_REF": "main",
+    "MATVERSE_FROZEN_CONTRACT_HASH": "67743cbe1f4d65983348401d2061e46dec22d57e232854ff263e1d646f600b26"
+  }
+}
