@@ -9,6 +9,7 @@
     "auto_install": false,
     "execute_discovered_binaries": false,
     "follow_http_redirects": false,
+    "use_environment_proxies": false,
     "trusted_upstreams_only": true,
     "runtime_identity": ["runtime_id", "version", "executable", "endpoint"],
     "model_identity": ["name", "digest", "size"]
