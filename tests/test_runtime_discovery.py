@@ -48,26 +48,26 @@ def test_ollama_api_and_model_digest_are_discovered() -> None:
     assert {item["digest"] for item in ollama["models"]} == {"sha256:abc", "sha256:def"}
 
 
-def test_llama_cpp_is_failover_when_ollama_is_degraded() -> None:
+def test_llama_cpp_live_api_is_failover_when_ollama_is_degraded() -> None:
     def getter(url: str, timeout: float) -> dict[str, Any]:
-        raise ConnectionError("service unavailable")
+        if url.endswith("/v1/models"):
+            return {"object": "list", "data": [{"id": "local-gguf", "object": "model"}]}
+        raise ConnectionError("ollama unavailable")
 
     report = discover_runtime_capabilities(
         getter=getter,
-        binary_probe=_binary_map(
-            {
-                "ollama": ("/usr/bin/ollama", "ollama 0.11.0"),
-                "llama-server": ("/usr/local/bin/llama-server", "version 9999"),
-            }
-        ),
+        binary_probe=_binary_map({"ollama": ("/usr/bin/ollama", "ollama 0.11.0")}),
     )
 
     assert _runtime(report, "ollama")["state"] == RuntimeState.DEGRADED.value
     assert _runtime(report, "llama_cpp")["state"] == RuntimeState.AVAILABLE.value
+    assert _runtime(report, "llama_cpp")["models"] == [
+        {"name": "local-gguf", "digest": None, "size": None}
+    ]
     assert report["selector"] == {
         "decision": "PASS",
         "runtime_id": "llama_cpp",
-        "reason": "server_binary_ready_not_running",
+        "reason": "openai_compatible_api_ready",
     }
 
 
