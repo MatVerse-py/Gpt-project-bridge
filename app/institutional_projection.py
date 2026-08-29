@@ -10,6 +10,7 @@ import re
 from typing import Any
 
 from .institutional_contract import validate_projection_semantics
+from .institutional_state_client import InstitutionalStateUnavailable, fetch_state_snapshot, remote_state_enabled
 from .organism_loop import constitutional_contract_hash, gate_fingerprint
 from .storage import _connect
 
@@ -153,7 +154,7 @@ def _event_source_commit(event: dict[str, Any], seq: int) -> str:
     return source_commit.lower()
 
 
-def _list_contract_artifacts(conn: Any, current_commit: str, ledger: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _project_contract_artifacts(rows: list[dict[str, Any]], current_commit: str, ledger: list[dict[str, Any]]) -> list[dict[str, Any]]:
     receipts_by_artifact: dict[str, dict[str, str]] = {}
     for row in ledger:
         try:
@@ -171,22 +172,29 @@ def _list_contract_artifacts(conn: Any, current_commit: str, ledger: list[dict[s
                 "source_commit": source_commit,
             }
 
-    rows = conn.execute("SELECT artifact_hash,kind,version FROM contract_artifacts ORDER BY artifact_hash").fetchall()
-
     projected: list[dict[str, Any]] = []
     for row in rows:
-        evidence = receipts_by_artifact.get(row["artifact_hash"])
+        artifact_hash = row["artifact_hash"]
+        evidence = receipts_by_artifact.get(artifact_hash)
         projected.append(
             {
-                "artifact_id": f"contract:{row['artifact_hash']}",
+                "artifact_id": f"contract:{artifact_hash}",
                 "kind": f"contract-registry/{row['kind']}/{row['version']}",
-                "content_hash": row["artifact_hash"],
+                "content_hash": artifact_hash,
                 "source_commit": evidence["source_commit"] if evidence is not None else current_commit,
                 "status": "PASS" if evidence is not None else "HOLD",
                 "evidence": [evidence] if evidence is not None else [],
             }
         )
     return projected
+
+
+def _list_contract_artifacts(conn: Any, current_commit: str, ledger: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows = [
+        dict(row)
+        for row in conn.execute("SELECT artifact_hash,kind,version FROM contract_artifacts ORDER BY artifact_hash").fetchall()
+    ]
+    return _project_contract_artifacts(rows, current_commit, ledger)
 
 
 def _project_receipts(current_commit: str, ledger: list[dict[str, Any]]) -> list[dict[str, str]]:
@@ -243,10 +251,7 @@ def _projection_time(ledger: list[dict[str, Any]]) -> str:
     return "1970-01-01T00:00:00+00:00"
 
 
-def build_institutional_projection_from_connection(conn: Any) -> dict[str, Any]:
-    """Build a projection from one caller-owned SQLite snapshot/transaction."""
-
-    ledger = _read_ledger_from_connection(conn)
+def _build_projection(ledger: list[dict[str, Any]], contract_artifacts: list[dict[str, Any]]) -> dict[str, Any]:
     chain = _verify_ledger_rows(ledger)
     if not chain.get("ok"):
         raise ProjectionUnavailable(f"canonical ledger integrity failure at seq={chain.get('failed_seq')}")
@@ -268,7 +273,7 @@ def build_institutional_projection_from_connection(conn: Any) -> dict[str, Any]:
         "subjects": [],
         "authority_traces": [],
         "maturity": [],
-        "artifacts": _list_contract_artifacts(conn, source["commit_sha"], ledger),
+        "artifacts": _project_contract_artifacts(contract_artifacts, source["commit_sha"], ledger),
         "claims": [],
         "experiments": [],
         "relations": [],
@@ -294,7 +299,34 @@ def build_institutional_projection_from_connection(conn: Any) -> dict[str, Any]:
     return projection
 
 
+def build_institutional_projection_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    ledger = snapshot.get("ledger")
+    contract_artifacts = snapshot.get("contract_artifacts")
+    if not isinstance(ledger, list) or not all(isinstance(row, dict) for row in ledger):
+        raise ProjectionUnavailable("institutional state snapshot ledger is invalid")
+    if not isinstance(contract_artifacts, list) or not all(isinstance(row, dict) for row in contract_artifacts):
+        raise ProjectionUnavailable("institutional state snapshot contract_artifacts is invalid")
+    return _build_projection(ledger, contract_artifacts)
+
+
+def build_institutional_projection_from_connection(conn: Any) -> dict[str, Any]:
+    """Build a projection from one caller-owned SQLite snapshot/transaction."""
+
+    ledger = _read_ledger_from_connection(conn)
+    artifacts = [
+        dict(row)
+        for row in conn.execute("SELECT artifact_hash,kind,version FROM contract_artifacts ORDER BY artifact_hash").fetchall()
+    ]
+    return _build_projection(ledger, artifacts)
+
+
 def build_institutional_projection() -> dict[str, Any]:
+    if remote_state_enabled():
+        try:
+            return build_institutional_projection_from_snapshot(fetch_state_snapshot())
+        except InstitutionalStateUnavailable as exc:
+            raise ProjectionUnavailable(str(exc)) from exc
+
     conn = _connect()
     try:
         # One read transaction guarantees Ledger, registry artifacts, source
