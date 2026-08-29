@@ -133,7 +133,7 @@ export class MatVerseContainer extends Container {
     MATVERSE_BUILD_TIMESTAMP: String(bindings.MATVERSE_BUILD_TIMESTAMP ?? ""),
   };
 
-  constructor(ctx: DurableObjectState, env: MatVerseEnv) {
+  constructor(ctx: DurableObjectState<{}>, env: MatVerseEnv) {
     super(ctx, env);
     this.ensureSchema();
   }
