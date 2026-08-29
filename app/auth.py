@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 from fastapi import HTTPException, Request
 
-from .storage import consume_auth_nonce
+from .institutional_state_client import consume_auth_nonce
 
 AUTH_WINDOW_SECONDS = 300
 
