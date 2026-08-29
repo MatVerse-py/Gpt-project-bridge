@@ -1,0 +1,49 @@
+name: Guard ContainerProxy export fix
+
+on:
+  push:
+    branches: [production/cloudflare-restart-evidence-v1]
+    paths:
+      - '.github/workflows/fix-container-proxy-export.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: production/cloudflare-restart-evidence-v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Export required ContainerProxy
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('deploy/cloudflare/src/index.ts')
+          text = p.read_text(encoding='utf-8')
+          anchor = 'import { Container } from "@cloudflare/containers";\n'
+          replacement = anchor + 'export { ContainerProxy } from "@cloudflare/containers";\n'
+          if 'export { ContainerProxy } from "@cloudflare/containers";' in text:
+              raise SystemExit('ContainerProxy already exported')
+          if anchor not in text:
+              raise SystemExit('expected import anchor not found')
+          p.write_text(text.replace(anchor, replacement, 1), encoding='utf-8')
+          PY
+      - name: Typecheck and Wrangler dry run
+        working-directory: deploy/cloudflare
+        run: |
+          npm install
+          npm run check
+          npx wrangler deploy --dry-run
+      - name: Commit only after Cloudflare checks pass
+        run: |
+          git config user.name "MatVerse CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add deploy/cloudflare/src/index.ts
+          git commit -m "Export ContainerProxy for outbound state routing"
+          git push origin HEAD:production/cloudflare-restart-evidence-v1
