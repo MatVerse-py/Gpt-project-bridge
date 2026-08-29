@@ -3,7 +3,21 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .institutional_projection import build_institutional_projection_from_connection, jcs_subset_hash
+from .institutional_projection import (
+    ProjectionUnavailable,
+    build_institutional_projection_from_connection,
+    build_institutional_projection_from_snapshot,
+    jcs_subset_hash,
+)
+from .institutional_state_client import (
+    InstitutionalStateRejected,
+    InstitutionalStateUnavailable,
+    accept_remote_intent,
+    fetch_state_snapshot,
+    get_remote_intent,
+    list_remote_intents,
+    remote_state_enabled,
+)
 from .model_bridge import assert_transferable_state
 from .storage import _append_ledger_tx, _canonical_json, _connect, _now
 
@@ -96,6 +110,48 @@ def _row_to_intent(row: Any) -> dict[str, Any]:
     }
 
 
+def _remote_failure(exc: InstitutionalStateRejected | InstitutionalStateUnavailable) -> Exception:
+    if isinstance(exc, InstitutionalStateRejected):
+        detail = exc.detail
+        if isinstance(detail, dict) and "detail" in detail:
+            detail = detail["detail"]
+        return ValueError(str(detail))
+    return ProjectionUnavailable(str(exc))
+
+
+def _persist_intent_remote(
+    *,
+    intent: dict[str, Any],
+    principal_id: str,
+    allow_delegated_actor: bool,
+) -> dict[str, Any]:
+    _verify_internal_boundary(intent, principal_id, allow_delegated_actor=allow_delegated_actor)
+    try:
+        snapshot = fetch_state_snapshot()
+    except InstitutionalStateUnavailable as exc:
+        raise ProjectionUnavailable(str(exc)) from exc
+    current_projection = build_institutional_projection_from_snapshot(snapshot)
+    expected_source = {
+        **current_projection["source"],
+        "projection_hash": current_projection["projection"]["projection_hash"],
+    }
+    if intent["source"] != expected_source:
+        raise ValueError(
+            "intent source binding became stale before persistence; "
+            f"current_projection_hash={current_projection['projection']['projection_hash']}"
+        )
+    expected_ledger_head = str(current_projection["projection"]["source_receipt"])
+    try:
+        return accept_remote_intent(
+            intent=intent,
+            principal_id=principal_id,
+            allow_delegated_actor=allow_delegated_actor,
+            expected_ledger_head=expected_ledger_head,
+        )
+    except (InstitutionalStateRejected, InstitutionalStateUnavailable) as exc:
+        raise _remote_failure(exc) from exc
+
+
 def persist_intent(
     *,
     intent: dict[str, Any],
@@ -104,11 +160,19 @@ def persist_intent(
 ) -> dict[str, Any]:
     """Persist a non-canonical intent commitment and ledger its acceptance.
 
-    Freshness is revalidated *inside the same BEGIN IMMEDIATE transaction* that
-    appends the acceptance receipt. This prevents two writers from accepting
-    different intents against the same stale projection. Raw parameters are
-    never persisted; only their canonical JCS/SHA-256 commitment is retained.
+    Local SQLite revalidates freshness inside one BEGIN IMMEDIATE transaction.
+    The durable backend performs the equivalent compare-and-append operation
+    against the expected ledger head inside its own atomic state transaction.
+    Raw parameters are never persisted; only their canonical JCS/SHA-256
+    commitment is retained.
     """
+
+    if remote_state_enabled():
+        return _persist_intent_remote(
+            intent=intent,
+            principal_id=principal_id,
+            allow_delegated_actor=allow_delegated_actor,
+        )
 
     intent_id, intent_hash, actor_id, target, _parameters, source, parameters_hash = _verify_internal_boundary(
         intent,
@@ -211,6 +275,12 @@ def persist_intent(
 
 
 def get_intent(intent_id: str) -> dict[str, Any] | None:
+    if remote_state_enabled():
+        try:
+            return get_remote_intent(intent_id)
+        except (InstitutionalStateRejected, InstitutionalStateUnavailable) as exc:
+            raise _remote_failure(exc) from exc
+
     conn = _connect()
     try:
         _ensure_table(conn)
@@ -227,6 +297,13 @@ def list_intents_for_principal(principal_id: str, *, limit: int = 100, offset: i
         raise ValueError("limit must be between 1 and 200")
     if offset < 0:
         raise ValueError("offset must be >= 0")
+
+    if remote_state_enabled():
+        try:
+            return list_remote_intents(principal_id, limit=limit, offset=offset)
+        except (InstitutionalStateRejected, InstitutionalStateUnavailable) as exc:
+            raise _remote_failure(exc) from exc
+
     conn = _connect()
     try:
         _ensure_table(conn)
