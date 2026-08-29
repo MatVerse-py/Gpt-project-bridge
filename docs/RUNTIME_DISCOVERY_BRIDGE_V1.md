@@ -71,9 +71,9 @@ Default behavior:
 - deterministic report hash for the same observed state;
 - model inventory stores identity metadata, not prompt or model output content.
 
-Remote endpoints require explicit `--allow-remote` in the CLI. A deployment should additionally constrain the permitted hostname at the network/policy layer before using that mode.
+Remote endpoints require explicit `--allow-remote` in the generic CLI. A deployment should additionally constrain the permitted hostname at the network/policy layer before using that mode.
 
-## CLI
+## Generic discovery CLI
 
 ```bash
 python scripts/runtime_preflight.py
@@ -92,6 +92,47 @@ python scripts/runtime_preflight.py \
   --llama-cpp-url http://127.0.0.1:8080
 ```
 
+## Execution binding
+
+Discovery alone is not sufficient for execution. `matverse.runtime-binding.v1` converts an observed discovery report into an execution binding only when workload requirements are met.
+
+The binding includes:
+
+- discovery report hash;
+- selected runtime ID;
+- runtime version;
+- executable path;
+- endpoint;
+- trusted upstream;
+- exact required model name;
+- model digest and size when observed;
+- optional container runtime identity;
+- deterministic `binding_hash`.
+
+A required model that is not present produces `HOLD`, even when Ollama itself is healthy. A changed model digest changes the binding hash.
+
+### COGNISYMBIOSIS preflight
+
+The current local vertical slice expects `qwen2.5:0.5b` by default:
+
+```bash
+python scripts/cognisymbiosis_runtime_preflight.py
+```
+
+Alternative model:
+
+```bash
+python scripts/cognisymbiosis_runtime_preflight.py --model phi3:mini
+```
+
+Containerization remains optional unless explicitly required:
+
+```bash
+python scripts/cognisymbiosis_runtime_preflight.py --require-container
+```
+
+The COGNISYMBIOSIS preflight never enables remote endpoints and returns exit code `2` on any unresolved runtime/model requirement.
+
 ## Integration with Capability/Federation routing
 
 The discovery report is an observation layer. It must not bypass Ω/HDB or authorize execution by itself.
@@ -100,6 +141,7 @@ The discovery report is an observation layer. It must not bypass Ω/HDB or autho
 Host
   -> Runtime Discovery
   -> RuntimeCapability[]
+  -> Execution Binding
   -> Capability Registry / Federation
   -> admissibility constraints
   -> route
@@ -107,7 +149,7 @@ Host
   -> EvidenceOS / ledger / replay
 ```
 
-A future executor binding should consume the selected `runtime_id` plus exact runtime/model identity and place that identity inside the execution receipt.
+The executor should place the `binding_hash` and exact runtime/model identity inside the execution receipt. Replay can then distinguish a true repeated execution from silent runtime/model drift.
 
 ## Out of scope v1
 
