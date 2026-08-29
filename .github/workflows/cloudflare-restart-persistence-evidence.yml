@@ -46,6 +46,7 @@ jobs:
           export MATVERSE_PROBE_SECRET="$PILOT_SECRET"
           export MATVERSE_PROBE_PRINCIPAL="pilot-local"
           export MATVERSE_PROBE_BASE_URL="http://127.0.0.1:8787"
+          export PYTHONPATH="$GITHUB_WORKSPACE"
 
           python - <<'PY'
           import json, os
