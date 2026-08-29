@@ -11,6 +11,7 @@ from typing import Any
 
 from .core import stable_hash
 from .model_bridge import build_handoff_digest
+from .state_store import resolve_transactional_state_store
 
 DB_PATH = Path(os.environ.get("MATVERSE_DB", "matverse.db"))
 CONTRACT_KINDS = {"ontology", "policy", "task", "rubric", "memory_policy"}
@@ -26,30 +27,10 @@ def _canonical_json(value: Any) -> str:
 
 
 def _connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH, timeout=30.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    conn.execute("PRAGMA busy_timeout=30000")
-    conn.execute("CREATE TABLE IF NOT EXISTS ledger (seq INTEGER PRIMARY KEY AUTOINCREMENT, prev_hash TEXT NOT NULL, event_hash TEXT NOT NULL UNIQUE, event_json TEXT NOT NULL, decision TEXT NOT NULL)")
-    conn.execute("CREATE TABLE IF NOT EXISTS auth_nonces (principal_id TEXT NOT NULL, nonce TEXT NOT NULL, expires_at INTEGER NOT NULL, PRIMARY KEY(principal_id,nonce))")
-    conn.execute("CREATE TABLE IF NOT EXISTS contract_artifacts (artifact_hash TEXT PRIMARY KEY, kind TEXT NOT NULL, version TEXT NOT NULL, content_json TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL)")
-    conn.execute("CREATE TABLE IF NOT EXISTS model_sessions (session_id TEXT PRIMARY KEY, protocol_version TEXT NOT NULL, contract_json TEXT NOT NULL, contract_hash TEXT NOT NULL, participants_json TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL)")
-    session_columns = {row[1] for row in conn.execute("PRAGMA table_info(model_sessions)").fetchall()}
-    if "created_by" not in session_columns:
-        conn.execute("ALTER TABLE model_sessions ADD COLUMN created_by TEXT NOT NULL DEFAULT 'legacy'")
-    conn.execute("""CREATE TABLE IF NOT EXISTS model_handoffs (
-        handoff_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, session_seq INTEGER NOT NULL,
-        from_participant TEXT NOT NULL, to_participant TEXT NOT NULL, parent_handoff_id TEXT,
-        payload_json TEXT NOT NULL, payload_hash TEXT NOT NULL, contract_hash TEXT NOT NULL,
-        status TEXT NOT NULL CHECK(status IN ('PENDING','ACKED')), created_at TEXT NOT NULL, acked_at TEXT,
-        FOREIGN KEY(session_id) REFERENCES model_sessions(session_id),
-        FOREIGN KEY(parent_handoff_id) REFERENCES model_handoffs(handoff_id),
-        UNIQUE(session_id,session_seq), UNIQUE(session_id,payload_hash)
-    )""")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_model_handoffs_inbox ON model_handoffs(session_id,to_participant,status,session_seq)")
-    conn.commit()
-    return conn
+    # All canonical SQL users share one selected transactional backend.
+    # Backend selection is fail-closed so production cannot silently fall back
+    # to an ephemeral store. DB_PATH remains injectable for existing tests.
+    return resolve_transactional_state_store(DB_PATH).connect()
 
 
 def consume_auth_nonce(principal_id: str, nonce: str, expires_at: int) -> bool:
