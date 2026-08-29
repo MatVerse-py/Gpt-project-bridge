@@ -1,0 +1,65 @@
+name: State store refactor corrected
+
+on:
+  push:
+    branches: [production/state-store-v1]
+    paths:
+      - '.github/workflows/state-store-refactor-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: production/state-store-v1
+
+      - name: Install declared dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Rehydrate reviewed refactor and fix test typo
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, re
+
+          workflow = Path('.github/workflows/state-store-refactor.yml').read_text(encoding='utf-8')
+          def payload(name: str) -> bytes:
+              match = re.search(rf'^\s*{name}:\s*(\S+)\s*$', workflow, re.MULTILINE)
+              if match is None:
+                  raise SystemExit(f'missing {name}')
+              return base64.b64decode(match.group(1), validate=True)
+
+          Path('app/state_store.py').write_bytes(payload('STATE_STORE_B64'))
+          test_text = payload('STATE_STORE_TEST_B64').decode('utf-8')
+          test_text = test_text.replace('MAVERSE_STATE_BACKEND', 'MATVERSE_STATE_BACKEND')
+          Path('tests/test_state_store.py').write_text(test_text, encoding='utf-8')
+
+          p = Path('app/storage.py')
+          text = p.read_text(encoding='utf-8')
+          anchor = 'from .model_bridge import build_handoff_digest\n'
+          if 'from .state_store import resolve_transactional_state_store' not in text:
+              text = text.replace(anchor, anchor + 'from .state_store import resolve_transactional_state_store\n', 1)
+          start = text.index('def _connect() -> sqlite3.Connection:\n')
+          end = text.index('\n\ndef consume_auth_nonce', start)
+          replacement = """def _connect() -> sqlite3.Connection:\n    # All canonical SQL users share one selected transactional backend.\n    # Backend selection is fail-closed so production cannot silently fall back\n    # to an ephemeral store. DB_PATH remains injectable for existing tests.\n    return resolve_transactional_state_store(DB_PATH).connect()\n"""
+          text = text[:start] + replacement + text[end:]
+          p.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Run full regression
+        run: pytest -q
+
+      - name: Commit refactor only after green suite
+        shell: bash
+        run: |
+          git config user.name "MatVerse CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add app/state_store.py app/storage.py tests/test_state_store.py
+          git commit -m "Introduce fail-closed transactional state store boundary"
+          git push origin HEAD:production/state-store-v1
