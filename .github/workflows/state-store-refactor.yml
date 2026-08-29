@@ -13,6 +13,10 @@ jobs:
   refactor:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      STATE_STORE_B64: ZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwoKaW1wb3J0IG9zCmltcG9ydCBzcWxpdGUzCmZyb20gZGF0YWNsYXNzZXMgaW1wb3J0IGRhdGFjbGFzcwpmcm9tIHBhdGhsaWIgaW1wb3J0IFBhdGgKZnJvbSB0eXBpbmcgaW1wb3J0IFByb3RvY29sCgoKY2xhc3MgU3RhdGVTdG9yZUNvbmZpZ3VyYXRpb25FcnJvcihSdW50aW1lRXJyb3IpOgogICAgcGFzcwoKCmNsYXNzIFRyYW5zYWN0aW9uYWxTdGF0ZVN0b3JlKFByb3RvY29sKToKICAgIGJhY2tlbmRfbmFtZTogc3RyCiAgICB0cmFuc2FjdGlvbl9tb2RlbDogc3RyCiAgICBwZXJzaXN0ZW5jZV9zY29wZTogc3RyCgogICAgZGVmIGNvbm5lY3Qoc2VsZikgLT4gc3FsaXRlMy5Db25uZWN0aW9uOiAuLi4KCgpAZGF0YWNsYXNzKGZyb3plbj1UcnVlKQpjbGFzcyBTUUxpdGVTdGF0ZVN0b3JlOgogICAgcGF0aDogUGF0aAogICAgYmFja2VuZF9uYW1lOiBzdHIgPSAic3FsaXRlIgogICAgdHJhbnNhY3Rpb25fbW9kZWw6IHN0ciA9ICJTUUxJVEVfQkVHSU5fSU1NRURJQVRFIgogICAgcGVyc2lzdGVuY2Vfc2NvcGU6IHN0ciA9ICJIT1NUX0ZJTEVTWVNURU1fQk9VTkQiCgogICAgZGVmIGNvbm5lY3Qoc2VsZikgLT4gc3FsaXRlMy5Db25uZWN0aW9uOgogICAgICAgIGNvbm4gPSBzcWxpdGUzLmNvbm5lY3Qoc2VsZi5wYXRoLCB0aW1lb3V0PTMwLjApCiAgICAgICAgY29ubi5yb3dfZmFjdG9yeSA9IHNxbGl0ZTMuUm93CiAgICAgICAgY29ubi5leGVjdXRlKCJQUkFHTUEgam91cm5hbF9tb2RlPVdBTCIpCiAgICAgICAgY29ubi5leGVjdXRlKCJQUkFHTUEgZm9yZWlnbl9rZXlzPU9OIikKICAgICAgICBjb25uLmV4ZWN1dGUoIlBSQUdNQSBidXN5X3RpbWVvdXQ9MzAwMDAiKQogICAgICAgIGNvbm4uZXhlY3V0ZSgiQ1JFQVRFIFRBQkxFIElGIE5PVCBFWElTVFMgbGVkZ2VyIChzZXEgSU5URUdFUiBQUklNQVJZIEtFWSBBVVRPSU5DUkVNRU5ULCBwcmV2X2hhc2ggVEVYVCBOT1QgTlVMTCwgZXZlbnRfaGFzaCBURVhUIE5PVCBOVUxMIFVOSVFVRSwgZXZlbnRfanNvbiBURVhUIE5PVCBOVUxMLCBkZWNpc2lvbiBURVhUIE5PVCBOVUxMKSIpCiAgICAgICAgY29ubi5leGVjdXRlKCJDUkVBVEUgVEFCTEUgSUYgTk9UIEVYSVNUUyBhdXRoX25vbmNlcyAocHJpbmNpcGFsX2lkIFRFWFQgTk9UIE5VTEwsIG5vbmNlIFRFWFQgTk9UIE5VTEwsIGV4cGlyZXNfYXQgSU5URUdFUiBOT1QgTlVMTCwgUFJJTUFSWSBLRVkocHJpbmNpcGFsX2lkLG5vbmNlKSkiKQogICAgICAgIGNvbm4uZXhlY3V0ZSgiQ1JFQVRFIFRBQkxFIElGIE5PVCBFWElTVFMgY29udHJhY3RfYXJ0aWZhY3RzIChhcnRpZmFjdF9oYXNoIFRFWFQgUFJJTUFSWSBLRVksIGtpbmQgVEVYVCBOT1QgTlVMTCwgdmVyc2lvbiBURVhUIE5PVCBOVUxMLCBjb250ZW50X2pzb24gVEVYVCBOT1QgTlVMTCwgY3JlYXRlZF9ieSBURVhUIE5PVCBOVUxMLCBjcmVhdGVkX2F0IFRFWFQgTk9UIE5VTEwpIikKICAgICAgICBjb25uLmV4ZWN1dGUoIkNSRUFURSBUQUJMRSBJRiBOT1QgRVhJU1RTIG1vZGVsX3Nlc3Npb25zIChzZXNzaW9uX2lkIFRFWFQgUFJJTUFSWSBLRVksIHByb3RvY29sX3ZlcnNpb24gVEVYVCBOT1QgTlVMTCwgY29udHJhY3RfanNvbiBURVhUIE5PVCBOVUxMLCBjb250cmFjdF9oYXNoIFRFWFQgTk9UIE5VTEwsIHBhcnRpY2lwYW50c19qc29uIFRFWFQgTk9UIE5VTEwsIGNyZWF0ZWRfYnkgVEVYVCBOT1QgTlVMTCwgY3JlYXRlZF9hdCBURVhUIE5PVCBOVUxMKSIpCiAgICAgICAgc2Vzc2lvbl9jb2x1bW5zID0ge3Jvd1sxXSBmb3Igcm93IGluIGNvbm4uZXhlY3V0ZSgiUFJBR01BIHRhYmxlX2luZm8obW9kZWxfc2Vzc2lvbnMpIikuZmV0Y2hhbGwoKX0KICAgICAgICBpZiAiY3JlYXRlZF9ieSIgbm90IGluIHNlc3Npb25fY29sdW1uczoKICAgICAgICAgICAgY29ubi5leGVjdXRlKCJBTFRFUiBUQUJMRSBtb2RlbF9zZXNzaW9ucyBBREQgQ09MVU1OIGNyZWF0ZWRfYnkgVEVYVCBOT1QgTlVMTCBERUZBVUxUICdsZWdhY3knIikKICAgICAgICBjb25uLmV4ZWN1dGUoIiIiQ1JFQVRFIFRBQkxFIElGIE5PVCBFWElTVFMgbW9kZWxfaGFuZG9mZnMgKAogICAgICAgICAgICBoYW5kb2ZmX2lkIFRFWFQgUFJJTUFSWSBLRVksIHNlc3Npb25faWQgVEVYVCBOT1QgTlVMTCwgc2Vzc2lvbl9zZXEgSU5URUdFUiBOT1QgTlVMTCwKICAgICAgICAgICAgZnJvbV9wYXJ0aWNpcGFudCBURVhUIE5PVCBOVUxMLCB0b19wYXJ0aWNpcGFudCBURVhUIE5PVCBOVUxMLCBwYXJlbnRfaGFuZG9mZl9pZCBURVhULAogICAgICAgICAgICBwYXlsb2FkX2pzb24gVEVYVCBOT1QgTlVMTCwgcGF5bG9hZF9oYXNoIFRFWFQgTk9UIE5VTEwsIGNvbnRyYWN0X2hhc2ggVEVYVCBOT1QgTlVMTCwKICAgICAgICAgICAgc3RhdHVzIFRFWFQgTk9UIE5VTEwgQ0hFQ0soc3RhdHVzIElOICgnUEVORElORycsJ0FDS0VEJykpLCBjcmVhdGVkX2F0IFRFWFQgTk9UIE5VTEwsIGFja2VkX2F0IFRFWFQsCiAgICAgICAgICAgIEZPUkVJR04gS0VZKHNlc3Npb25faWQpIFJFRkVSRU5DRVMgbW9kZWxfc2Vzc2lvbnMoc2Vzc2lvbl9pZCksCiAgICAgICAgICAgIEZPUkVJR04gS0VZKHBhcmVudF9oYW5kb2ZmX2lkKSBSRUZFUkVOQ0VTIG1vZGVsX2hhbmRvZmZzKGhhbmRvZmZfaWQpLAogICAgICAgICAgICBVTklRVUUoc2Vzc2lvbl9pZCxzZXNzaW9uX3NlcSksIFVOSVFVRShzZXNzaW9uX2lkLHBheWxvYWRfaGFzaCkKICAgICAgICApIiIiKQogICAgICAgIGNvbm4uZXhlY3V0ZSgiQ1JFQVRFIElOREVYIElGIE5PVCBFWElTVFMgaWR4X21vZGVsX2hhbmRvZmZzX2luYm94IE9OIG1vZGVsX2hhbmRvZmZzKHNlc3Npb25faWQsdG9fcGFydGljaXBhbnQsc3RhdHVzLHNlc3Npb25fc2VxKSIpCiAgICAgICAgY29ubi5jb21taXQoKQogICAgICAgIHJldHVybiBjb25uCgoKZGVmIHJlc29sdmVfdHJhbnNhY3Rpb25hbF9zdGF0ZV9zdG9yZShwYXRoOiBQYXRoKSAtPiBUcmFuc2FjdGlvbmFsU3RhdGVTdG9yZToKICAgIGJhY2tlbmQgPSBvcy5lbnZpcm9uLmdldCgiTUFUVkVSU0VfU1RBVEVfQkFDS0VORCIsICJzcWxpdGUiKS5zdHJpcCgpLmxvd2VyKCkKICAgIGlmIGJhY2tlbmQgPT0gInNxbGl0ZSI6CiAgICAgICAgcmV0dXJuIFNRTGl0ZVN0YXRlU3RvcmUoUGF0aChwYXRoKSkKICAgIHJhaXNlIFN0YXRlU3RvcmVDb25maWd1cmF0aW9uRXJyb3IoCiAgICAgICAgZiJ1bnN1cHBvcnRlZCBNQVRWRVJTRV9TVEFURV9CQUNLRU5EPXtiYWNrZW5kIXJ9OyBmYWlsLWNsb3NlZCB1bnRpbCBhbiBhdG9taWMgY29tcGF0aWJsZSBiYWNrZW5kIGlzIGltcGxlbWVudGVkIgogICAgKQoKCmRlZiBkZXNjcmliZV9zdGF0ZV9zdG9yZShwYXRoOiBQYXRoKSAtPiBkaWN0W3N0ciwgc3RyXToKICAgIHN0b3JlID0gcmVzb2x2ZV90cmFuc2FjdGlvbmFsX3N0YXRlX3N0b3JlKHBhdGgpCiAgICByZXR1cm4gewogICAgICAgICJiYWNrZW5kIjogc3RvcmUuYmFja2VuZF9uYW1lLAogICAgICAgICJ0cmFuc2FjdGlvbl9tb2RlbCI6IHN0b3JlLnRyYW5zYWN0aW9uX21vZGVsLAogICAgICAgICJwZXJzaXN0ZW5jZV9zY29wZSI6IHN0b3JlLnBlcnNpc3RlbmNlX3Njb3BlLAogICAgfQo=
+      STATE_STORE_TEST_B64: ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCgppbXBvcnQgcHl0ZXN0Cgpmcm9tIGFwcCBpbXBvcnQgc3RvcmFnZQpmcm9tIGFwcC5zdGF0ZV9zdG9yZSBpbXBvcnQgKAogICAgU1FMaXRlU3RhdGVTdG9yZSwKICAgIFN0YXRlU3RvcmVDb25maWd1cmF0aW9uRXJyb3IsCiAgICBkZXNjcmliZV9zdGF0ZV9zdG9yZSwKICAgIHJlc29sdmVfdHJhbnNhY3Rpb25hbF9zdGF0ZV9zdG9yZSwKKQoKCmRlZiB0ZXN0X2RlZmF1bHRfYmFja2VuZF9pc19zcWxpdGVfYW5kX2ZpbGVzeXN0ZW1fYm91bmQodG1wX3BhdGgsIG1vbmtleXBhdGNoKToKICAgIG1vbmtleXBhdGNoLmRlbGVudigiTUFUVkVSU0VfU1RBVEVfQkFDS0VORCIsIHJhaXNpbmc9RmFsc2UpCiAgICBkYiA9IHRtcF9wYXRoIC8gInN0YXRlLmRiIgogICAgc3RvcmUgPSByZXNvbHZlX3RyYW5zYWN0aW9uYWxfc3RhdGVfc3RvcmUoZGIpCiAgICBhc3NlcnQgaXNpbnN0YW5jZShzdG9yZSwgU1FMaXRlU3RhdGVTdG9yZSkKICAgIGFzc2VydCBzdG9yZS5wYXRoID09IGRiCiAgICBhc3NlcnQgZGVzY3JpYmVfc3RhdGVfc3RvcmUoZGIpID09IHsKICAgICAgICAiYmFja2VuZCI6ICJzcWxpdGUiLAogICAgICAgICJ0cmFuc2FjdGlvbl9tb2RlbCI6ICJTUUxJVEVfQkVHSU5fSU1NRURJQVRFIiwKICAgICAgICAicGVyc2lzdGVuY2Vfc2NvcGUiOiAiSE9TVF9GSUxFU1lTVEVNX0JPVU5EIiwKICAgIH0KCgpkZWYgdGVzdF91bmtub3duX2JhY2tlbmRfZmFpbHNfY2xvc2VkKHRtcF9wYXRoLCBtb25rZXlwYXRjaCk6CiAgICBtb25rZXlwYXRjaC5zZXRlbnYoIk1BVFZFUlNFX1NUQVRFX0JBQ0tFTkQiLCAiZHVyYWJsZS1vYmplY3QiKQogICAgd2l0aCBweXRlc3QucmFpc2VzKFN0YXRlU3RvcmVDb25maWd1cmF0aW9uRXJyb3IsIG1hdGNoPSJmYWlsLWNsb3NlZCIpOgogICAgICAgIHJlc29sdmVfdHJhbnNhY3Rpb25hbF9zdGF0ZV9zdG9yZSh0bXBfcGF0aCAvICJzdGF0ZS5kYiIpCgoKZGVmIHRlc3Rfc3RvcmFnZV9kYl9wYXRoX2luamVjdGlvbl9pc19wcmVzZXJ2ZWQodG1wX3BhdGgsIG1vbmtleXBhdGNoKToKICAgIG1vbmtleXBhdGNoLmRlbGVudigiTUFUVkVSU0VfU1RBVEVfQkFDS0VORCIsIHJhaXNpbmc9RmFsc2UpCiAgICBkYiA9IHRtcF9wYXRoIC8gImluamVjdGVkLmRiIgogICAgbW9ua2V5cGF0Y2guc2V0YXR0cihzdG9yYWdlLCAiREJfUEFUSCIsIGRiKQogICAgY29ubiA9IHN0b3JhZ2UuX2Nvbm5lY3QoKQogICAgdHJ5OgogICAgICAgIHJvdyA9IGNvbm4uZXhlY3V0ZSgiUFJBR01BIGRhdGFiYXNlX2xpc3QiKS5mZXRjaG9uZSgpCiAgICAgICAgYXNzZXJ0IFBhdGgocm93WzJdKSA9PSBkYgogICAgICAgIHRhYmxlcyA9IHtyWzBdIGZvciByIGluIGNvbm4uZXhlY3V0ZSgiU0VMRUNUIG5hbWUgRlJPTSBzcWxpdGVfbWFzdGVyIFdIRVJFIHR5cGU9J3RhYmxlJyIpLmZldGNoYWxsKCl9CiAgICAgICAgYXNzZXJ0IHsibGVkZ2VyIiwgImF1dGhfbm9uY2VzIiwgImNvbnRyYWN0X2FydGlmYWN0cyIsICJtb2RlbF9zZXNzaW9ucyIsICJtb2RlbF9oYW5kb2ZmcyJ9IDw9IHRhYmxlcwogICAgZmluYWxseToKICAgICAgICBjb25uLmNsb3NlKCkK
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,96 +25,20 @@ jobs:
       - name: Introduce transactional state-store boundary
         shell: bash
         run: |
+          printf '%s' "$STATE_STORE_B64" | base64 -d > app/state_store.py
+          printf '%s' "$STATE_STORE_TEST_B64" | base64 -d > tests/test_state_store.py
           python - <<'PY'
           from pathlib import Path
-
-          state_store = '''from __future__ import annotations
-
-import os
-import sqlite3
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Protocol
-
-
-class StateStoreConfigurationError(RuntimeError):
-    pass
-
-
-class TransactionalStateStore(Protocol):
-    backend_name: str
-    transaction_model: str
-    persistence_scope: str
-
-    def connect(self) -> sqlite3.Connection: ...
-
-
-@dataclass(frozen=True)
-class SQLiteStateStore:
-    path: Path
-    backend_name: str = "sqlite"
-    transaction_model: str = "SQLITE_BEGIN_IMMEDIATE"
-    persistence_scope: str = "HOST_FILESYSTEM_BOUND"
-
-    def connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.path, timeout=30.0)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA foreign_keys=ON")
-        conn.execute("PRAGMA busy_timeout=30000")
-        conn.execute("CREATE TABLE IF NOT EXISTS ledger (seq INTEGER PRIMARY KEY AUTOINCREMENT, prev_hash TEXT NOT NULL, event_hash TEXT NOT NULL UNIQUE, event_json TEXT NOT NULL, decision TEXT NOT NULL)")
-        conn.execute("CREATE TABLE IF NOT EXISTS auth_nonces (principal_id TEXT NOT NULL, nonce TEXT NOT NULL, expires_at INTEGER NOT NULL, PRIMARY KEY(principal_id,nonce))")
-        conn.execute("CREATE TABLE IF NOT EXISTS contract_artifacts (artifact_hash TEXT PRIMARY KEY, kind TEXT NOT NULL, version TEXT NOT NULL, content_json TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL)")
-        conn.execute("CREATE TABLE IF NOT EXISTS model_sessions (session_id TEXT PRIMARY KEY, protocol_version TEXT NOT NULL, contract_json TEXT NOT NULL, contract_hash TEXT NOT NULL, participants_json TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL)")
-        session_columns = {row[1] for row in conn.execute("PRAGMA table_info(model_sessions)").fetchall()}
-        if "created_by" not in session_columns:
-            conn.execute("ALTER TABLE model_sessions ADD COLUMN created_by TEXT NOT NULL DEFAULT 'legacy'")
-        conn.execute("""CREATE TABLE IF NOT EXISTS model_handoffs (
-            handoff_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, session_seq INTEGER NOT NULL,
-            from_participant TEXT NOT NULL, to_participant TEXT NOT NULL, parent_handoff_id TEXT,
-            payload_json TEXT NOT NULL, payload_hash TEXT NOT NULL, contract_hash TEXT NOT NULL,
-            status TEXT NOT NULL CHECK(status IN ('PENDING','ACKED')), created_at TEXT NOT NULL, acked_at TEXT,
-            FOREIGN KEY(session_id) REFERENCES model_sessions(session_id),
-            FOREIGN KEY(parent_handoff_id) REFERENCES model_handoffs(handoff_id),
-            UNIQUE(session_id,session_seq), UNIQUE(session_id,payload_hash)
-        )""")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_model_handoffs_inbox ON model_handoffs(session_id,to_participant,status,session_seq)")
-        conn.commit()
-        return conn
-
-
-def resolve_transactional_state_store(path: Path) -> TransactionalStateStore:
-    backend = os.environ.get("MATVERSE_STATE_BACKEND", "sqlite").strip().lower()
-    if backend == "sqlite":
-        return SQLiteStateStore(Path(path))
-    raise StateStoreConfigurationError(
-        f"unsupported MATVERSE_STATE_BACKEND={backend!r}; fail-closed until an atomic compatible backend is implemented"
-    )
-
-
-def describe_state_store(path: Path) -> dict[str, str]:
-    store = resolve_transactional_state_store(path)
-    return {
-        "backend": store.backend_name,
-        "transaction_model": store.transaction_model,
-        "persistence_scope": store.persistence_scope,
-    }
-'''
-          Path('app/state_store.py').write_text(state_store, encoding='utf-8')
-
           p = Path('app/storage.py')
           text = p.read_text(encoding='utf-8')
-          import_anchor = 'from .model_bridge import build_handoff_digest\n'
+          anchor = 'from .model_bridge import build_handoff_digest\n'
           if 'from .state_store import resolve_transactional_state_store' not in text:
-              text = text.replace(import_anchor, import_anchor + 'from .state_store import resolve_transactional_state_store\n', 1)
+              text = text.replace(anchor, anchor + 'from .state_store import resolve_transactional_state_store\n', 1)
           start = text.index('def _connect() -> sqlite3.Connection:\n')
           end = text.index('\n\ndef consume_auth_nonce', start)
-          replacement = '''def _connect() -> sqlite3.Connection:\n    # All canonical SQL users share one selected transactional backend.\n    # Backend selection is fail-closed so production cannot silently fall back\n    # to an ephemeral store. DB_PATH remains injectable for existing tests.\n    return resolve_transactional_state_store(DB_PATH).connect()\n'''
+          replacement = """def _connect() -> sqlite3.Connection:\n    # All canonical SQL users share one selected transactional backend.\n    # Backend selection is fail-closed so production cannot silently fall back\n    # to an ephemeral store. DB_PATH remains injectable for existing tests.\n    return resolve_transactional_state_store(DB_PATH).connect()\n"""
           text = text[:start] + replacement + text[end:]
           p.write_text(text, encoding='utf-8')
-
-          tests = '''from pathlib import Path\n\nimport pytest\n\nfrom app import storage\nfrom app.state_store import (\n    SQLiteStateStore,\n    StateStoreConfigurationError,\n    describe_state_store,\n    resolve_transactional_state_store,\n)\n\n\ndef test_default_backend_is_sqlite_and_filesystem_bound(tmp_path, monkeypatch):\n    monkeypatch.delenv("MATVERSE_STATE_BACKEND", raising=False)\n    db = tmp_path / "state.db"\n    store = resolve_transactional_state_store(db)\n    assert isinstance(store, SQLiteStateStore)\n    assert store.path == db\n    assert describe_state_store(db) == {\n        "backend": "sqlite",\n        "transaction_model": "SQLITE_BEGIN_IMMEDIATE",\n        "persistence_scope": "HOST_FILESYSTEM_BOUND",\n    }\n\n\ndef test_unknown_backend_fails_closed(tmp_path, monkeypatch):\n    monkeypatch.setenv("MATVERSE_STATE_BACKEND", "durable-object")\n    with pytest.raises(StateStoreConfigurationError, match="fail-closed"):\n        resolve_transactional_state_store(tmp_path / "state.db")\n\n\ndef test_storage_db_path_injection_is_preserved(tmp_path, monkeypatch):\n    monkeypatch.delenv("MATVERSE_STATE_BACKEND", raising=False)\n    db = tmp_path / "injected.db"\n    monkeypatch.setattr(storage, "DB_PATH", db)\n    conn = storage._connect()\n    try:\n        row = conn.execute("PRAGMA database_list").fetchone()\n        assert Path(row[2]) == db\n        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}\n        assert {"ledger", "auth_nonces", "contract_artifacts", "model_sessions", "model_handoffs"} <= tables\n    finally:\n        conn.close()\n'''
-          Path('tests/test_state_store.py').write_text(tests, encoding='utf-8')
           PY
 
       - name: Run full regression
