@@ -1,4 +1,5 @@
 import { Container } from "@cloudflare/containers";
+export { ContainerProxy } from "@cloudflare/containers";
 import { env as globalEnv } from "cloudflare:workers";
 
 
