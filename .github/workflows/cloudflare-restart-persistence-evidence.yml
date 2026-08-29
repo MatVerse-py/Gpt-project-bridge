@@ -7,6 +7,8 @@ on:
       - 'scripts/run_cloudflare_persistence_probe.py'
       - '.github/workflows/cloudflare-restart-persistence-evidence.yml'
       - 'deploy/cloudflare/**'
+      - 'Dockerfile.institutional'
+      - 'requirements.txt'
       - 'app/**'
   workflow_dispatch:
 
@@ -78,6 +80,9 @@ jobs:
 
           WRANGLER_PID=""
           cleanup() {
+            mkdir -p evidence
+            [[ -f "$LOG1" ]] && cp "$LOG1" evidence/wrangler-before-restart.log || true
+            [[ -f "$LOG2" ]] && cp "$LOG2" evidence/wrangler-after-restart.log || true
             if [[ -n "${WRANGLER_PID:-}" ]]; then
               kill -TERM -- "-$WRANGLER_PID" 2>/dev/null || true
               wait "$WRANGLER_PID" 2>/dev/null || true
