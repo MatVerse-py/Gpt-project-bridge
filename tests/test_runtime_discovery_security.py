@@ -19,12 +19,17 @@ def _runtime(report: dict[str, Any], runtime_id: str) -> dict[str, Any]:
     return next(item for item in report["capabilities"] if item["runtime_id"] == runtime_id)
 
 
-def test_denied_remote_ollama_stays_unknown_even_if_local_binary_exists() -> None:
-    calls: list[str] = []
-
+def _local_only_getter(calls: list[str]):
     def getter(url: str, timeout: float) -> dict[str, Any]:
         calls.append(url)
-        raise AssertionError("denied remote URL must not be fetched")
+        assert "remote.invalid" not in url, "denied remote URL must not be fetched"
+        raise ConnectionError("local service not running")
+
+    return getter
+
+
+def test_denied_remote_ollama_stays_unknown_even_if_local_binary_exists() -> None:
+    calls: list[str] = []
 
     def binary_probe(candidates: tuple[str, ...]) -> tuple[str | None, str | None, str]:
         if candidates == ("ollama",):
@@ -33,11 +38,11 @@ def test_denied_remote_ollama_stays_unknown_even_if_local_binary_exists() -> Non
 
     report = discover_runtime_capabilities(
         DiscoveryConfig(ollama_url="https://remote.invalid:11434"),
-        getter=getter,
+        getter=_local_only_getter(calls),
         binary_probe=binary_probe,
     )
 
-    assert calls == []
+    assert calls == ["http://127.0.0.1:8080/v1/models"]
     ollama = _runtime(report, "ollama")
     assert ollama["state"] == RuntimeState.UNKNOWN.value
     assert ollama["reason"] == "remote_probe_denied"
@@ -46,10 +51,6 @@ def test_denied_remote_ollama_stays_unknown_even_if_local_binary_exists() -> Non
 def test_denied_remote_llama_cpp_stays_unknown_even_if_server_binary_exists() -> None:
     calls: list[str] = []
 
-    def getter(url: str, timeout: float) -> dict[str, Any]:
-        calls.append(url)
-        raise AssertionError("denied remote URL must not be fetched")
-
     def binary_probe(candidates: tuple[str, ...]) -> tuple[str | None, str | None, str]:
         if candidates == ("llama-server", "llama-cli"):
             return "/usr/local/bin/llama-server", None, "binary_present_not_executed"
@@ -57,11 +58,14 @@ def test_denied_remote_llama_cpp_stays_unknown_even_if_server_binary_exists() ->
 
     report = discover_runtime_capabilities(
         DiscoveryConfig(llama_cpp_url="https://remote.invalid:8080"),
-        getter=getter,
+        getter=_local_only_getter(calls),
         binary_probe=binary_probe,
     )
 
-    assert calls == []
+    assert calls == [
+        "http://127.0.0.1:11434/api/version",
+        "http://127.0.0.1:11434/api/tags",
+    ]
     llama_cpp = _runtime(report, "llama_cpp")
     assert llama_cpp["state"] == RuntimeState.UNKNOWN.value
     assert llama_cpp["reason"] == "remote_probe_denied"
