@@ -4,9 +4,9 @@ Protocol: `matverse.runtime-discovery.v1`
 
 ## Purpose
 
-Extend the MatVerse Bridge from model-to-model transfer into governed discovery of local execution capabilities. The component discovers what the host can actually execute before a route is promoted.
+Extend the MatVerse Bridge from model-to-model transfer into governed discovery of local execution capabilities. Discovery observes what a host can support before a route is promoted; it does not authorize execution.
 
-It does **not** install software, execute remote installers, or infer readiness from a package name alone.
+It does **not** install software, execute discovered binaries, follow redirects, or use environment HTTP proxies.
 
 ## Baseline runtimes
 
@@ -14,41 +14,43 @@ It does **not** install software, execute remote installers, or infer readiness 
 |---|---|---|---|
 | Python | LANGUAGE_RUNTIME | Bridge/runtime process | https://github.com/python/cpython |
 | Ollama | LLM_RUNTIME | preferred local model server | https://github.com/ollama/ollama |
-| llama.cpp | LLM_RUNTIME | local fallback / OpenAI-compatible server | https://github.com/ggml-org/llama.cpp |
+| llama.cpp | LLM_RUNTIME | local server fallback | https://github.com/ggml-org/llama.cpp |
 | Docker | CONTAINER_RUNTIME | optional packaging/isolation | https://github.com/docker/cli |
 | Podman | CONTAINER_RUNTIME | optional rootless container fallback | https://github.com/containers/podman |
 | Git | SCM_RUNTIME | source/version control | https://github.com/git/git |
 
-The first production target is **Ollama**. `llama.cpp` is a local fallback. Docker/Podman are optional and are not prerequisites for an Ollama-native host.
+Ollama is the preferred LLM runtime. llama.cpp is selected only when its OpenAI-compatible `/v1/models` API is semantically valid. Merely finding `llama-server` or `llama-cli` is not sufficient for `PASS`.
 
 ## Ollama evidence boundary
 
-The official Ollama repository documents:
+The official Ollama repository documents generation, chat, model inventory, model information, embeddings, running-model inventory, and version endpoints. The default local endpoint is `http://127.0.0.1:11434`.
 
-- `POST /api/generate`
-- `POST /api/chat`
-- local model inventory
-- model information
-- embeddings
-- running model inventory
-- version endpoint
+Discovery probes:
 
-The default local endpoint used by the Bridge is `http://127.0.0.1:11434`.
+- `/api/version` — must contain a non-empty string `version`;
+- `/api/tags` — must contain a `models` list.
 
-Discovery probes `/api/version` and `/api/tags`. Model identity retains `name`, `digest`, and `size` when supplied by Ollama so later execution receipts can bind to the observed model artifact.
+Both shapes must be valid for Ollama to become `AVAILABLE`. A random JSON service returning `{}` cannot prove Ollama readiness. Valid evidence from only one endpoint is `DEGRADED`.
+
+Model identity retains `name`, `digest`, and `size` when supplied by Ollama so later execution receipts can bind to the observed model artifact.
 
 ## Decision semantics
 
 ```text
-Ollama API ready
+valid Ollama version + valid model inventory
     -> PASS / ollama
 
-Ollama installed but API unavailable
+partial Ollama evidence or Ollama binary only
     -> DEGRADED
-    -> try llama.cpp
 
-llama.cpp binary or API ready
+live llama.cpp OpenAI-compatible model inventory
     -> PASS / llama_cpp
+
+llama-server binary but API unavailable
+    -> DEGRADED
+
+llama-cli only
+    -> DEGRADED
 
 no ready local LLM runtime
     -> HOLD
@@ -57,23 +59,27 @@ remote endpoint without explicit permission
     -> UNKNOWN
 ```
 
-Runtime absence is **not** a constitutional violation, therefore it is `HOLD`, not `BLOCK`.
+Runtime absence is not a constitutional violation, therefore it is `HOLD`, not `BLOCK`.
 
 ## Security boundary
 
 Default behavior:
 
 - loopback probes only;
+- environment HTTP/HTTPS proxies disabled for probes;
+- all HTTP redirects rejected;
 - no automatic installation;
-- no shell installer execution;
+- no binary execution during discovery, including `--version`;
 - no remote endpoint probing;
-- trusted upstream metadata is explicit;
+- trusted upstream metadata explicit;
 - deterministic report hash for the same observed state;
-- model inventory stores identity metadata, not prompt or model output content.
+- model inventory stores identity metadata, not prompt or model-output content.
 
-Remote endpoints require explicit `--allow-remote` in the generic CLI. A deployment should additionally constrain the permitted hostname at the network/policy layer before using that mode.
+Remote endpoints require explicit `--allow-remote` in the generic CLI. A deployment should additionally constrain allowed hosts through policy/network controls before enabling that mode.
 
 ## Generic discovery CLI
+
+From a source checkout:
 
 ```bash
 python scripts/runtime_preflight.py
@@ -81,7 +87,7 @@ python scripts/runtime_preflight.py
 
 Exit codes:
 
-- `0`: a preferred LLM runtime is ready;
+- `0`: a preferred LLM runtime is live and semantically ready;
 - `2`: no ready LLM runtime (`HOLD`).
 
 Custom local endpoints:
@@ -94,22 +100,22 @@ python scripts/runtime_preflight.py \
 
 ## Execution binding
 
-Discovery alone is not sufficient for execution. `matverse.runtime-binding.v1` converts an observed discovery report into an execution binding only when workload requirements are met.
+Discovery alone is insufficient for execution. `matverse.runtime-binding.v1` converts a discovery report into a workload binding only when requirements are met.
 
 The binding includes:
 
 - discovery report hash;
 - selected runtime ID;
-- runtime version;
-- executable path;
+- runtime version when semantically observed;
+- executable path when present;
 - endpoint;
 - trusted upstream;
 - exact required model name;
 - model digest and size when observed;
-- optional container runtime identity;
+- optional container-runtime identity;
 - deterministic `binding_hash`.
 
-A required model that is not present produces `HOLD`, even when Ollama itself is healthy. A changed model digest changes the binding hash.
+A required model that is not present produces `HOLD`, even when the runtime is healthy. A changed model digest changes the binding hash.
 
 ### COGNISYMBIOSIS preflight
 
@@ -131,7 +137,7 @@ Containerization remains optional unless explicitly required:
 python scripts/cognisymbiosis_runtime_preflight.py --require-container
 ```
 
-The COGNISYMBIOSIS preflight never enables remote endpoints and returns exit code `2` on any unresolved runtime/model requirement.
+The COGNISYMBIOSIS preflight never enables remote endpoints and returns exit code `2` on unresolved runtime/model requirements.
 
 ## Integration with Capability/Federation routing
 
@@ -149,14 +155,14 @@ Host
   -> EvidenceOS / ledger / replay
 ```
 
-The executor should place the `binding_hash` and exact runtime/model identity inside the execution receipt. Replay can then distinguish a true repeated execution from silent runtime/model drift.
+The executor should place `binding_hash` plus exact runtime/model identity inside the execution receipt. Replay can then distinguish a repeated execution from silent runtime/model drift.
 
 ## Out of scope v1
 
 - software installation;
-- pulling a model automatically;
+- automatic model pulling;
 - GPU benchmark claims;
-- vector database requirement;
+- vector-database requirement;
 - Kubernetes/Kafka/Ceph;
 - quantum runtime selection;
 - remote SaaS/provider discovery.
