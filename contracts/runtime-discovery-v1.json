@@ -1,12 +1,14 @@
 {
   "protocol_version": "matverse.runtime-discovery.v1",
-  "purpose": "Discover local execution capabilities without installing software or probing remote endpoints by default.",
+  "purpose": "Discover local execution capabilities without installing or executing discovered software and without probing remote endpoints by default.",
   "states": ["AVAILABLE", "DEGRADED", "ABSENT", "UNKNOWN"],
   "llm_runtime_preference": ["ollama", "llama_cpp"],
   "required_semantics": {
     "missing_runtime": "HOLD",
     "remote_probe_without_explicit_permission": "UNKNOWN",
     "auto_install": false,
+    "execute_discovered_binaries": false,
+    "follow_http_redirects": false,
     "trusted_upstreams_only": true,
     "runtime_identity": ["runtime_id", "version", "executable", "endpoint"],
     "model_identity": ["name", "digest", "size"]
