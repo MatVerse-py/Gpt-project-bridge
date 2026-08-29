@@ -218,12 +218,16 @@ def _discover_llama_cpp(config: DiscoveryConfig, binary_probe: BinaryProbe, gett
                 models.append({"name": item["id"], "digest": None, "size": None})
     models.sort(key=lambda item: item["name"])
 
+    executable_name = os.path.basename(executable) if executable is not None else None
     if models_payload is not None:
         state = RuntimeState.AVAILABLE
         reason = "openai_compatible_api_ready"
-    elif executable is not None:
+    elif executable_name == "llama-server":
         state = RuntimeState.AVAILABLE
-        reason = "binary_ready_server_not_running"
+        reason = "server_binary_ready_not_running"
+    elif executable is not None:
+        state = RuntimeState.DEGRADED
+        reason = "llama_cli_present_server_absent"
     elif probe_reason == "remote_probe_denied":
         state = RuntimeState.UNKNOWN
         reason = "remote_probe_denied"
