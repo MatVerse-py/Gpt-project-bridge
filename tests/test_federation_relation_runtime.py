@@ -19,6 +19,7 @@ from app.federation_routing import (
 CONTRACT = "a" * 64
 SOURCE_SECRET = "source-secret-for-tests"
 TARGET_SECRET = "target-secret-for-tests"
+CAPABILITY = "state.transfer"
 
 
 def make_relation(status: RelationStatus = RelationStatus.ACTIVE):
@@ -30,7 +31,7 @@ def make_relation(status: RelationStatus = RelationStatus.ACTIVE):
             source_authority="authority-a",
             target_authority="authority-b",
             contract_hash=CONTRACT,
-            capabilities=("state.transfer",),
+            capabilities=(CAPABILITY,),
             valid_from=100,
             valid_until=200,
             status=status,
@@ -57,7 +58,7 @@ def build_graph(relations, gate):
                 "domain-b",
                 0.1,
                 "rel-a-b-runtime",
-                "state.transfer",
+                CAPABILITY,
                 CONTRACT,
             )
         ],
@@ -76,26 +77,37 @@ def test_relation_expiry_after_graph_creation_is_enforced_at_route_time():
     )
     graph = build_graph([make_relation()], gate)
 
-    assert graph.route("domain-a", ["domain-b"]).route.path == ("domain-a", "domain-b")
+    assert graph.route("domain-a", ["domain-b"], capability=CAPABILITY).route.path == (
+        "domain-a",
+        "domain-b",
+    )
 
     clock["now"] = 250
-    assert any("relation_expired" in reasons for reasons in graph.blocked.values())
+    assert any(
+        "relation_expired" in reasons
+        for reasons in graph.blocked_for(CAPABILITY).values()
+    )
     with pytest.raises(ValueError, match="no admissible target is reachable"):
-        graph.route("domain-a", ["domain-b"])
+        graph.route("domain-a", ["domain-b"], capability=CAPABILITY)
 
 
 def test_relation_registry_revocation_is_visible_without_rebuilding_graph():
-    clock = {"now": 150}
     registry = [make_relation()]
     gate = RelationIntegrityGate(
         {"authority-a": SOURCE_SECRET, "authority-b": TARGET_SECRET},
-        now=lambda: clock["now"],
+        now=lambda: 150,
     )
     graph = build_graph(lambda: tuple(registry), gate)
 
-    assert graph.route("domain-a", ["domain-b"]).route.path == ("domain-a", "domain-b")
+    assert graph.route("domain-a", ["domain-b"], capability=CAPABILITY).route.path == (
+        "domain-a",
+        "domain-b",
+    )
 
     registry[0] = make_relation(RelationStatus.REVOKED)
-    assert any("status:REVOKED" in reasons for reasons in graph.blocked.values())
+    assert any(
+        "status:REVOKED" in reasons
+        for reasons in graph.blocked_for(CAPABILITY).values()
+    )
     with pytest.raises(ValueError, match="no admissible target is reachable"):
-        graph.route("domain-a", ["domain-b"])
+        graph.route("domain-a", ["domain-b"], capability=CAPABILITY)
