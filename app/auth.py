@@ -201,11 +201,12 @@ async def _authenticate_ed25519(request: Request) -> Principal:
         raise HTTPException(status_code=401, detail="unknown principal credential")
     principal_record = credential.principal
     key_record = credential.key
+    observed_at = int(time.time())
     if principal_record.status != "ACTIVE":
         raise HTTPException(status_code=401, detail="principal revoked")
     if ts < key_record.valid_from or ts >= key_record.valid_until:
         raise HTTPException(status_code=401, detail="principal credential outside validity window")
-    if key_record.revoked_at is not None and ts >= key_record.revoked_at:
+    if key_record.revoked_at is not None and observed_at >= key_record.revoked_at:
         raise HTTPException(status_code=401, detail="principal credential revoked")
     try:
         public_key = Ed25519PublicKey.from_public_bytes(bytes.fromhex(key_record.public_key_hex))
