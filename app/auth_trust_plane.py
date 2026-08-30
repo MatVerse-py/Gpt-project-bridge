@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -292,6 +293,11 @@ def revoke_principal(
     _can_act_on(actor, principal_id, "revoke")
     if actor.principal_id == principal_id and not actor.allows("auth:principal:revoke:self"):
         raise HTTPException(status_code=403, detail="self-revocation requires auth:principal:revoke:self")
+    if req.effective_at > int(time.time()):
+        raise HTTPException(
+            status_code=422,
+            detail="future principal revocation scheduling is not supported by v1; submit at the intended effective time",
+        )
     try:
         if remote_state_enabled():
             result = revoke_remote_principal(
