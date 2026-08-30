@@ -113,7 +113,7 @@ def test_missing_witness_fails_closed_before_routing():
     graph = routing_graph(relation())
     assert any(
         "missing_bilateral_witness" in reasons
-        for reasons in graph.blocked_relations.values()
+        for reasons in graph.blocked.values()
     )
     with pytest.raises(ValueError, match="no admissible target is reachable"):
         graph.route("domain-a", ["domain-b"])
@@ -164,7 +164,7 @@ def test_expired_relation_is_blocked_even_with_valid_witnesses():
 
 def test_expired_relation_cannot_be_reopened_by_routing_input():
     graph = routing_graph(signed_relation(), now=250)
-    assert any("relation_expired" in reasons for reasons in graph.blocked_relations.values())
+    assert any("relation_expired" in reasons for reasons in graph.blocked.values())
     with pytest.raises(ValueError, match="no admissible target is reachable"):
         graph.route("domain-a", ["domain-b"])
 
@@ -173,7 +173,7 @@ def test_contract_drift_blocks_crossing():
     graph = routing_graph(signed_relation(), crossing_contract=OTHER_CONTRACT)
     assert any(
         "contract_hash_mismatch" in reasons
-        for reasons in graph.blocked_relations.values()
+        for reasons in graph.blocked.values()
     )
     with pytest.raises(ValueError, match="no admissible target is reachable"):
         graph.route("domain-a", ["domain-b"])
@@ -183,7 +183,7 @@ def test_capability_out_of_scope_blocks_crossing():
     graph = routing_graph(signed_relation(), capability="model.invoke")
     assert any(
         "capability_out_of_scope" in reasons
-        for reasons in graph.blocked_relations.values()
+        for reasons in graph.blocked.values()
     )
 
 
