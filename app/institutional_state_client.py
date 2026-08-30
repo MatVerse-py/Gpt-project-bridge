@@ -4,7 +4,7 @@ import json
 import os
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 
@@ -90,6 +90,23 @@ def consume_auth_nonce(principal_id: str, nonce: str, expires_at: int) -> bool:
     if not isinstance(result, dict) or not isinstance(result.get("consumed"), bool):
         raise InstitutionalStateUnavailable("nonce response is missing consumed boolean")
     return bool(result["consumed"])
+
+
+def fetch_remote_auth_credential(principal_id: str, key_id: str) -> dict[str, Any] | None:
+    path = f"/v1/auth/credentials/{quote(principal_id, safe='')}/{quote(key_id, safe='')}"
+    try:
+        result = _request_json("GET", path)
+    except InstitutionalStateRejected as exc:
+        if exc.status == 404:
+            return None
+        raise
+    if not isinstance(result, dict):
+        raise InstitutionalStateUnavailable("auth credential response must be an object")
+    principal = result.get("principal")
+    key = result.get("key")
+    if not isinstance(principal, dict) or not isinstance(key, dict):
+        raise InstitutionalStateUnavailable("auth credential response is missing principal/key objects")
+    return result
 
 
 def fetch_state_snapshot() -> dict[str, Any]:
