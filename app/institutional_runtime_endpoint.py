@@ -5,7 +5,7 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from .auth import Principal, authenticate, configured_auth_scheme
+from .auth import Principal, authenticate
 from .auth_trust_plane import management_router, public_router
 from .institutional_projection import ProjectionUnavailable, build_institutional_projection
 from .institutional_protocol import PROTOCOL_VERSION, RUNTIME_SCHEMA_VERSION
@@ -53,7 +53,7 @@ def institutional_runtime(principal: Principal = Depends(authenticate)) -> dict:
         "schema_version": RUNTIME_SCHEMA_VERSION,
         "protocol_version": PROTOCOL_VERSION,
         "runtime_id": _runtime_id_or_503(),
-        "authentication": configured_auth_scheme(),
+        "authentication": principal.auth_scheme,
         "authenticated_principal_id": principal.principal_id,
         "authenticated_key_id": principal.key_id,
         "source": projection["source"],
