@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass, replace
 from enum import Enum
 from types import MappingProxyType
-from typing import Callable, Mapping, Sequence
+from typing import Callable, Mapping, Protocol, Sequence
 
 from .federation_routing import (
     AdmissibilityGate,
@@ -40,6 +40,13 @@ def _require_sha256(value: str, name: str) -> None:
 
 def _blocked_key(src: str, dst: str, relation_id: str) -> str:
     return json.dumps([src, dst, relation_id], separators=(",", ":"))
+
+
+class FederationWitness(Protocol):
+    """Structural contract shared by all federation witness schemes."""
+
+    scheme: str
+    payload_sha256: str
 
 
 @dataclass(frozen=True)
@@ -77,7 +84,7 @@ class FederationRelation:
     status: RelationStatus = RelationStatus.ACTIVE
     evidence_policy: str = "receipt_required"
     witness_scheme: str = HMAC_SHARED_SECRET_SCHEME
-    witness: RelationWitness | None = None
+    witness: FederationWitness | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -155,6 +162,16 @@ class RelationDecision:
     reasons: tuple[str, ...]
     relation_sha256: str
     evaluated_at: int
+
+
+class RelationGate(Protocol):
+    """Verifier interface consumed by federated routing."""
+
+    def evaluate(
+        self,
+        relation: FederationRelation,
+        request: RelationRequest,
+    ) -> RelationDecision: ...
 
 
 def _relation_signature(secret: str, relation_sha256: str, role: str) -> str:
@@ -244,6 +261,8 @@ class RelationIntegrityGate:
         witness = relation.witness
         if witness is None:
             reasons.append("missing_bilateral_witness")
+        elif not isinstance(witness, RelationWitness):
+            reasons.append("witness_type_mismatch")
         else:
             if witness.scheme != relation.witness_scheme:
                 reasons.append("witness_scheme_mismatch")
@@ -324,7 +343,7 @@ class FederatedCapabilityGraph:
         capability_gate: AdmissibilityGate,
         preference: PreferenceModel,
         relations: RelationSource,
-        relation_gate: RelationIntegrityGate,
+        relation_gate: RelationGate,
     ) -> None:
         pair_keys = [(crossing.src, crossing.dst) for crossing in crossings]
         if len(set(pair_keys)) != len(pair_keys):
