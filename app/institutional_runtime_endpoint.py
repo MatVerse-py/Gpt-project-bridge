@@ -5,11 +5,14 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from .auth import Principal, authenticate
+from .auth import Principal, authenticate, configured_auth_scheme
+from .auth_trust_plane import management_router, public_router
 from .institutional_projection import ProjectionUnavailable, build_institutional_projection
-from .institutional_protocol import AUTH_METHOD, PROTOCOL_VERSION, RUNTIME_SCHEMA_VERSION
+from .institutional_protocol import PROTOCOL_VERSION, RUNTIME_SCHEMA_VERSION
 
 runtime_router = APIRouter()
+runtime_router.include_router(public_router)
+runtime_router.include_router(management_router)
 _RUNTIME_ID = re.compile(r"^[A-Za-z0-9._:-]{3,128}$")
 
 
@@ -50,8 +53,9 @@ def institutional_runtime(principal: Principal = Depends(authenticate)) -> dict:
         "schema_version": RUNTIME_SCHEMA_VERSION,
         "protocol_version": PROTOCOL_VERSION,
         "runtime_id": _runtime_id_or_503(),
-        "authentication": AUTH_METHOD,
+        "authentication": configured_auth_scheme(),
         "authenticated_principal_id": principal.principal_id,
+        "authenticated_key_id": principal.key_id,
         "source": projection["source"],
         "projection_hash": projection["projection"]["projection_hash"],
         "status": "READY",
