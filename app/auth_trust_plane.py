@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .auth import Principal, require_capability
-from .principal_registry import PrincipalIdentityRegistry
+from .principal_registry import PrincipalIdentityRegistry, PrincipalRegistryUnavailable
 
 management_router = APIRouter(prefix="/trust/auth", tags=["asymmetric-auth-trust-plane"])
 public_router = APIRouter(prefix="/v1/auth", tags=["asymmetric-auth-public-material"])
@@ -61,6 +61,11 @@ class RevokeRequest(StrictModel):
 
 
 def _raise_registry_error(exc: Exception) -> None:
+    if isinstance(exc, PrincipalRegistryUnavailable):
+        raise HTTPException(
+            status_code=503,
+            detail={"decision": "HOLD", "reason": str(exc)},
+        ) from exc
     if isinstance(exc, LookupError):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     if isinstance(exc, PermissionError):
