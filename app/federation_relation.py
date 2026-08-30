@@ -5,7 +5,7 @@ import hmac
 import json
 import re
 import time
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Callable, Mapping, Sequence
 
@@ -19,6 +19,7 @@ from .federation_routing import (
 )
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+HMAC_SHARED_SECRET_SCHEME = "HMAC-SHA256-SHARED-SECRET-V1"
 
 
 class RelationStatus(str, Enum):
@@ -38,11 +39,13 @@ def _require_sha256(value: str, name: str) -> None:
 
 @dataclass(frozen=True)
 class RelationWitness:
+    scheme: str
     payload_sha256: str
     source_hmac_sha256: str
     target_hmac_sha256: str
 
     def __post_init__(self) -> None:
+        _require_text(self.scheme, "scheme")
         _require_sha256(self.payload_sha256, "payload_sha256")
         _require_sha256(self.source_hmac_sha256, "source_hmac_sha256")
         _require_sha256(self.target_hmac_sha256, "target_hmac_sha256")
@@ -50,7 +53,7 @@ class RelationWitness:
 
 @dataclass(frozen=True)
 class FederationRelation:
-    """Directed, bilateral authorization for one federation boundary.
+    """Directed bilateral authorization for one federation boundary.
 
     A relation is not trusted because both domains exist. It is trusted only when
     its canonical payload is witnessed by both declared authorities and the
@@ -68,6 +71,7 @@ class FederationRelation:
     valid_until: int
     status: RelationStatus = RelationStatus.ACTIVE
     evidence_policy: str = "receipt_required"
+    witness_scheme: str = HMAC_SHARED_SECRET_SCHEME
     witness: RelationWitness | None = None
 
     def __post_init__(self) -> None:
@@ -78,8 +82,11 @@ class FederationRelation:
             "source_authority",
             "target_authority",
             "evidence_policy",
+            "witness_scheme",
         ):
             _require_text(getattr(self, name), name)
+        if not isinstance(self.status, RelationStatus):
+            raise ValueError("status must be a RelationStatus")
         if self.source_domain == self.target_domain:
             raise ValueError("federation relation must cross distinct domains")
         if self.source_authority == self.target_authority:
@@ -112,6 +119,7 @@ class FederationRelation:
             "valid_until": self.valid_until,
             "status": self.status.value,
             "evidence_policy": self.evidence_policy,
+            "witness_scheme": self.witness_scheme,
         }
 
     def payload_sha256(self) -> str:
@@ -157,11 +165,18 @@ def sign_relation(
     source_secret: str,
     target_secret: str,
 ) -> FederationRelation:
-    """Attach bilateral HMAC witness to an otherwise immutable relation."""
+    """Attach the current trust-domain HMAC witness to an immutable relation.
+
+    This helper deliberately does not claim independent-domain cryptographic
+    sovereignty. A public-key witness adapter is a separate promotion gate.
+    """
     if relation.witness is not None:
         raise ValueError("relation is already witnessed")
+    if relation.witness_scheme != HMAC_SHARED_SECRET_SCHEME:
+        raise ValueError(f"unsupported witness scheme: {relation.witness_scheme}")
     digest = relation.payload_sha256()
     witness = RelationWitness(
+        scheme=HMAC_SHARED_SECRET_SCHEME,
         payload_sha256=digest,
         source_hmac_sha256=_relation_signature(source_secret, digest, "source"),
         target_hmac_sha256=_relation_signature(target_secret, digest, "target"),
@@ -169,25 +184,34 @@ def sign_relation(
     return replace(relation, witness=witness)
 
 
-@dataclass
 class RelationIntegrityGate:
-    """Fail-closed bilateral relation verification.
+    """Fail-closed relation verification for the current shared-secret trust domain.
 
-    authority_secrets is intentionally injected by the caller. Secrets never
-    become relation fields or receipt material.
+    Authority secrets are copied into the verifier and never persisted inside
+    relations or receipts. This is compatible with the repository's current HMAC
+    principal model, but by itself is not evidence of provider-independent or
+    administratively independent federation.
     """
 
-    authority_secrets: Mapping[str, str]
-    now: Callable[[], int] = field(default=lambda: int(time.time()))
+    def __init__(
+        self,
+        authority_secrets: Mapping[str, str],
+        now: Callable[[], int] | None = None,
+    ) -> None:
+        copied = dict(authority_secrets)
+        if any(not isinstance(key, str) or not key for key in copied):
+            raise ValueError("authority ids must be non-empty strings")
+        if any(not isinstance(secret, str) or not secret for secret in copied.values()):
+            raise ValueError("authority secrets must be non-empty strings")
+        self._authority_secrets = copied
+        self._now = now or (lambda: int(time.time()))
 
     def evaluate(
         self,
         relation: FederationRelation,
         request: RelationRequest,
-        *,
-        evaluated_at: int | None = None,
     ) -> RelationDecision:
-        timestamp = int(self.now()) if evaluated_at is None else int(evaluated_at)
+        timestamp = int(self._now())
         reasons: list[str] = []
         digest = relation.payload_sha256()
 
@@ -205,16 +229,20 @@ class RelationIntegrityGate:
             reasons.append("relation_not_yet_valid")
         if timestamp >= relation.valid_until:
             reasons.append("relation_expired")
+        if relation.witness_scheme != HMAC_SHARED_SECRET_SCHEME:
+            reasons.append("unsupported_witness_scheme")
 
         witness = relation.witness
         if witness is None:
             reasons.append("missing_bilateral_witness")
         else:
+            if witness.scheme != relation.witness_scheme:
+                reasons.append("witness_scheme_mismatch")
             if not hmac.compare_digest(witness.payload_sha256, digest):
                 reasons.append("witness_payload_hash_mismatch")
 
-            source_secret = self.authority_secrets.get(relation.source_authority)
-            target_secret = self.authority_secrets.get(relation.target_authority)
+            source_secret = self._authority_secrets.get(relation.source_authority)
+            target_secret = self._authority_secrets.get(relation.target_authority)
             if not source_secret:
                 reasons.append("unknown_source_authority")
             else:
@@ -276,8 +304,6 @@ class FederatedCapabilityGraph:
         preference: PreferenceModel,
         relations: Sequence[FederationRelation],
         relation_gate: RelationIntegrityGate,
-        *,
-        evaluated_at: int | None = None,
     ) -> None:
         relation_by_id = {relation.relation_id: relation for relation in relations}
         if len(relation_by_id) != len(relations):
@@ -306,7 +332,6 @@ class FederatedCapabilityGraph:
                     contract_hash=crossing.contract_hash,
                     capability=crossing.capability,
                 ),
-                evaluated_at=evaluated_at,
             )
             if not decision.admissible:
                 self.blocked_relations[key] = list(decision.reasons)
