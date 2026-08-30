@@ -21,6 +21,7 @@ from .federation_routing import (
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 HMAC_SHARED_SECRET_SCHEME = "HMAC-SHA256-SHARED-SECRET-V1"
+_ROUTING_GOVERNED_WITNESS_SCHEMES = frozenset({"ED25519-PUBLIC-KEY-V1"})
 
 
 class RelationStatus(str, Enum):
@@ -334,6 +335,11 @@ class FederatedCapabilityGraph:
     relation without reconstructing the graph object. The requested transfer
     capability is supplied independently to route() and must be valid on every
     traversable boundary.
+
+    Witness schemes listed in ``_ROUTING_GOVERNED_WITNESS_SCHEMES`` are not
+    routable through cryptographic-only verifiers. Their gate must explicitly
+    declare ``enforces_key_lifecycle = True``. This prevents a caller from
+    bypassing key binding, rotation, or revocation by supplying a weaker gate.
     """
 
     def __init__(
@@ -388,22 +394,29 @@ class FederatedCapabilityGraph:
             if relation is None:
                 reasons.append("relation_not_found")
             else:
-                decision = self._relation_gate.evaluate(
-                    relation,
-                    RelationRequest(
-                        source_domain=crossing.src,
-                        target_domain=crossing.dst,
-                        contract_hash=crossing.contract_hash,
-                        capability=capability,
-                    ),
+                lifecycle_required = relation.witness_scheme in _ROUTING_GOVERNED_WITNESS_SCHEMES
+                lifecycle_enforced = bool(
+                    getattr(self._relation_gate, "enforces_key_lifecycle", False)
                 )
-                reasons.extend(decision.reasons)
-                if not reasons:
-                    crossing_by_pair[(crossing.src, crossing.dst)] = crossing
-                    relation_digest_by_id[relation.relation_id] = decision.relation_sha256
-                    valid_crossings.append(
-                        Crossing(crossing.src, crossing.dst, crossing.cost, crossing.reason)
+                if lifecycle_required and not lifecycle_enforced:
+                    reasons.append("governed_key_lifecycle_required")
+                else:
+                    decision = self._relation_gate.evaluate(
+                        relation,
+                        RelationRequest(
+                            source_domain=crossing.src,
+                            target_domain=crossing.dst,
+                            contract_hash=crossing.contract_hash,
+                            capability=capability,
+                        ),
                     )
+                    reasons.extend(decision.reasons)
+                    if not reasons:
+                        crossing_by_pair[(crossing.src, crossing.dst)] = crossing
+                        relation_digest_by_id[relation.relation_id] = decision.relation_sha256
+                        valid_crossings.append(
+                            Crossing(crossing.src, crossing.dst, crossing.cost, crossing.reason)
+                        )
             if reasons:
                 blocked_relations[key] = reasons
 

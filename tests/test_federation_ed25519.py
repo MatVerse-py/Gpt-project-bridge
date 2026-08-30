@@ -233,7 +233,7 @@ def test_hybrid_gate_rejects_unknown_witness_scheme_without_cross_scheme_fallbac
     assert "missing_bilateral_witness" in decision.reasons
 
 
-def test_ed25519_relation_routes_through_existing_federated_graph():
+def test_ed25519_relation_cannot_route_without_governed_key_lifecycle():
     nodes = [
         CapabilityNode("domain-a", "domain", {"quality": 0.5}),
         CapabilityNode("domain-b", "domain", {"quality": 0.9}),
@@ -265,10 +265,8 @@ def test_ed25519_relation_routes_through_existing_federated_graph():
             now=lambda: 150,
         ),
     )
-    result = graph.route(
-        "domain-a",
-        ["domain-b"],
-        capability="state.transfer",
+    blocked = graph.blocked_for("state.transfer")
+    assert any(
+        "governed_key_lifecycle_required" in reasons
+        for reasons in blocked.values()
     )
-    assert result.route.path == ("domain-a", "domain-b")
-    assert result.traversed_relations == ("rel-a-b-ed25519-v1",)
