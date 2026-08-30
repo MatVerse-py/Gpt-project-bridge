@@ -203,6 +203,12 @@ async def _authenticate_ed25519(request: Request) -> Principal:
         raise HTTPException(status_code=401, detail="unknown principal credential")
     principal_record = credential.principal
     key_record = credential.key
+    if (
+        principal_record.principal_id != principal_id
+        or key_record.principal_id != principal_id
+        or key_record.key_id != key_id
+    ):
+        raise HTTPException(status_code=401, detail="principal credential identity binding mismatch")
     observed_at = int(time.time())
     if principal_record.status == "REVOKED" and (
         principal_record.revoked_at is None or observed_at >= principal_record.revoked_at
