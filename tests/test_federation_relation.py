@@ -3,6 +3,7 @@ from dataclasses import replace
 import pytest
 
 from app.federation_relation import (
+    HMAC_SHARED_SECRET_SCHEME,
     FederatedCapabilityGraph,
     FederatedCrossing,
     FederationRelation,
@@ -26,7 +27,12 @@ SOURCE_SECRET = "source-secret-for-tests"
 TARGET_SECRET = "target-secret-for-tests"
 
 
-def relation(*, capability: str = "state.transfer", status: RelationStatus = RelationStatus.ACTIVE) -> FederationRelation:
+def relation(
+    *,
+    capability: str = "state.transfer",
+    status: RelationStatus = RelationStatus.ACTIVE,
+    witness_scheme: str = HMAC_SHARED_SECRET_SCHEME,
+) -> FederationRelation:
     return FederationRelation(
         relation_id="rel-a-b-v1",
         source_domain="domain-a",
@@ -38,6 +44,7 @@ def relation(*, capability: str = "state.transfer", status: RelationStatus = Rel
         valid_from=100,
         valid_until=200,
         status=status,
+        witness_scheme=witness_scheme,
     )
 
 
@@ -59,7 +66,13 @@ def relation_gate(now: int = 150) -> RelationIntegrityGate:
     )
 
 
-def routing_graph(rel: FederationRelation, *, crossing_contract: str = CONTRACT, capability: str = "state.transfer"):
+def routing_graph(
+    rel: FederationRelation,
+    *,
+    crossing_contract: str = CONTRACT,
+    capability: str = "state.transfer",
+    now: int = 150,
+):
     nodes = [
         CapabilityNode("domain-a", "domain", {"quality": 0.5}),
         CapabilityNode("domain-b", "domain", {"quality": 0.9}),
@@ -83,8 +96,7 @@ def routing_graph(rel: FederationRelation, *, crossing_contract: str = CONTRACT,
         capability_gate=AdmissibilityGate([]),
         preference=preference,
         relations=[rel],
-        relation_gate=relation_gate(),
-        evaluated_at=150,
+        relation_gate=relation_gate(now),
     )
 
 
@@ -113,7 +125,6 @@ def test_tampering_after_witness_invalidates_relation():
     decision = relation_gate().evaluate(
         tampered,
         RelationRequest("domain-a", "domain-b", CONTRACT, "state.transfer"),
-        evaluated_at=150,
     )
     assert decision.admissible is False
     assert "witness_payload_hash_mismatch" in decision.reasons
@@ -127,6 +138,7 @@ def test_invalid_target_witness_fails_closed():
     forged = replace(
         original,
         witness=RelationWitness(
+            scheme=HMAC_SHARED_SECRET_SCHEME,
             payload_sha256=original.witness.payload_sha256,
             source_hmac_sha256=original.witness.source_hmac_sha256,
             target_hmac_sha256="0" * 64,
@@ -135,7 +147,6 @@ def test_invalid_target_witness_fails_closed():
     decision = relation_gate().evaluate(
         forged,
         RelationRequest("domain-a", "domain-b", CONTRACT, "state.transfer"),
-        evaluated_at=150,
     )
     assert decision.admissible is False
     assert decision.reasons == ("invalid_target_witness",)
@@ -147,7 +158,15 @@ def test_expired_relation_is_blocked_even_with_valid_witnesses():
         RelationRequest("domain-a", "domain-b", CONTRACT, "state.transfer"),
     )
     assert decision.admissible is False
+    assert decision.evaluated_at == 250
     assert "relation_expired" in decision.reasons
+
+
+def test_expired_relation_cannot_be_reopened_by_routing_input():
+    graph = routing_graph(signed_relation(), now=250)
+    assert any("relation_expired" in reasons for reasons in graph.blocked_relations.values())
+    with pytest.raises(ValueError, match="no admissible target is reachable"):
+        graph.route("domain-a", ["domain-b"])
 
 
 def test_contract_drift_blocks_crossing():
@@ -172,10 +191,39 @@ def test_revoked_relation_cannot_be_reused():
     decision = relation_gate().evaluate(
         signed_relation(status=RelationStatus.REVOKED),
         RelationRequest("domain-a", "domain-b", CONTRACT, "state.transfer"),
-        evaluated_at=150,
     )
     assert decision.admissible is False
     assert "status:REVOKED" in decision.reasons
+
+
+def test_unknown_target_authority_fails_closed():
+    gate = RelationIntegrityGate(
+        {"authority-a": SOURCE_SECRET},
+        now=lambda: 150,
+    )
+    decision = gate.evaluate(
+        signed_relation(),
+        RelationRequest("domain-a", "domain-b", CONTRACT, "state.transfer"),
+    )
+    assert decision.admissible is False
+    assert "unknown_target_authority" in decision.reasons
+
+
+def test_unsupported_witness_scheme_is_not_silently_downgraded():
+    unsupported = relation(witness_scheme="ED25519-V1")
+    with pytest.raises(ValueError, match="unsupported witness scheme"):
+        sign_relation(
+            unsupported,
+            source_secret=SOURCE_SECRET,
+            target_secret=TARGET_SECRET,
+        )
+    decision = relation_gate().evaluate(
+        unsupported,
+        RelationRequest("domain-a", "domain-b", CONTRACT, "state.transfer"),
+    )
+    assert decision.admissible is False
+    assert "unsupported_witness_scheme" in decision.reasons
+    assert "missing_bilateral_witness" in decision.reasons
 
 
 def test_relation_receipt_is_deterministic():
