@@ -13,6 +13,7 @@ from app.federation_ed25519 import (
 )
 from app.federation_key_registry import authority_key_id
 from app.federation_relation import FederationRelation
+from conftest import auth_request
 
 CONTRACT = "a" * 64
 SOURCE_PRIVATE = Ed25519PrivateKey.from_private_bytes(bytes.fromhex("31" * 32))
@@ -27,7 +28,7 @@ def _events() -> list[dict[str, object]]:
     return [json.loads(row["event_json"]) for row in storage.read_ledger()]
 
 
-def _register(client, auth_request, authority_id: str, public_key_hex: str, *, valid_from: int = 100, valid_until: int = 200):
+def _register(client, authority_id: str, public_key_hex: str, *, valid_from: int = 100, valid_until: int = 200):
     return auth_request(
         client,
         "admin",
@@ -41,8 +42,8 @@ def _register(client, auth_request, authority_id: str, public_key_hex: str, *, v
     )
 
 
-def test_genesis_key_actor_is_authenticated_principal(client, auth_request):
-    response = _register(client, auth_request, "authority-a", SOURCE_PUBLIC)
+def test_genesis_key_actor_is_authenticated_principal(client):
+    response = _register(client, "authority-a", SOURCE_PUBLIC)
     assert response.status_code == 200
     body = response.json()
     assert body["authenticated_actor"] == "admin"
@@ -55,7 +56,7 @@ def test_genesis_key_actor_is_authenticated_principal(client, auth_request):
     assert "actor_id" not in event
 
 
-def test_forged_actor_fields_are_rejected_before_mutation(client, auth_request):
+def test_forged_actor_fields_are_rejected_before_mutation(client):
     response = auth_request(
         client,
         "admin",
@@ -72,7 +73,7 @@ def test_forged_actor_fields_are_rejected_before_mutation(client, auth_request):
     assert storage.read_ledger() == []
 
 
-def test_missing_capability_cannot_mutate_registry(client, auth_request):
+def test_missing_capability_cannot_mutate_registry(client):
     response = auth_request(
         client,
         "gpt",
@@ -88,7 +89,7 @@ def test_missing_capability_cannot_mutate_registry(client, auth_request):
     assert storage.read_ledger() == []
 
 
-def test_invalid_signature_cannot_mutate_registry(client, auth_request):
+def test_invalid_signature_cannot_mutate_registry(client):
     response = auth_request(
         client,
         "admin",
@@ -105,7 +106,7 @@ def test_invalid_signature_cannot_mutate_registry(client, auth_request):
     assert storage.read_ledger() == []
 
 
-def test_nonce_replay_cannot_repeat_authenticated_mutation(client, auth_request):
+def test_nonce_replay_cannot_repeat_authenticated_mutation(client):
     nonce = "0123456789abcdef0123456789abcdef"
     first = auth_request(
         client,
@@ -137,8 +138,8 @@ def test_nonce_replay_cannot_repeat_authenticated_mutation(client, auth_request)
     assert [event["event_type"] for event in _events()] == ["FEDERATION_AUTHORITY_KEY_REGISTERED"]
 
 
-def test_rotation_derives_lineage_and_revocation_records_authenticated_actor(client, auth_request):
-    first = _register(client, auth_request, "authority-a", SOURCE_PUBLIC, valid_from=100, valid_until=200)
+def test_rotation_derives_lineage_and_revocation_records_authenticated_actor(client):
+    first = _register(client, "authority-a", SOURCE_PUBLIC, valid_from=100, valid_until=200)
     assert first.status_code == 200
 
     rotated_private = Ed25519PrivateKey.from_private_bytes(bytes.fromhex("51" * 32))
@@ -177,9 +178,9 @@ def test_rotation_derives_lineage_and_revocation_records_authenticated_actor(cli
     assert events[-1]["revoked_by"] == "admin"
 
 
-def test_relation_binding_is_authenticated_and_ledgered(client, auth_request):
-    assert _register(client, auth_request, "authority-a", SOURCE_PUBLIC).status_code == 200
-    assert _register(client, auth_request, "authority-b", TARGET_PUBLIC).status_code == 200
+def test_relation_binding_is_authenticated_and_ledgered(client):
+    assert _register(client, "authority-a", SOURCE_PUBLIC).status_code == 200
+    assert _register(client, "authority-b", TARGET_PUBLIC).status_code == 200
 
     relation = FederationRelation(
         relation_id="rel-a-b-authenticated-v1",
