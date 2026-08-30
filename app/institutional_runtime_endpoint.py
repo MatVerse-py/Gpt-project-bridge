@@ -44,6 +44,12 @@ def _projection_or_503() -> dict:
         ) from exc
 
 
+def _wire_authentication(principal: Principal) -> str:
+    if principal.auth_scheme == "HMAC-SHA256-LEGACY":
+        return "HMAC-SHA256"
+    return principal.auth_scheme
+
+
 @runtime_router.get("/institutional/runtime")
 def institutional_runtime(principal: Principal = Depends(authenticate)) -> dict:
     if not principal.allows("institutional:projection:read"):
@@ -53,7 +59,7 @@ def institutional_runtime(principal: Principal = Depends(authenticate)) -> dict:
         "schema_version": RUNTIME_SCHEMA_VERSION,
         "protocol_version": PROTOCOL_VERSION,
         "runtime_id": _runtime_id_or_503(),
-        "authentication": principal.auth_scheme,
+        "authentication": _wire_authentication(principal),
         "authenticated_principal_id": principal.principal_id,
         "authenticated_key_id": principal.key_id,
         "source": projection["source"],
