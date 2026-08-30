@@ -293,8 +293,16 @@ class FederatedRoutingResult:
     relation_receipt_sha256: str
 
 
+RelationSource = Sequence[FederationRelation] | Callable[[], Sequence[FederationRelation]]
+
+
 class FederatedCapabilityGraph:
-    """Capability routing where every cross-domain edge has a valid relation."""
+    """Capability routing where every cross-domain edge has a current valid relation.
+
+    Relations and their temporal validity are re-evaluated for every route call.
+    Supplying a callable relation source allows a registry to revoke or replace a
+    relation without reconstructing the graph object.
+    """
 
     def __init__(
         self,
@@ -302,29 +310,48 @@ class FederatedCapabilityGraph:
         crossings: Sequence[FederatedCrossing],
         capability_gate: AdmissibilityGate,
         preference: PreferenceModel,
-        relations: Sequence[FederationRelation],
+        relations: RelationSource,
         relation_gate: RelationIntegrityGate,
     ) -> None:
+        pair_keys = [(crossing.src, crossing.dst) for crossing in crossings]
+        if len(set(pair_keys)) != len(pair_keys):
+            raise ValueError("parallel federated crossings are not supported in v1")
+        self._nodes = tuple(nodes)
+        self._crossings = tuple(crossings)
+        self._capability_gate = capability_gate
+        self._preference = preference
+        self._relation_source = relations
+        self._relation_gate = relation_gate
+
+    def _current_relations(self) -> tuple[FederationRelation, ...]:
+        current = self._relation_source() if callable(self._relation_source) else self._relation_source
+        return tuple(current)
+
+    def _validated_state(
+        self,
+    ) -> tuple[
+        CapabilityGraph,
+        dict[tuple[str, str], FederatedCrossing],
+        dict[str, list[str]],
+        dict[str, str],
+    ]:
+        relations = self._current_relations()
         relation_by_id = {relation.relation_id: relation for relation in relations}
         if len(relation_by_id) != len(relations):
             raise ValueError("duplicate relation_id")
 
-        pair_keys = [(crossing.src, crossing.dst) for crossing in crossings]
-        if len(set(pair_keys)) != len(pair_keys):
-            raise ValueError("parallel federated crossings are not supported in v1")
-
-        self._crossing_by_pair: dict[tuple[str, str], FederatedCrossing] = {}
-        self.blocked_relations: dict[str, list[str]] = {}
+        crossing_by_pair: dict[tuple[str, str], FederatedCrossing] = {}
+        blocked_relations: dict[str, list[str]] = {}
         valid_crossings: list[Crossing] = []
-        self._relation_digest_by_id: dict[str, str] = {}
+        relation_digest_by_id: dict[str, str] = {}
 
-        for crossing in crossings:
+        for crossing in self._crossings:
             key = f"{crossing.src}->{crossing.dst}:{crossing.relation_id}"
             relation = relation_by_id.get(crossing.relation_id)
             if relation is None:
-                self.blocked_relations[key] = ["relation_not_found"]
+                blocked_relations[key] = ["relation_not_found"]
                 continue
-            decision = relation_gate.evaluate(
+            decision = self._relation_gate.evaluate(
                 relation,
                 RelationRequest(
                     source_domain=crossing.src,
@@ -334,33 +361,36 @@ class FederatedCapabilityGraph:
                 ),
             )
             if not decision.admissible:
-                self.blocked_relations[key] = list(decision.reasons)
+                blocked_relations[key] = list(decision.reasons)
                 continue
-            self._crossing_by_pair[(crossing.src, crossing.dst)] = crossing
-            self._relation_digest_by_id[relation.relation_id] = decision.relation_sha256
+            crossing_by_pair[(crossing.src, crossing.dst)] = crossing
+            relation_digest_by_id[relation.relation_id] = decision.relation_sha256
             valid_crossings.append(
                 Crossing(crossing.src, crossing.dst, crossing.cost, crossing.reason)
             )
 
-        self._graph = CapabilityGraph(
-            nodes=nodes,
+        graph = CapabilityGraph(
+            nodes=self._nodes,
             crossings=valid_crossings,
-            gate=capability_gate,
-            preference=preference,
+            gate=self._capability_gate,
+            preference=self._preference,
         )
+        return graph, crossing_by_pair, blocked_relations, relation_digest_by_id
 
     @property
     def blocked(self) -> Mapping[str, Sequence[str]]:
+        graph, _, blocked_relations, _ = self._validated_state()
         return {
-            **{key: tuple(value) for key, value in self._graph.blocked.items()},
-            **{key: tuple(value) for key, value in self.blocked_relations.items()},
+            **{key: tuple(value) for key, value in graph.blocked.items()},
+            **{key: tuple(value) for key, value in blocked_relations.items()},
         }
 
     def route(self, origin: str, targets: Sequence[str] | None = None) -> FederatedRoutingResult:
-        route = self._graph.route(origin, targets)
+        graph, crossing_by_pair, blocked_relations, relation_digest_by_id = self._validated_state()
+        route = graph.route(origin, targets)
         traversed: list[str] = []
         for src, dst in zip(route.path, route.path[1:]):
-            crossing = self._crossing_by_pair.get((src, dst))
+            crossing = crossing_by_pair.get((src, dst))
             if crossing is None:
                 raise RuntimeError("route crossed an edge without a validated federation relation")
             traversed.append(crossing.relation_id)
@@ -369,11 +399,11 @@ class FederatedCapabilityGraph:
             "route_receipt_sha256": route.receipt_sha256,
             "traversed_relations": traversed,
             "relation_hashes": {
-                relation_id: self._relation_digest_by_id[relation_id]
+                relation_id: relation_digest_by_id[relation_id]
                 for relation_id in sorted(set(traversed))
             },
             "blocked_relations": {
-                key: sorted(value) for key, value in sorted(self.blocked_relations.items())
+                key: sorted(value) for key, value in sorted(blocked_relations.items())
             },
         }
         receipt = hashlib.sha256(
@@ -382,6 +412,6 @@ class FederatedCapabilityGraph:
         return FederatedRoutingResult(
             route=route,
             traversed_relations=tuple(traversed),
-            blocked_relations=self.blocked_relations,
+            blocked_relations=blocked_relations,
             relation_receipt_sha256=receipt,
         )
