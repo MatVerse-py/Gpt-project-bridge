@@ -7,6 +7,7 @@ import re
 import time
 from dataclasses import dataclass, replace
 from enum import Enum
+from types import MappingProxyType
 from typing import Callable, Mapping, Sequence
 
 from .federation_routing import (
@@ -35,6 +36,10 @@ def _require_text(value: str, name: str) -> None:
 def _require_sha256(value: str, name: str) -> None:
     if not isinstance(value, str) or _SHA256_RE.fullmatch(value) is None:
         raise ValueError(f"{name} must be a lowercase SHA-256 hex digest")
+
+
+def _blocked_key(src: str, dst: str, relation_id: str) -> str:
+    return json.dumps([src, dst, relation_id], separators=(",", ":"))
 
 
 @dataclass(frozen=True)
@@ -174,6 +179,10 @@ def sign_relation(
         raise ValueError("relation is already witnessed")
     if relation.witness_scheme != HMAC_SHARED_SECRET_SCHEME:
         raise ValueError(f"unsupported witness scheme: {relation.witness_scheme}")
+    _require_text(source_secret, "source_secret")
+    _require_text(target_secret, "target_secret")
+    if hmac.compare_digest(source_secret, target_secret):
+        raise ValueError("source and target authority secrets must be distinct")
     digest = relation.payload_sha256()
     witness = RelationWitness(
         scheme=HMAC_SHARED_SECRET_SCHEME,
@@ -245,13 +254,15 @@ class RelationIntegrityGate:
             target_secret = self._authority_secrets.get(relation.target_authority)
             if not source_secret:
                 reasons.append("unknown_source_authority")
-            else:
+            if not target_secret:
+                reasons.append("unknown_target_authority")
+            if source_secret and target_secret and hmac.compare_digest(source_secret, target_secret):
+                reasons.append("shared_authority_secret")
+            if source_secret:
                 expected = _relation_signature(source_secret, digest, "source")
                 if not hmac.compare_digest(expected, witness.source_hmac_sha256):
                     reasons.append("invalid_source_witness")
-            if not target_secret:
-                reasons.append("unknown_target_authority")
-            else:
+            if target_secret:
                 expected = _relation_signature(target_secret, digest, "target")
                 if not hmac.compare_digest(expected, witness.target_hmac_sha256):
                     reasons.append("invalid_target_witness")
@@ -289,7 +300,7 @@ class FederatedCrossing:
 class FederatedRoutingResult:
     route: RoutingResult
     traversed_relations: tuple[str, ...]
-    blocked_relations: Mapping[str, Sequence[str]]
+    blocked_relations: Mapping[str, tuple[str, ...]]
     relation_receipt_sha256: str
 
 
@@ -301,7 +312,9 @@ class FederatedCapabilityGraph:
 
     Relations and their temporal validity are re-evaluated for every route call.
     Supplying a callable relation source allows a registry to revoke or replace a
-    relation without reconstructing the graph object.
+    relation without reconstructing the graph object. The requested transfer
+    capability is supplied independently to route() and must be valid on every
+    traversable boundary.
     """
 
     def __init__(
@@ -329,12 +342,14 @@ class FederatedCapabilityGraph:
 
     def _validated_state(
         self,
+        capability: str,
     ) -> tuple[
         CapabilityGraph,
         dict[tuple[str, str], FederatedCrossing],
         dict[str, list[str]],
         dict[str, str],
     ]:
+        _require_text(capability, "capability")
         relations = self._current_relations()
         relation_by_id = {relation.relation_id: relation for relation in relations}
         if len(relation_by_id) != len(relations):
@@ -346,28 +361,32 @@ class FederatedCapabilityGraph:
         relation_digest_by_id: dict[str, str] = {}
 
         for crossing in self._crossings:
-            key = f"{crossing.src}->{crossing.dst}:{crossing.relation_id}"
+            key = _blocked_key(crossing.src, crossing.dst, crossing.relation_id)
+            reasons: list[str] = []
+            if crossing.capability != capability:
+                reasons.append("crossing_capability_mismatch")
             relation = relation_by_id.get(crossing.relation_id)
             if relation is None:
-                blocked_relations[key] = ["relation_not_found"]
-                continue
-            decision = self._relation_gate.evaluate(
-                relation,
-                RelationRequest(
-                    source_domain=crossing.src,
-                    target_domain=crossing.dst,
-                    contract_hash=crossing.contract_hash,
-                    capability=crossing.capability,
-                ),
-            )
-            if not decision.admissible:
-                blocked_relations[key] = list(decision.reasons)
-                continue
-            crossing_by_pair[(crossing.src, crossing.dst)] = crossing
-            relation_digest_by_id[relation.relation_id] = decision.relation_sha256
-            valid_crossings.append(
-                Crossing(crossing.src, crossing.dst, crossing.cost, crossing.reason)
-            )
+                reasons.append("relation_not_found")
+            else:
+                decision = self._relation_gate.evaluate(
+                    relation,
+                    RelationRequest(
+                        source_domain=crossing.src,
+                        target_domain=crossing.dst,
+                        contract_hash=crossing.contract_hash,
+                        capability=capability,
+                    ),
+                )
+                reasons.extend(decision.reasons)
+                if not reasons:
+                    crossing_by_pair[(crossing.src, crossing.dst)] = crossing
+                    relation_digest_by_id[relation.relation_id] = decision.relation_sha256
+                    valid_crossings.append(
+                        Crossing(crossing.src, crossing.dst, crossing.cost, crossing.reason)
+                    )
+            if reasons:
+                blocked_relations[key] = reasons
 
         graph = CapabilityGraph(
             nodes=self._nodes,
@@ -377,16 +396,22 @@ class FederatedCapabilityGraph:
         )
         return graph, crossing_by_pair, blocked_relations, relation_digest_by_id
 
-    @property
-    def blocked(self) -> Mapping[str, Sequence[str]]:
-        graph, _, blocked_relations, _ = self._validated_state()
-        return {
+    def blocked_for(self, capability: str) -> Mapping[str, tuple[str, ...]]:
+        graph, _, blocked_relations, _ = self._validated_state(capability)
+        snapshot = {
             **{key: tuple(value) for key, value in graph.blocked.items()},
             **{key: tuple(value) for key, value in blocked_relations.items()},
         }
+        return MappingProxyType(snapshot)
 
-    def route(self, origin: str, targets: Sequence[str] | None = None) -> FederatedRoutingResult:
-        graph, crossing_by_pair, blocked_relations, relation_digest_by_id = self._validated_state()
+    def route(
+        self,
+        origin: str,
+        targets: Sequence[str] | None = None,
+        *,
+        capability: str,
+    ) -> FederatedRoutingResult:
+        graph, crossing_by_pair, blocked_relations, relation_digest_by_id = self._validated_state(capability)
         route = graph.route(origin, targets)
         traversed: list[str] = []
         for src, dst in zip(route.path, route.path[1:]):
@@ -395,7 +420,11 @@ class FederatedCapabilityGraph:
                 raise RuntimeError("route crossed an edge without a validated federation relation")
             traversed.append(crossing.relation_id)
 
+        immutable_blocked = {
+            key: tuple(value) for key, value in blocked_relations.items()
+        }
         payload = {
+            "requested_capability": capability,
             "route_receipt_sha256": route.receipt_sha256,
             "traversed_relations": traversed,
             "relation_hashes": {
@@ -403,7 +432,7 @@ class FederatedCapabilityGraph:
                 for relation_id in sorted(set(traversed))
             },
             "blocked_relations": {
-                key: sorted(value) for key, value in sorted(blocked_relations.items())
+                key: list(value) for key, value in sorted(immutable_blocked.items())
             },
         }
         receipt = hashlib.sha256(
@@ -412,6 +441,6 @@ class FederatedCapabilityGraph:
         return FederatedRoutingResult(
             route=route,
             traversed_relations=tuple(traversed),
-            blocked_relations=blocked_relations,
+            blocked_relations=MappingProxyType(immutable_blocked),
             relation_receipt_sha256=receipt,
         )
