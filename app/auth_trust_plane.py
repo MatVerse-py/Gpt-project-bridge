@@ -6,6 +6,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .auth import Principal, require_capability
+from .institutional_state_client import (
+    InstitutionalStateRejected,
+    InstitutionalStateUnavailable,
+    fetch_remote_auth_credential,
+    fetch_remote_principal,
+    register_remote_principal,
+    remote_state_enabled,
+    revoke_remote_principal,
+    revoke_remote_principal_key,
+    rotate_remote_principal_key,
+)
 from .principal_registry import PrincipalIdentityRegistry, PrincipalRegistryUnavailable
 
 management_router = APIRouter(prefix="/trust/auth", tags=["asymmetric-auth-trust-plane"])
@@ -61,11 +72,14 @@ class RevokeRequest(StrictModel):
 
 
 def _raise_registry_error(exc: Exception) -> None:
-    if isinstance(exc, PrincipalRegistryUnavailable):
+    if isinstance(exc, (PrincipalRegistryUnavailable, InstitutionalStateUnavailable)):
         raise HTTPException(
             status_code=503,
             detail={"decision": "HOLD", "reason": str(exc)},
         ) from exc
+    if isinstance(exc, InstitutionalStateRejected):
+        status = exc.status if 400 <= exc.status < 500 else 503
+        raise HTTPException(status_code=status, detail=exc.detail) from exc
     if isinstance(exc, LookupError):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     if isinstance(exc, PermissionError):
@@ -109,8 +123,31 @@ def _serialized_principal(principal_id: str) -> dict[str, object]:
     }
 
 
+def _remote_or_local_principal(principal_id: str) -> dict[str, object]:
+    if remote_state_enabled():
+        try:
+            result = fetch_remote_principal(principal_id)
+        except Exception as exc:
+            _raise_registry_error(exc)
+            raise AssertionError("unreachable")
+        if result is None:
+            raise HTTPException(status_code=404, detail="principal not found")
+        return result
+    return _serialized_principal(principal_id)
+
+
 @public_router.get("/credentials/{principal_id}/{key_id}")
 def public_credential(principal_id: str, key_id: str) -> dict[str, object]:
+    if remote_state_enabled():
+        try:
+            result = fetch_remote_auth_credential(principal_id, key_id)
+        except Exception as exc:
+            _raise_registry_error(exc)
+            raise AssertionError("unreachable")
+        if result is None:
+            raise HTTPException(status_code=404, detail="principal credential not found")
+        return {**result, "private_material_present": False}
+
     try:
         _registry.bootstrap_root_from_environment()
     except Exception as exc:
@@ -135,6 +172,16 @@ def create_principal(
 ) -> dict[str, object]:
     _assert_grant_subset(actor, req.capabilities)
     try:
+        if remote_state_enabled():
+            result = register_remote_principal(
+                principal_id=principal_id,
+                capabilities=list(req.capabilities),
+                public_key_hex=req.public_key_hex,
+                valid_from=req.valid_from,
+                valid_until=req.valid_until,
+                actor_id=actor.principal_id,
+            )
+            return {**result, "authenticated_actor": actor.principal_id}
         result = _registry.register_principal(
             principal_id=principal_id,
             capabilities=req.capabilities,
@@ -160,7 +207,7 @@ def read_principal(
     actor: Principal = Depends(require_capability("auth:principal:read")),
 ) -> dict[str, object]:
     _can_act_on(actor, principal_id, "read")
-    return {**_serialized_principal(principal_id), "read_by": actor.principal_id}
+    return {**_remote_or_local_principal(principal_id), "read_by": actor.principal_id}
 
 
 @management_router.post("/principals/{principal_id}/keys/{previous_key_id}/rotate")
@@ -172,6 +219,16 @@ def rotate_principal_key(
 ) -> dict[str, object]:
     _can_act_on(actor, principal_id, "rotate")
     try:
+        if remote_state_enabled():
+            result = rotate_remote_principal_key(
+                principal_id=principal_id,
+                previous_key_id=previous_key_id,
+                public_key_hex=req.public_key_hex,
+                valid_from=req.valid_from,
+                valid_until=req.valid_until,
+                actor_id=actor.principal_id,
+            )
+            return {**result, "authenticated_actor": actor.principal_id}
         result = _registry.rotate_key(
             principal_id=principal_id,
             previous_key_id=previous_key_id,
@@ -199,6 +256,15 @@ def revoke_principal_key(
 ) -> dict[str, object]:
     _can_act_on(actor, principal_id, "revoke-key")
     try:
+        if remote_state_enabled():
+            result = revoke_remote_principal_key(
+                principal_id=principal_id,
+                key_id=key_id,
+                effective_at=req.effective_at,
+                reason=req.reason,
+                actor_id=actor.principal_id,
+            )
+            return {**result, "authenticated_actor": actor.principal_id}
         result = _registry.revoke_key(
             principal_id=principal_id,
             key_id=key_id,
@@ -227,6 +293,14 @@ def revoke_principal(
     if actor.principal_id == principal_id and not actor.allows("auth:principal:revoke:self"):
         raise HTTPException(status_code=403, detail="self-revocation requires auth:principal:revoke:self")
     try:
+        if remote_state_enabled():
+            result = revoke_remote_principal(
+                principal_id=principal_id,
+                effective_at=req.effective_at,
+                reason=req.reason,
+                actor_id=actor.principal_id,
+            )
+            return {**result, "authenticated_actor": actor.principal_id}
         result = _registry.revoke_principal(
             principal_id=principal_id,
             effective_at=req.effective_at,
