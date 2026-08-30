@@ -25,11 +25,12 @@ CONTRACT = "a" * 64
 OTHER_CONTRACT = "b" * 64
 SOURCE_SECRET = "source-secret-for-tests"
 TARGET_SECRET = "target-secret-for-tests"
+CAPABILITY = "state.transfer"
 
 
 def relation(
     *,
-    capability: str = "state.transfer",
+    capability: str = CAPABILITY,
     status: RelationStatus = RelationStatus.ACTIVE,
     witness_scheme: str = HMAC_SHARED_SECRET_SCHEME,
 ) -> FederationRelation:
@@ -70,7 +71,7 @@ def routing_graph(
     rel: FederationRelation,
     *,
     crossing_contract: str = CONTRACT,
-    capability: str = "state.transfer",
+    crossing_capability: str = CAPABILITY,
     now: int = 150,
 ):
     nodes = [
@@ -89,7 +90,7 @@ def routing_graph(
                 "domain-b",
                 0.1,
                 rel.relation_id,
-                capability,
+                crossing_capability,
                 crossing_contract,
             )
         ],
@@ -102,7 +103,7 @@ def routing_graph(
 
 def test_bilateral_witness_allows_only_scoped_cross_domain_route():
     graph = routing_graph(signed_relation())
-    result = graph.route("domain-a", ["domain-b"])
+    result = graph.route("domain-a", ["domain-b"], capability=CAPABILITY)
     assert result.route.path == ("domain-a", "domain-b")
     assert result.traversed_relations == ("rel-a-b-v1",)
     assert len(result.relation_receipt_sha256) == 64
@@ -113,10 +114,10 @@ def test_missing_witness_fails_closed_before_routing():
     graph = routing_graph(relation())
     assert any(
         "missing_bilateral_witness" in reasons
-        for reasons in graph.blocked.values()
+        for reasons in graph.blocked_for(CAPABILITY).values()
     )
     with pytest.raises(ValueError, match="no admissible target is reachable"):
-        graph.route("domain-a", ["domain-b"])
+        graph.route("domain-a", ["domain-b"], capability=CAPABILITY)
 
 
 def test_tampering_after_witness_invalidates_relation():
@@ -124,7 +125,7 @@ def test_tampering_after_witness_invalidates_relation():
     tampered = replace(original, evidence_policy="different-policy")
     decision = relation_gate().evaluate(
         tampered,
-        RelationRequest("domain-a", "domain-b", CONTRACT, "state.transfer"),
+        RelationRequest("domain-a", "domain-b", CONTRACT, CAPABILITY),
     )
     assert decision.admissible is False
     assert "witness_payload_hash_mismatch" in decision.reasons
@@ -146,7 +147,7 @@ def test_invalid_target_witness_fails_closed():
     )
     decision = relation_gate().evaluate(
         forged,
-        RelationRequest("domain-a", "domain-b", CONTRACT, "state.transfer"),
+        RelationRequest("domain-a", "domain-b", CONTRACT, CAPABILITY),
     )
     assert decision.admissible is False
     assert decision.reasons == ("invalid_target_witness",)
@@ -155,7 +156,7 @@ def test_invalid_target_witness_fails_closed():
 def test_expired_relation_is_blocked_even_with_valid_witnesses():
     decision = relation_gate(now=250).evaluate(
         signed_relation(),
-        RelationRequest("domain-a", "domain-b", CONTRACT, "state.transfer"),
+        RelationRequest("domain-a", "domain-b", CONTRACT, CAPABILITY),
     )
     assert decision.admissible is False
     assert decision.evaluated_at == 250
@@ -164,33 +165,36 @@ def test_expired_relation_is_blocked_even_with_valid_witnesses():
 
 def test_expired_relation_cannot_be_reopened_by_routing_input():
     graph = routing_graph(signed_relation(), now=250)
-    assert any("relation_expired" in reasons for reasons in graph.blocked.values())
+    assert any(
+        "relation_expired" in reasons
+        for reasons in graph.blocked_for(CAPABILITY).values()
+    )
     with pytest.raises(ValueError, match="no admissible target is reachable"):
-        graph.route("domain-a", ["domain-b"])
+        graph.route("domain-a", ["domain-b"], capability=CAPABILITY)
 
 
 def test_contract_drift_blocks_crossing():
     graph = routing_graph(signed_relation(), crossing_contract=OTHER_CONTRACT)
     assert any(
         "contract_hash_mismatch" in reasons
-        for reasons in graph.blocked.values()
+        for reasons in graph.blocked_for(CAPABILITY).values()
     )
     with pytest.raises(ValueError, match="no admissible target is reachable"):
-        graph.route("domain-a", ["domain-b"])
+        graph.route("domain-a", ["domain-b"], capability=CAPABILITY)
 
 
 def test_capability_out_of_scope_blocks_crossing():
-    graph = routing_graph(signed_relation(), capability="model.invoke")
+    graph = routing_graph(signed_relation(capability="model.invoke"), crossing_capability=CAPABILITY)
     assert any(
         "capability_out_of_scope" in reasons
-        for reasons in graph.blocked.values()
+        for reasons in graph.blocked_for(CAPABILITY).values()
     )
 
 
 def test_revoked_relation_cannot_be_reused():
     decision = relation_gate().evaluate(
         signed_relation(status=RelationStatus.REVOKED),
-        RelationRequest("domain-a", "domain-b", CONTRACT, "state.transfer"),
+        RelationRequest("domain-a", "domain-b", CONTRACT, CAPABILITY),
     )
     assert decision.admissible is False
     assert "status:REVOKED" in decision.reasons
@@ -203,7 +207,7 @@ def test_unknown_target_authority_fails_closed():
     )
     decision = gate.evaluate(
         signed_relation(),
-        RelationRequest("domain-a", "domain-b", CONTRACT, "state.transfer"),
+        RelationRequest("domain-a", "domain-b", CONTRACT, CAPABILITY),
     )
     assert decision.admissible is False
     assert "unknown_target_authority" in decision.reasons
@@ -219,7 +223,7 @@ def test_unsupported_witness_scheme_is_not_silently_downgraded():
         )
     decision = relation_gate().evaluate(
         unsupported,
-        RelationRequest("domain-a", "domain-b", CONTRACT, "state.transfer"),
+        RelationRequest("domain-a", "domain-b", CONTRACT, CAPABILITY),
     )
     assert decision.admissible is False
     assert "unsupported_witness_scheme" in decision.reasons
@@ -228,6 +232,6 @@ def test_unsupported_witness_scheme_is_not_silently_downgraded():
 
 def test_relation_receipt_is_deterministic():
     graph = routing_graph(signed_relation())
-    first = graph.route("domain-a", ["domain-b"])
-    second = graph.route("domain-a", ["domain-b"])
+    first = graph.route("domain-a", ["domain-b"], capability=CAPABILITY)
+    second = graph.route("domain-a", ["domain-b"], capability=CAPABILITY)
     assert first.relation_receipt_sha256 == second.relation_receipt_sha256
