@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import time
 from dataclasses import dataclass
@@ -246,7 +247,7 @@ class FederationAuthorityKeyRegistry:
                 return {
                     "record": stored,
                     "registration_sha256": stored.registration_sha256(),
-                    "receipt": storage.json.loads(existing["registration_receipt_json"]),
+                    "receipt": json.loads(existing["registration_receipt_json"]),
                     "idempotent": True,
                 }
 
@@ -358,7 +359,7 @@ class FederationAuthorityKeyRegistry:
                     conn.commit()
                     return {
                         "record": self._row_to_key(row),
-                        "receipt": storage.json.loads(row["revocation_receipt_json"]),
+                        "receipt": json.loads(row["revocation_receipt_json"]),
                         "idempotent": True,
                     }
                 raise ValueError("key is already revoked with different revocation state")
@@ -458,7 +459,7 @@ class FederationAuthorityKeyRegistry:
                 return {
                     "binding": stored,
                     "binding_sha256": stored.binding_sha256(),
-                    "receipt": storage.json.loads(existing["receipt_json"]),
+                    "receipt": json.loads(existing["receipt_json"]),
                     "idempotent": True,
                 }
 
@@ -575,6 +576,8 @@ class FederationAuthorityKeyRegistry:
 
 class GovernedEd25519RelationIntegrityGate:
     """Resolve relation signatures through immutable key bindings and lifecycle state."""
+
+    enforces_key_lifecycle = True
 
     def __init__(
         self,
