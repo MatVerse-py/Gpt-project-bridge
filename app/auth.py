@@ -41,7 +41,9 @@ class Principal:
 
 
 def _auth_mode() -> str:
-    mode = os.environ.get(AUTH_MODE_ENV, LEGACY_HMAC_MODE).strip().lower()
+    mode = os.environ.get(AUTH_MODE_ENV, "").strip().lower()
+    if not mode:
+        raise RuntimeError(f"{AUTH_MODE_ENV} must be explicitly configured; implicit authentication fallback is forbidden")
     if mode not in {LEGACY_HMAC_MODE, ED25519_MODE}:
         raise RuntimeError(
             f"{AUTH_MODE_ENV} must be one of {LEGACY_HMAC_MODE!r} or {ED25519_MODE!r}; no implicit fallback is allowed"
@@ -202,9 +204,11 @@ async def _authenticate_ed25519(request: Request) -> Principal:
     principal_record = credential.principal
     key_record = credential.key
     observed_at = int(time.time())
-    if principal_record.status != "ACTIVE":
+    if principal_record.status == "REVOKED" and (
+        principal_record.revoked_at is None or observed_at >= principal_record.revoked_at
+    ):
         raise HTTPException(status_code=401, detail="principal revoked")
-    if ts < key_record.valid_from or ts >= key_record.valid_until:
+    if observed_at < key_record.valid_from or observed_at >= key_record.valid_until:
         raise HTTPException(status_code=401, detail="principal credential outside validity window")
     if key_record.revoked_at is not None and observed_at >= key_record.revoked_at:
         raise HTTPException(status_code=401, detail="principal credential revoked")
