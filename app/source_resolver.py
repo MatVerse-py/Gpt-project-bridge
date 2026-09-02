@@ -22,6 +22,7 @@ DEFAULT_FALLBACK_ORDER: tuple[RepresentationType, ...] = (
     RepresentationType.SAVED_PDF,
     RepresentationType.SAVED_IMAGE,
     RepresentationType.SCREENSHOT,
+    RepresentationType.DOCUMENT_PAGE_RENDER,
     RepresentationType.DOI_METADATA,
     RepresentationType.ORCID_SNAPSHOT,
     RepresentationType.REPOSITORY_FILE,
@@ -102,6 +103,7 @@ def resolve_source(
             "evidence_hash": evidence.evidence_hash,
             "evidence_tier": evidence.evidence_tier,
             "independent_evidence": evidence.independent_evidence,
+            "admissible": _evidence_is_admissible(evidence),
             "identifiers": dict(evidence.identifiers),
             "conflicts": [
                 {
@@ -125,9 +127,16 @@ def resolve_source(
     return SourceResolution(evidence=evidence, attempts=tuple(attempts), receipt=receipt)
 
 
+def _evidence_is_admissible(evidence: SourceEvidence) -> bool:
+    if evidence.state in {EvidenceState.VERIFIED, EvidenceState.VERIFIED_SNAPSHOT}:
+        return evidence.independent_evidence
+    if evidence.state is EvidenceState.PARTIAL:
+        # Partial can be admitted for bounded, explicitly partial use only when
+        # at least one independent root exists. Generated-only and derivative-
+        # only evidence remain non-admissible.
+        return evidence.independent_evidence
+    return False
+
+
 def source_is_admissible(resolution: SourceResolution) -> bool:
-    return resolution.evidence.state in {
-        EvidenceState.VERIFIED,
-        EvidenceState.VERIFIED_SNAPSHOT,
-        EvidenceState.PARTIAL,
-    }
+    return _evidence_is_admissible(resolution.evidence)
