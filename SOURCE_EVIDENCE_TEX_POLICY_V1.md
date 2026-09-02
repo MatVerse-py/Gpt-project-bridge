@@ -99,7 +99,7 @@ The PDF is a compiled representation of the source; DOI/publication metadata is 
 - Hugging Face snapshot: 75 (`P3`)
 - saved PDF: 70 (`P2`)
 - non-generated saved image: 60 (`P2`)
-- screenshot: 55 (`P1`/`P2` boundary by current tier table)
+- screenshot: 55 (`P1`)
 - corpus copy: 50 (`P1`)
 - document page render: 45 (`P1`, derivative)
 - model report: 10 (`P0`)
