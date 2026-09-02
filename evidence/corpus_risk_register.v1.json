@@ -1,0 +1,68 @@
+{
+  "schema": "matverse.corpus-risk-register.v1",
+  "status": "ACTIVE_REMEDIATION",
+  "principles": [
+    "CORPUS_NOT_CANON",
+    "HASH_NOT_TRUTH",
+    "RECEIPT_NOT_SCIENTIFIC_VALIDATION",
+    "BUILD_NOT_RUNTIME",
+    "RUNTIME_NOT_INTEGRATION",
+    "INTEGRATION_NOT_INDEPENDENT_REPRODUCTION",
+    "SIMULATION_NOT_MEASUREMENT",
+    "NO_SILENT_MERGE",
+    "PRESERVE_HISTORY",
+    "FAIL_CLOSED"
+  ],
+  "promotion_order": [
+    "REPORTED",
+    "OBSERVED",
+    "VERIFIED",
+    "PASS_LOCAL",
+    "REPLAYED",
+    "WITNESSED_EXTERNAL",
+    "SCIENTIFICALLY_VALIDATED"
+  ],
+  "risks": [
+    {"id":"R-001","severity":"P0","class":"SEMANTIC_COLLISION","state":"CONTROLLED","automatic_promotion":false},
+    {"id":"R-002","severity":"P0","class":"EPISTEMIC_PROMOTION","state":"CONTROLLED","automatic_promotion":false},
+    {"id":"R-003","severity":"P0","class":"RUNTIME_SPLIT_BRAIN","state":"OPEN","automatic_promotion":false},
+    {"id":"R-004","severity":"P0","class":"STALE_LIVENESS","state":"OPEN","automatic_promotion":false},
+    {"id":"R-005","severity":"P0","class":"EVIDENCE_LAUNDERING","state":"FIXED_CURRENT_PATH","automatic_promotion":false},
+    {"id":"R-006","severity":"P0","class":"CLAIM_SCOPE_LAUNDERING","state":"FIXED_CURRENT_PATH","automatic_promotion":false},
+    {"id":"R-007","severity":"P1","class":"SIMULATION_AS_EMPIRICAL","state":"HOLD_PER_ARTIFACT","automatic_promotion":false},
+    {"id":"R-008","severity":"P1","class":"EPHEMERAL_LEDGER_AS_PROOF","state":"PARTIAL","automatic_promotion":false},
+    {"id":"R-009","severity":"P1","class":"SECRET_OR_PII_DISCLOSURE","state":"CONTROLLED_CURRENT_PATH","automatic_promotion":false},
+    {"id":"R-010","severity":"P1","class":"IMAGE_OR_OCR_OVERCLAIM","state":"CONTROLLED","automatic_promotion":false},
+    {"id":"R-011","severity":"P1","class":"PUBLICATION_STATUS_CONFUSION","state":"CONTROLLED","automatic_promotion":false},
+    {"id":"R-012","severity":"P1","class":"MARKET_IP_OVERCLAIM","state":"OPEN","automatic_promotion":false},
+    {"id":"R-013","severity":"P1","class":"UI_OUTCLAIMS_BACKEND","state":"OPEN","automatic_promotion":false},
+    {"id":"R-014","severity":"P1","class":"AUTOMATED_CENSORSHIP_OR_POLITICAL_HARM","state":"CANONICAL_CONTROL","automatic_promotion":false},
+    {"id":"R-015","severity":"P2","class":"ARCHITECTURAL_ROLE_DRIFT","state":"CONTROLLED_CONCEPTUALLY","automatic_promotion":false},
+    {"id":"R-016","severity":"P2","class":"UNBOUNDED_INGESTION","state":"FIXED_CURRENT_PATH","automatic_promotion":false},
+    {"id":"R-017","severity":"P2","class":"LEGAL_COMPLIANCE_OVERCLAIM","state":"CONTROLLED_BY_POLICY","automatic_promotion":false},
+    {"id":"R-018","severity":"P2","class":"QUANTUM_BIOLOGICAL_METAPHOR_PROMOTION","state":"OPEN_PER_ARTIFACT","automatic_promotion":false}
+  ],
+  "unresolved_term_policy": {
+    "states": ["PRESERVE", "HOLD_DEFINITION", "SOURCE_RECOVERY_REQUIRED", "NO_SILENT_MERGE"],
+    "terms": ["Umjam", "COHERON", "FRACTA", "Genesis Network", "MetaObservatory", "Observatory", "PoLE", "PoSE", "Omega-Capitals", "QUCA", "GTCC", "MENBIT function", "Mem-Bit granularity"]
+  },
+  "required_claim_fields": [
+    "claim_class",
+    "epistemic_state",
+    "source_class",
+    "evidence_roots",
+    "version"
+  ],
+  "forbidden_equivalences": [
+    "MATVERSE=website",
+    "OSX=SymbiOS",
+    "ARGUS=ARGOS",
+    "MNB=MMNB",
+    "CFC=Omega-Gate",
+    "Atlas=Registry",
+    "receipt=scientific_evidence",
+    "hash=truth",
+    "simulation=measurement",
+    "QPU_execution=quantum_advantage"
+  ]
+}
