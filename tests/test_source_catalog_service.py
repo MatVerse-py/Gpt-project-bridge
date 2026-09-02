@@ -1,3 +1,5 @@
+from hashlib import sha256
+
 from fastapi.testclient import TestClient
 
 from app.source_catalog_service import (
@@ -62,14 +64,16 @@ def test_catalog_no_match_fails_closed_as_unavailable():
     assert result["evidence_tier"] == "P0"
 
 
-def test_sidecar_exposes_query_contract():
+def test_sidecar_exposes_query_contract_with_full_text():
     client = TestClient(create_app(lambda: catalog()))
+    claim = "ARGUS factual integrity"
     response = client.post(
         "/evidence/query",
         json={
             "schema": "matverse.argus-evidence-query.v1",
             "claim_ref": "claim://bound",
-            "claim_text": "ARGUS factual integrity",
+            "claim_text": claim,
+            "claim_sha256": sha256(claim.encode()).hexdigest(),
             "max_sources": 8,
         },
     )
@@ -78,6 +82,39 @@ def test_sidecar_exposes_query_contract():
     assert payload["schema"] == ARGUS_BATCH_SCHEMA
     assert payload["catalog_match_count"] == 1
     assert payload["items"][0]["claim_relation"] == "SUPPORTS"
+
+
+def test_sidecar_accepts_minimized_terms_and_hash_without_full_claim():
+    client = TestClient(create_app(lambda: catalog()))
+    claim = "ARGUS factual integrity"
+    response = client.post(
+        "/evidence/query",
+        json={
+            "schema": "matverse.argus-evidence-query.v1",
+            "claim_ref": "claim://privacy",
+            "claim_sha256": sha256(claim.encode()).hexdigest(),
+            "query_terms": ["argus", "factual", "integrity"],
+            "max_sources": 8,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["catalog_match_count"] == 1
+    assert "claim_relation" not in payload["items"][0]
+
+
+def test_sidecar_rejects_text_hash_mismatch():
+    client = TestClient(create_app(lambda: catalog()))
+    response = client.post(
+        "/evidence/query",
+        json={
+            "schema": "matverse.argus-evidence-query.v1",
+            "claim_ref": "claim://1",
+            "claim_text": "ARGUS factual integrity",
+            "claim_sha256": "0" * 64,
+        },
+    )
+    assert response.status_code == 422
 
 
 def test_sidecar_rejects_unknown_query_schema():
