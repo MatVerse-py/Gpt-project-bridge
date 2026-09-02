@@ -2,102 +2,116 @@
 
 ## Purpose
 
-The Bridge must not equate a blocked live page with missing evidence.
+The Bridge resolves evidence from multiple representations without confusing accessibility, visual appearance, version identity, publication status or scientific validity.
 
-`LIVE_FAILURE != SOURCE_FAILURE`
+A resolution may combine live pages, APIs, preserved documents, LaTeX sources, repository objects, images and model reports. Provenance determines authority.
 
-Before returning `UNAVAILABLE_AFTER_FALLBACK`, the Bridge may inspect authorized alternative representations and preserve the relationship between them.
+## Representation principle
 
-## Resolution order
+A representation supports only the predicates for which its provenance is competent.
 
-1. `LIVE_HTML`
-2. `API_METADATA`
-3. `SAVED_HTML`
-4. `LATEX_SOURCE`
-5. `SAVED_PDF`
-6. `SAVED_IMAGE`
-7. `SCREENSHOT`
-8. `DOCUMENT_PAGE_RENDER`
-9. `DOI_METADATA`
-10. `ORCID_SNAPSHOT`
-11. `REPOSITORY_FILE`
-12. `GIT_COMMIT`
-13. `HF_SNAPSHOT`
-14. `CORPUS_COPY`
-15. `GENERATED_IMAGE`
-16. `MODEL_REPORT`
+Examples:
 
-The order is explicit and versionable. Adapters are I/O boundaries; adapter failure does not abort the full resolution path.
+- `LATEX_SOURCE`: source content/version;
+- `ARXIV_EPRINT_SOURCE`: source content/version plus bounded third-party custody when independently verified;
+- `DOI_METADATA`: publication/identifier metadata;
+- `GIT_COMMIT`: repository version/timestamp lineage;
+- `SAVED_PDF`: preserved compiled document content;
+- `SCREENSHOT`: visible rendered state;
+- `GENERATED_IMAGE`: generated visual claim only.
 
-The fallback order is not identical to evidentiary authority. For example, a verified Git commit or DOI metadata has higher identity authority than an earlier low-authority representation reached in the fallback sequence.
+No representation receives universal authority merely because it has a high compatibility tier.
 
-## Evidence states
+## Compatibility tier versus claim authority
 
-- `VERIFIED`
-- `VERIFIED_SNAPSHOT`
-- `PARTIAL`
-- `CONFLICT`
-- `HOLD_AUTHORITY`
-- `HOLD_SEMANTICS`
-- `UNAVAILABLE_AFTER_FALLBACK`
-- `BLOCK_TAMPERED`
+`P0..P5` is retained as a compatibility/fallback ranking.
 
-A conflict between high-priority structured identifiers fails closed. A stale human-readable description can be recorded as `STALE_PROSE` without overriding structured platform metadata.
+It is **not** a universal truth score.
 
-## Structured metadata precedence
+Claim-scoped authority is separately exposed for:
 
-For a saved Zenodo HTML, fields such as `citation_doi`, `citation_author`, `citation_title`, `citation_pdf_url` and the canonical link are treated as structured platform metadata. If a prose description still says that a DOI is pending while `citation_doi` exists, the Bridge preserves both observations and records `STALE_PROSE`.
+`content | version | authorship | publication | timestamp | execution`
 
-It does not silently rewrite history.
+Policy authority values are non-probabilistic weights. Aggregation uses the strongest independent admissible root per domain rather than probabilistic multiplication.
 
-## LaTeX and official-version evidence
+## LaTeX source rules
 
-A preserved `.tex` source is represented as `LATEX_SOURCE` and is independent structured evidence with base priority 80 (`P3`).
+### Complete closure
 
-The extension alone does not establish official status.
+A `.tex` entry is a complete source only after its transitive local artifact closure is resolved. The closure includes local inputs/includes, figures, bibliographies and local class/style files.
 
-A TeX source becomes strong official-version evidence only when:
+Incomplete source closure:
 
-`official_version=true AND verified_immutable_anchor=true`
+- state: `PARTIAL` when it is the only independent root;
+- compatibility tier capped at `P1`;
+- zero claim-scoped authority;
+- not admissible as an official source;
+- records `LATEX_CLOSURE_INCOMPLETE` when officiality was requested.
 
-A verified immutable anchor may be a verified Git commit, source commit, release tag, manifest SHA-256, canonical locator, or verified signature.
+### Claimed identifiers
 
-When anchored, the TeX source receives effective priority 95 (`P5`) **for source/version identity**. This authority is scoped: it can establish which exact source text/version was official, but it does not by itself establish external publication, DOI resolution, peer review, reproduction, or scientific validity.
+DOI/ORCID strings written in TeX are `CLAIMED_IDENTIFIER`, not resolved metadata.
 
-An `official_version=true` TeX without a verified anchor records `OFFICIAL_VERSION_UNANCHORED` and remains ordinary P3 TeX evidence.
+They are exposed under `claimed_identifiers` and do not enter `identifiers` until independently resolved by a competent representation such as DOI metadata, ORCID metadata, Git lookup or another external registry.
 
-See `SOURCE_EVIDENCE_TEX_POLICY_V1.md`.
+### Official version
 
-## SourceEvidence
+`official_version=true` is necessary but insufficient.
 
-A resolved source preserves:
+Official source/version evidence requires:
 
-- original and resolved locator;
-- all representations consulted;
-- content hashes;
-- capture time when known;
-- identifiers such as DOI, ORCID, repository, commit SHA, canonical URL and version;
-- whether a verified official-version TeX root exists;
+`complete closure + verified immutable provenance anchor`
+
+Accepted verified anchors include commit, release tag, manifest digest, canonical locator or signature.
+
+A complete anchored TeX source receives effective `P5` **only for source/version identity**. Publication authority remains zero unless an independent publication representation exists.
+
+## arXiv distinction
+
+`LATEX_SOURCE != ARXIV_EPRINT_SOURCE`
+
+An arXiv-shaped locator or filename does not produce publication authority. `ARXIV_EPRINT_SOURCE` receives third-party custody/timestamp authority only when the adapter independently verifies external timestamp plus canonical/signature custody.
+
+## Structured conflicts
+
+High-priority structured identifier/version disagreements are blocking `IDENTIFIER_CONFLICT` events.
+
+Image-vs-structured disagreement is retained as `IMAGE_METADATA_CONFLICT`; structured metadata keeps identity precedence, but the visual observation is preserved.
+
+## Stale prose
+
+Human-readable prose that says a DOI is pending may be stale while structured DOI metadata is current. `STALE_PROSE` is recorded without allowing stale prose to overwrite structured metadata.
+
+## Generated and derivative representations
+
+Generated images never become independent evidence roots.
+
+Document page renders are derivative and cannot create a second root from the document they render.
+
+Exact SHA-256 duplicates count as one root. Perceptual similarity is only a review signal.
+
+## Tamper rule
+
+Any representation marked with a mismatched expected hash produces `BLOCK_TAMPERED` and zero authority for the resolution.
+
+## Receipts
+
+`matverse.evidence-receipt.v1` commits by hash to:
+
+- resolved state;
+- compatibility tier;
+- claim-scoped authority;
+- resolved identifiers;
+- claimed identifiers;
+- official-version decision;
 - conflicts;
-- ordinal evidence tier;
-- deterministic evidence hash.
+- representation hashes;
+- TeX closure status when applicable.
 
-The resolution is then wrapped by the existing `matverse.evidence-receipt.v1` receipt.
+## Current LaTeX operational boundary
 
-## Semantic provenance
+Transitive closure scanning and closure hashing are implemented.
 
-Source resolution is separate from semantic authority.
+The governed root manifest is `evidence/latex_roots.json`. It currently remains `HOLD_NO_DECLARED_CANONICAL_ROOTS`; no paper `.tex -> deposited PDF` pair is invented.
 
-For terminology, the Bridge records speaker and speech act. An explicit user correction has greater project-semantic authority than a model proposal. Antiquity is used as a prior/tiebreaker among observations of equal authority; it does not override a later explicit user correction.
-
-`older_model_inference < newer_user_correction`
-
-`older_equal_authority_definition > newer_equal_authority_definition`
-
-This is not a scientific-truth rule. Scientific claims still require claim-scoped evidence and reproduction.
-
-## Constitutional invariant
-
-A name, acronym, page or `.tex` file is not canonical merely because it is frequent, well formatted, currently reachable, or carries the word "official".
-
-A source may only be promoted when provenance, identity and conflicts are resolved to the level required by the consuming gate.
+LaTeX-to-PDF derivation verification remains HOLD until real canonical source/PDF pairs are declared. The intended next stage is a pinned build environment and normalized PDF invariant comparison, not naive byte equality.
