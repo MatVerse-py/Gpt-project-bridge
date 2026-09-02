@@ -108,10 +108,14 @@ Any representation marked with a mismatched expected hash produces `BLOCK_TAMPER
 - representation hashes;
 - TeX closure status when applicable.
 
+The receipt stores commitments (`input_hash`, `output_hash`, `merkle_root`, `receipt_hash`), not a plaintext duplicate of the full output payload.
+
 ## Current LaTeX operational boundary
 
-Transitive closure scanning and closure hashing are implemented.
+Transitive closure scanning and closure hashing are implemented and covered by 12 dedicated TeX policy tests.
 
 The governed root manifest is `evidence/latex_roots.json`. It currently remains `HOLD_NO_DECLARED_CANONICAL_ROOTS`; no paper `.tex -> deposited PDF` pair is invented.
+
+The dedicated LaTeX diagnostic CI may therefore be green while reporting that HOLD. CI PASS proves that the diagnostic/policy behaved as specified; it does not prove a real source-to-PDF derivation.
 
 LaTeX-to-PDF derivation verification remains HOLD until real canonical source/PDF pairs are declared. The intended next stage is a pinned build environment and normalized PDF invariant comparison, not naive byte equality.
