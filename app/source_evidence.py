@@ -15,6 +15,7 @@ class RepresentationType(str, Enum):
     SAVED_PDF = "SAVED_PDF"
     SAVED_IMAGE = "SAVED_IMAGE"
     SCREENSHOT = "SCREENSHOT"
+    DOCUMENT_PAGE_RENDER = "DOCUMENT_PAGE_RENDER"
     GENERATED_IMAGE = "GENERATED_IMAGE"
     DOI_METADATA = "DOI_METADATA"
     ORCID_SNAPSHOT = "ORCID_SNAPSHOT"
@@ -50,6 +51,7 @@ STRUCTURED_REPRESENTATIONS = {
 IMAGE_REPRESENTATIONS = {
     RepresentationType.SAVED_IMAGE,
     RepresentationType.SCREENSHOT,
+    RepresentationType.DOCUMENT_PAGE_RENDER,
     RepresentationType.GENERATED_IMAGE,
 }
 
@@ -66,6 +68,7 @@ REPRESENTATION_PRIORITY: dict[RepresentationType, int] = {
     RepresentationType.SAVED_IMAGE: 60,
     RepresentationType.SCREENSHOT: 55,
     RepresentationType.CORPUS_COPY: 50,
+    RepresentationType.DOCUMENT_PAGE_RENDER: 45,
     RepresentationType.MODEL_REPORT: 10,
     RepresentationType.GENERATED_IMAGE: 0,
 }
@@ -187,15 +190,33 @@ class SourceEvidence:
     def independent_evidence(self) -> bool:
         if not self.representations:
             return False
-        return any(
-            rep.kind is not RepresentationType.GENERATED_IMAGE
-            and rep.metadata.get("generated") is not True
-            for rep in self.representations
-        )
+        return any(_representation_is_independent(rep) for rep in self.representations)
+
+
+def _representation_is_generated(rep: SourceRepresentation) -> bool:
+    return rep.kind is RepresentationType.GENERATED_IMAGE or rep.metadata.get("generated") is True or rep.metadata.get("model_generated") is True
+
+
+def _representation_is_derivative(rep: SourceRepresentation) -> bool:
+    return rep.kind is RepresentationType.DOCUMENT_PAGE_RENDER
+
+
+def _representation_is_independent(rep: SourceRepresentation) -> bool:
+    return not _representation_is_generated(rep) and not _representation_is_derivative(rep)
+
+
+def _effective_priority(rep: SourceRepresentation) -> int:
+    # Provenance dominates visual appearance. A model-generated PNG does not gain
+    # P2 authority merely because it visually resembles a saved report.
+    if _representation_is_generated(rep):
+        return 0
+    if _representation_is_derivative(rep):
+        return min(REPRESENTATION_PRIORITY[rep.kind], 45)
+    return REPRESENTATION_PRIORITY[rep.kind]
 
 
 def _tier(representations: Iterable[SourceRepresentation]) -> str:
-    highest = max((REPRESENTATION_PRIORITY[r.kind] for r in representations), default=0)
+    highest = max((_effective_priority(r) for r in representations), default=0)
     for threshold, tier in TIER_BY_PRIORITY:
         if highest >= threshold:
             return tier
@@ -208,6 +229,11 @@ def _collect_values(
 ) -> list[tuple[int, RepresentationType, str]]:
     values: list[tuple[int, RepresentationType, str]] = []
     for rep in representations:
+        # Generated images may contain text that looks like DOI/ORCID/repo data,
+        # but those strings remain visual claims and must not become resolved
+        # identifiers without an independent representation.
+        if _representation_is_generated(rep):
+            continue
         raw = rep.metadata.get(key)
         if raw is None:
             continue
@@ -215,7 +241,7 @@ def _collect_values(
         for item in raw_values:
             if not isinstance(item, str) or not item.strip():
                 continue
-            values.append((REPRESENTATION_PRIORITY[rep.kind], rep.kind, item.strip()))
+            values.append((_effective_priority(rep), rep.kind, item.strip()))
     return values
 
 
@@ -282,6 +308,8 @@ def _detect_stale_prose(representations: tuple[SourceRepresentation, ...], ident
         return conflicts
 
     for rep in representations:
+        if _representation_is_generated(rep):
+            continue
         description = rep.metadata.get("description")
         if not isinstance(description, str):
             continue
@@ -381,14 +409,11 @@ def build_source_evidence(
     conflicts.extend(_detect_stale_prose(reps, identifiers))
     blocking = any(c.blocking for c in conflicts)
 
-    only_generated_images = all(
-        rep.kind is RepresentationType.GENERATED_IMAGE or rep.metadata.get("generated") is True
-        for rep in reps
-    )
+    no_independent_root = not any(_representation_is_independent(rep) for rep in reps)
 
     if blocking:
         state = EvidenceState.CONFLICT
-    elif only_generated_images:
+    elif no_independent_root:
         state = EvidenceState.PARTIAL
     elif _has_unverified_external_image_claim(reps) and not any(rep.kind in STRUCTURED_REPRESENTATIONS for rep in reps):
         state = EvidenceState.PARTIAL
@@ -401,7 +426,7 @@ def build_source_evidence(
 
     resolved_url = identifiers.get("canonical_url")
     if not resolved_url:
-        best = max(reps, key=lambda rep: REPRESENTATION_PRIORITY[rep.kind])
+        best = max(reps, key=_effective_priority)
         resolved_url = best.locator
 
     evidence_payload = {
@@ -414,6 +439,7 @@ def build_source_evidence(
                 "content_hash": rep.content_hash,
                 "captured_at": rep.captured_at,
                 "metadata": dict(rep.metadata),
+                "effective_priority": _effective_priority(rep),
             }
             for rep in reps
         ],
