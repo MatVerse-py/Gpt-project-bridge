@@ -110,6 +110,34 @@ Any representation marked with a mismatched expected hash produces `BLOCK_TAMPER
 
 The receipt stores commitments (`input_hash`, `output_hash`, `merkle_root`, `receipt_hash`), not a plaintext duplicate of the full output payload.
 
+## Bridge → ARGUS exchange
+
+`app/source_exchange.py` defines the transport-neutral contract:
+
+`matverse.bridge-evidence-batch.v1`
+
+Each exported representation carries:
+
+- `locator`;
+- `representation`;
+- original `source_content_hash`;
+- `evidence_root_id`;
+- independent/derivative provenance;
+- a small allowlisted metadata set;
+- optional explicit `claim_relation`;
+- optional `observed_text` only when the caller deliberately supplies it;
+- `observed_text_sha256` when text is disclosed.
+
+Raw source content is never exported implicitly. Private/unrecognized metadata is omitted from the wire representation.
+
+The consumer must not treat Bridge authority as a universal truth score. The URANO ARGUS adapter re-evaluates authority locally from the representation class and uses Bridge hashes/relations as provenance inputs. In particular:
+
+`Bridge claim_relation=SUPPORTS != ARGOS PASS`
+
+A source may support a claim semantically while still remaining below the local ARGOS authority threshold, producing `SUPPORTED/HOLD` rather than bypassing policy.
+
+The exchange module is transport-agnostic: HTTP, MCP, a local catalog or another Bridge adapter may expose the same schema without changing evidence semantics.
+
 ## Current LaTeX operational boundary
 
 Transitive closure scanning and closure hashing are implemented and covered by 12 dedicated TeX policy tests.
