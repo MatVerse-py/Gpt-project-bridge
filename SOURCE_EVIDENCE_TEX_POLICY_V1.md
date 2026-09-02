@@ -4,26 +4,73 @@
 
 A preserved LaTeX source (`.tex`) is a structured textual representation and can be strong evidence of the exact source content of a version.
 
-The policy separates two questions:
+The policy separates four questions:
 
-1. **What source text/version existed?**
-2. **Was it externally published, peer reviewed, reproduced, or scientifically validated?**
+1. **What source content existed?**
+2. **What complete source closure constituted that version?**
+3. **Was that source externally published/custodied?**
+4. **Are the scientific claims correct?**
 
-A `.tex` file can answer the first question strongly when its provenance is anchored. It does not answer the second question by itself.
+A `.tex` source may strongly answer (1) and (2). It does not answer (3) or (4) by itself.
 
-## Evidence classes
+## Core rule
+
+`LATEX_SOURCE != EXTERNAL_PUBLICATION`
+
+`OFFICIAL_TEX_VERSION != SCIENTIFIC_VALIDITY`
+
+`CLAIMED_IDENTIFIER != RESOLVED_IDENTIFIER`
+
+## 1. TeX as source representation
 
 ### Ordinary preserved TeX
 
-`LATEX_SOURCE` is independent structured evidence with base priority 80 (`P3`).
+`LATEX_SOURCE` is independent structured evidence with base compatibility priority 80 (`P3`) **when its source closure is complete**.
 
-A `.tex` file does **not** become official merely because of its extension, filename, title, folder, or prose inside the document.
+A `.tex` file does **not** become official merely because of its extension, filename, title, folder, prose, embedded DOI, embedded ORCID or version macro.
 
-### Official anchored TeX
+### Source closure
 
-A TeX source is promoted to strong official-version evidence only when:
+The evidence object is not only the entry `.tex`. The local artifact closure includes, transitively, resolvable references such as:
 
-- `official_version = true`; and
+- `\input` / `\include`;
+- `\includegraphics`;
+- `\bibliography` / `\addbibresource`;
+- local `.sty` files;
+- local `.cls` files.
+
+Bare toolchain packages/classes are not treated as missing local artifacts unless they are explicitly path-like or resolve locally.
+
+The closure is hashed over sorted relative paths and file-content SHA-256 digests. Changing any local dependency changes the closure digest.
+
+If a mandatory local reference cannot be resolved:
+
+`closure_complete = false`
+
+The TeX representation becomes `PARTIAL`, its compatibility tier is capped at `P1`, and it has zero claim-authority until the closure is recovered. It cannot establish an official version.
+
+## 2. Claimed identifiers are not resolved identifiers
+
+A DOI, ORCID, commit-like string, contract address or other identifier written inside TeX is source text. It is recorded as a `CLAIMED_IDENTIFIER`.
+
+It is **not** promoted into `SourceEvidence.identifiers` by the TeX representation itself.
+
+Resolution requires an independent representation, for example:
+
+- DOI/DataCite/Crossref/Zenodo metadata;
+- ORCID metadata;
+- Git commit lookup;
+- chain explorer/API;
+- another authoritative external registry.
+
+This is the same fail-closed principle applied to generated images: a string rendered or authored inside an artifact does not self-verify.
+
+## 3. Official anchored TeX
+
+A complete TeX source is promoted to strong official-version evidence only when:
+
+- `official_version = true`;
+- `closure_complete = true`; and
 - at least one immutable provenance anchor is independently verified.
 
 Accepted anchor classes:
@@ -35,72 +82,97 @@ Accepted anchor classes:
 - canonical locator + `canonical_verified=true`;
 - verified signature (`signature_verified=true`).
 
-When both conditions hold, the representation receives effective priority 95 (`P5`) **for source/version identity**.
-
-## Scoped authority
-
-`P5` here is claim-scoped.
-
-An official anchored `.tex` can strongly support:
-
-- exact source text of the official version;
-- title/author/version declarations present in that source;
-- provenance of that source version;
-- relation between a version label and an immutable commit/tag/manifest/signature when verified.
-
-It does not by itself prove:
-
-- DOI registration or resolution;
-- external publication;
-- peer review;
-- independent reproduction;
-- correctness of results;
-- scientific validity;
-- authorship beyond what the provenance chain independently establishes.
-
-Formally:
-
-`OFFICIAL_TEX_VERSION != EXTERNAL_PUBLICATION`
-
-`OFFICIAL_TEX_VERSION != SCIENTIFIC_VALIDITY`
-
-## Fail-closed rule
+When all conditions hold, the representation receives effective compatibility priority 95 (`P5`) **for official source/version identity**.
 
 If `official_version=true` is present without a verified anchor, the Bridge records:
 
 `OFFICIAL_VERSION_UNANCHORED`
 
-The file remains ordinary `LATEX_SOURCE` evidence (`P3`) and does not receive official-version authority.
+If the closure is incomplete, it records:
 
-A disagreement between anchored official TeX and another high-priority structured representation is not silently resolved. It produces a blocking structured identifier/version conflict and the source resolution becomes `CONFLICT`.
+`LATEX_CLOSURE_INCOMPLETE`
 
-## Version identity
+Neither case gains official-version authority.
 
-`version` is a resolvable structured field alongside DOI, ORCID, repository, commit, canonical URL, title and author.
+## 4. Authority is a vector, not a scalar
 
-The content itself is SHA-256 hashed. The hash identifies exact bytes/text representation; the verified provenance anchor establishes why that exact source should be treated as the official version.
+`P0–P5` remains only a compatibility/fallback ranking. It is not universal proof strength.
 
-## Recommended chain
+The Bridge also exposes claim-scoped policy authority across:
 
-For papers and specifications:
+`content | version | authorship | publication | timestamp | execution`
 
-`official .tex -> SHA-256 -> verified Git commit/tag/manifest -> compiled PDF -> publication metadata/DOI`
+Examples:
 
-The PDF is a compiled representation of the source; DOI/publication metadata is external publication evidence. These representations corroborate different claims and should not be collapsed into one generic notion of proof.
+| Representation | content | version | authorship | publication | timestamp | execution |
+|---|---:|---:|---:|---:|---:|---:|
+| `LATEX_SOURCE` (complete) | 1.00 | 1.00 | 0.30 | 0.00 | 0.00 | 0.00 |
+| `ARXIV_EPRINT_SOURCE` with verified third-party custody | 1.00 | 1.00 | 0.60 | 0.70 | 0.90 | 0.00 |
+| `SAVED_PDF` | 0.80 | 0.60 | 0.30 | 0.00 | 0.00 | 0.00 |
+| `DOI_METADATA` | 0.20 | 0.70 | 0.60 | 1.00 | 0.90 | 0.00 |
+| `GIT_COMMIT` | 0.90 | 1.00 | 0.60 | 0.00 | 0.85 | 0.00 |
+| `GENERATED_IMAGE` | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
 
-## Priority summary
+These numbers are **policy weights, not probabilities, empirical confidence or scientific truth scores**.
 
-- API metadata: 100 (`P5`)
-- Git commit: 95 (`P5`)
-- official anchored TeX: effective 95 (`P5`, scoped to version identity)
-- live HTML: 90 (`P4`)
-- saved HTML / ORCID snapshot: 85 (`P4`)
-- ordinary TeX / repository file: 80 (`P3`)
-- Hugging Face snapshot: 75 (`P3`)
-- saved PDF: 70 (`P2`)
-- non-generated saved image: 60 (`P2`)
-- screenshot: 55 (`P1`)
-- corpus copy: 50 (`P1`)
-- document page render: 45 (`P1`, derivative)
-- model report: 10 (`P0`)
-- generated image: 0 (`P0`)
+Aggregation currently uses the maximum authority from independent admissible roots per domain. It deliberately does not use probabilistic noisy-OR because derivational independence is not statistical independence.
+
+## 5. arXiv source is a distinct evidence class
+
+`LATEX_SOURCE` and `ARXIV_EPRINT_SOURCE` are not synonyms.
+
+A local/repository TeX source can establish content/version but has zero publication authority by itself.
+
+An arXiv-custodied source can gain partial publication/timestamp authority only when third-party custody and canonical/timestamp metadata are independently verified. Merely using an `arxiv://` locator or filename does not create authority.
+
+## 6. Source → compiled artifact relation
+
+The statement “this TeX source produced that PDF” is a separate claim and must not be inferred from filenames.
+
+The intended future derivation protocol is:
+
+`complete closure -> pinned build environment -> compile -> normalize PDF -> compare invariants`
+
+Byte-for-byte equality is not required because PDF compilation may inject non-semantic entropy such as creation/modification dates, IDs, producer metadata, font subsets and object ordering.
+
+Derivation results should distinguish at least:
+
+- `MATCH`;
+- `BENIGN_DIVERGENCE` — semantic/text/page invariants agree but binary internals differ;
+- `SUBSTANTIVE_DIVERGENCE` — semantic/text/page invariants differ;
+- `BUILD_FAILED`.
+
+A failed derivation does not erase the TeX source. It means the source and deposited artifact have not been proven to be the same version and should produce `SOURCE_ARTIFACT_DIVERGENCE` at the appropriate severity.
+
+## 7. Current implementation boundary
+
+Implemented now:
+
+- `LATEX_SOURCE`;
+- `ARXIV_EPRINT_SOURCE` classification;
+- claimed-vs-resolved identifier separation;
+- complete/incomplete closure state;
+- transitive local closure scanner;
+- closure SHA-256 digest;
+- official-version P5 only with complete closure + verified anchor;
+- claim-scoped authority vector;
+- fail-closed conflicts for unanchored/incomplete official TeX;
+- receipts expose authority, claimed identifiers and closure status.
+
+Not yet promoted to operational PASS:
+
+- reproducible LaTeX→PDF derivation CI over real deposited paper pairs.
+
+Reason: the Bridge repository currently has no declared canonical paper `.tex` → deposited `.pdf` pairs. Those mappings must be supplied in `evidence/latex_roots.json` before expensive compilation verification is meaningful.
+
+## 8. Recommended chain
+
+For papers/specifications:
+
+`entry.tex + transitive closure`
+`-> closure SHA-256`
+`-> verified Git commit/tag/manifest/signature`
+`-> compiled PDF relation verification`
+`-> external publication metadata / DOI / arXiv custody`
+
+Each step supports different predicates. They must remain distinct in EvidenceOS/Bridge rather than being collapsed into one generic notion of “proof”.
