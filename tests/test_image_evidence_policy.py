@@ -1,43 +1,52 @@
-from app.source_evidence import EvidenceConflict, EvidenceState, RepresentationType, SourceEvidence
+from app.source_evidence import (
+    EvidenceState,
+    RepresentationType,
+    SourceRepresentation,
+    build_source_evidence,
+)
 
 
-def test_screenshot_is_visual_observation_not_structured_identity():
-    ev = SourceEvidence(
-        source_id="img:urano",
-        original_url=None,
-        representation=RepresentationType.SCREENSHOT,
-        content_hash="a" * 64,
+def test_screenshot_is_partial_visual_evidence_not_structured_identity():
+    rep = SourceRepresentation.from_bytes(
+        kind=RepresentationType.SCREENSHOT,
+        locator="library://urano.png",
+        content=b"png-bytes",
         metadata={"visible_text": ["URANO OSX", "Q-Gate", "Ledger"]},
     )
-    assert ev.representation is RepresentationType.SCREENSHOT
-    assert ev.state in {EvidenceState.PARTIAL, EvidenceState.VERIFIED_SNAPSHOT}
+    ev = build_source_evidence(original_url="https://example.invalid/urano", representations=(rep,))
+    assert ev.state is EvidenceState.PARTIAL
+    assert ev.independent_evidence is True
 
 
 def test_generated_image_is_not_independent_external_evidence():
-    ev = SourceEvidence(
-        source_id="img:omega-seed",
-        original_url=None,
-        representation=RepresentationType.GENERATED_IMAGE,
-        content_hash="b" * 64,
-        metadata={"claims_external_deploy": True},
+    rep = SourceRepresentation.from_bytes(
+        kind=RepresentationType.GENERATED_IMAGE,
+        locator="library://omega-seed.png",
+        content=b"generated-image",
+        metadata={"generated": True, "external_claims": ["sepolia_deployed"]},
     )
+    ev = build_source_evidence(original_url="https://example.invalid/genesis", representations=(rep,))
     assert ev.independent_evidence is False
     assert ev.state is EvidenceState.PARTIAL
 
 
-def test_image_conflict_with_structured_metadata_is_blocking_for_identifier():
-    conflict = EvidenceConflict(
-        code="IMAGE_METADATA_CONFLICT",
-        field="doi",
-        values=("10.1/image", "10.1/structured"),
-        blocking=True,
-        reason="screenshot identifier conflicts with structured platform metadata",
+def test_image_identifier_disagreement_yields_explicit_nonblocking_conflict_and_structured_wins():
+    screenshot = SourceRepresentation.from_bytes(
+        kind=RepresentationType.SCREENSHOT,
+        locator="library://shot.png",
+        content=b"shot",
+        metadata={"doi": "10.1/image"},
     )
-    ev = SourceEvidence(
-        source_id="img:doi-conflict",
-        original_url=None,
-        representation=RepresentationType.SCREENSHOT,
-        content_hash="c" * 64,
-        conflicts=(conflict,),
+    structured = SourceRepresentation.from_text(
+        kind=RepresentationType.SAVED_HTML,
+        locator="library://record.html",
+        content="<html></html>",
+        metadata={"doi": "10.1/structured", "canonical_url": "https://example.org/record"},
     )
-    assert ev.state is EvidenceState.CONFLICT
+    ev = build_source_evidence(
+        original_url="https://example.org/record",
+        representations=(screenshot, structured),
+    )
+    assert ev.identifiers["doi"] == "10.1/structured"
+    assert any(c.code == "IMAGE_METADATA_CONFLICT" for c in ev.conflicts)
+    assert ev.state is EvidenceState.VERIFIED_SNAPSHOT
