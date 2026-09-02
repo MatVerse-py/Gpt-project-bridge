@@ -149,6 +149,19 @@ The exchange module is transport-agnostic: HTTP, MCP, a local catalog or another
 
 The catalog format is `matverse.bridge-evidence-catalog.v1`. It performs deterministic lexical retrieval over explicit catalog fields and never acts as an opaque truth model or web-search oracle. Search-only `search_text` helps discovery but is removed from returned evidence items.
 
+### Query disclosure
+
+The preferred/default URANO query mode minimizes disclosure. The Bridge receives:
+
+- `claim_ref`;
+- `claim_sha256` over the normalized claim;
+- deterministic `query_terms`;
+- `max_sources`.
+
+The full claim sentence does **not** need to cross the Bridge boundary for ordinary lexical discovery. `claim_text` remains optional and is sent only when an operator explicitly selects full-text disclosure. When both `claim_text` and `claim_sha256` are supplied, the sidecar rejects a mismatch.
+
+Claim relations remain claim-scoped. `claim_relation` is emitted only when its catalog entry is bound to the requested `claim_ref` or to the requested claim digest. A generic relation cannot automatically support a lexically similar claim.
+
 If no evidence matches, the sidecar returns `UNAVAILABLE_AFTER_FALLBACK/P0` with an empty item list. A matching catalog returns a `PARTIAL` batch because retrieval alone is not adjudication.
 
 Example local service:
