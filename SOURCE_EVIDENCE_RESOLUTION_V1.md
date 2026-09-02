@@ -138,6 +138,32 @@ A source may support a claim semantically while still remaining below the local 
 
 The exchange module is transport-agnostic: HTTP, MCP, a local catalog or another Bridge adapter may expose the same schema without changing evidence semantics.
 
+## Evidence catalog sidecar
+
+`app/source_catalog_service.py` exposes a concrete HTTP-compatible discovery endpoint over **pre-resolved evidence only**:
+
+- query schema: `matverse.argus-evidence-query.v1`;
+- response schema: `matverse.bridge-evidence-batch.v1`;
+- endpoint: `POST /evidence/query`;
+- health: `GET /health`.
+
+The catalog format is `matverse.bridge-evidence-catalog.v1`. It performs deterministic lexical retrieval over explicit catalog fields and never acts as an opaque truth model or web-search oracle. Search-only `search_text` helps discovery but is removed from returned evidence items.
+
+If no evidence matches, the sidecar returns `UNAVAILABLE_AFTER_FALLBACK/P0` with an empty item list. A matching catalog returns a `PARTIAL` batch because retrieval alone is not adjudication.
+
+Example local service:
+
+```bash
+MATVERSE_SOURCE_CATALOG=evidence/source_catalog.example.json \
+uvicorn app.source_catalog_service:app --host 127.0.0.1 --port 8001
+```
+
+URANO can then point `BridgeEvidenceRetriever` to:
+
+`http://127.0.0.1:8001/evidence/query`
+
+External web/Crossref/Zenodo/GitHub/ORCID/Hugging Face adapters remain responsible for **populating** the resolved catalog. The catalog service only discovers among governed evidence already present; it does not fabricate retrieval provenance.
+
 ## Current LaTeX operational boundary
 
 Transitive closure scanning and closure hashing are implemented and covered by 12 dedicated TeX policy tests.
