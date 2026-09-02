@@ -1,4 +1,5 @@
 from dataclasses import replace
+from hashlib import sha256
 from pathlib import Path
 import shutil
 
@@ -10,7 +11,6 @@ from app.forensic_evidence import (
     build_forensic_evidence,
     create_custody_event,
     entropy_observation,
-    sha256_file,
     shannon_entropy_bytes,
     verify_custody_chain,
     verify_logical_copy,
@@ -88,7 +88,7 @@ def test_hash_mismatch_fails_closed():
 
 def test_verified_integrity_and_custody_produce_forensic_verified_receipt():
     payload = b"evidence bytes"
-    digest = sha256_file.__globals__["_sha256_bytes"](payload)
+    digest = sha256(payload).hexdigest()
     first = create_custody_event(
         sequence=0,
         event_type=CustodyEventType.ACQUIRED,
