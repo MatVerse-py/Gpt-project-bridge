@@ -13,16 +13,23 @@ Before returning `UNAVAILABLE_AFTER_FALLBACK`, the Bridge may inspect authorized
 1. `LIVE_HTML`
 2. `API_METADATA`
 3. `SAVED_HTML`
-4. `SAVED_PDF`
-5. `DOI_METADATA`
-6. `ORCID_SNAPSHOT`
-7. `REPOSITORY_FILE`
-8. `GIT_COMMIT`
-9. `HF_SNAPSHOT`
-10. `CORPUS_COPY`
-11. `MODEL_REPORT`
+4. `LATEX_SOURCE`
+5. `SAVED_PDF`
+6. `SAVED_IMAGE`
+7. `SCREENSHOT`
+8. `DOCUMENT_PAGE_RENDER`
+9. `DOI_METADATA`
+10. `ORCID_SNAPSHOT`
+11. `REPOSITORY_FILE`
+12. `GIT_COMMIT`
+13. `HF_SNAPSHOT`
+14. `CORPUS_COPY`
+15. `GENERATED_IMAGE`
+16. `MODEL_REPORT`
 
 The order is explicit and versionable. Adapters are I/O boundaries; adapter failure does not abort the full resolution path.
+
+The fallback order is not identical to evidentiary authority. For example, a verified Git commit or DOI metadata has higher identity authority than an earlier low-authority representation reached in the fallback sequence.
 
 ## Evidence states
 
@@ -43,6 +50,24 @@ For a saved Zenodo HTML, fields such as `citation_doi`, `citation_author`, `cita
 
 It does not silently rewrite history.
 
+## LaTeX and official-version evidence
+
+A preserved `.tex` source is represented as `LATEX_SOURCE` and is independent structured evidence with base priority 80 (`P3`).
+
+The extension alone does not establish official status.
+
+A TeX source becomes strong official-version evidence only when:
+
+`official_version=true AND verified_immutable_anchor=true`
+
+A verified immutable anchor may be a verified Git commit, source commit, release tag, manifest SHA-256, canonical locator, or verified signature.
+
+When anchored, the TeX source receives effective priority 95 (`P5`) **for source/version identity**. This authority is scoped: it can establish which exact source text/version was official, but it does not by itself establish external publication, DOI resolution, peer review, reproduction, or scientific validity.
+
+An `official_version=true` TeX without a verified anchor records `OFFICIAL_VERSION_UNANCHORED` and remains ordinary P3 TeX evidence.
+
+See `SOURCE_EVIDENCE_TEX_POLICY_V1.md`.
+
 ## SourceEvidence
 
 A resolved source preserves:
@@ -51,7 +76,8 @@ A resolved source preserves:
 - all representations consulted;
 - content hashes;
 - capture time when known;
-- identifiers such as DOI, ORCID, repository, commit SHA and canonical URL;
+- identifiers such as DOI, ORCID, repository, commit SHA, canonical URL and version;
+- whether a verified official-version TeX root exists;
 - conflicts;
 - ordinal evidence tier;
 - deterministic evidence hash.
@@ -72,6 +98,6 @@ This is not a scientific-truth rule. Scientific claims still require claim-scope
 
 ## Constitutional invariant
 
-A name, acronym or page is not canonical merely because it is frequent or currently reachable.
+A name, acronym, page or `.tex` file is not canonical merely because it is frequent, well formatted, currently reachable, or carries the word "official".
 
 A source may only be promoted when provenance, identity and conflicts are resolved to the level required by the consuming gate.
