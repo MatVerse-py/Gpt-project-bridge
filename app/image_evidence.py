@@ -11,6 +11,7 @@ class ImageEvidenceKind(str, Enum):
     SCREENSHOT = "SCREENSHOT"
     SAVED_IMAGE = "SAVED_IMAGE"
     GENERATED_IMAGE = "GENERATED_IMAGE"
+    DOCUMENT_PAGE_RENDER = "DOCUMENT_PAGE_RENDER"
 
 
 class ImageEvidenceState(str, Enum):
@@ -29,6 +30,7 @@ class ImageEvidence:
     visible_text: tuple[str, ...] = ()
     source_url: str | None = None
     generated: bool = False
+    derived_from_hash: str | None = None
     external_claims: tuple[str, ...] = ()
     independently_verified_claims: tuple[str, ...] = ()
     conflicts: tuple[str, ...] = ()
@@ -36,7 +38,14 @@ class ImageEvidence:
 
     @property
     def independent_evidence(self) -> bool:
-        return self.kind is not ImageEvidenceKind.GENERATED_IMAGE and not self.generated
+        # Provenance dominates appearance: a generated image remains generated
+        # even if it visually resembles a report, browser capture, or dashboard.
+        if self.generated or self.kind is ImageEvidenceKind.GENERATED_IMAGE:
+            return False
+        # A page render is derivative of the underlying PDF/document root.
+        if self.kind is ImageEvidenceKind.DOCUMENT_PAGE_RENDER:
+            return False
+        return True
 
     @property
     def state(self) -> ImageEvidenceState:
@@ -67,6 +76,7 @@ def image_evidence_from_file(
     visible_text: Sequence[str] = (),
     source_url: str | None = None,
     generated: bool = False,
+    derived_from_hash: str | None = None,
     external_claims: Sequence[str] = (),
     independently_verified_claims: Sequence[str] = (),
     expected_sha256: str | None = None,
@@ -81,19 +91,31 @@ def image_evidence_from_file(
         visible_text=tuple(visible_text),
         source_url=source_url,
         generated=generated,
+        derived_from_hash=derived_from_hash,
         external_claims=tuple(external_claims),
         independently_verified_claims=tuple(independently_verified_claims),
         metadata={"tampered": tampered, "size_bytes": len(raw)},
     )
 
 
+def group_by_hash(items: Sequence[ImageEvidence]) -> dict[str, tuple[ImageEvidence, ...]]:
+    """Group exact byte-identical images into one probative root per SHA-256."""
+    groups: dict[str, list[ImageEvidence]] = {}
+    for item in items:
+        groups.setdefault(item.sha256, []).append(item)
+    return {digest: tuple(group) for digest, group in groups.items()}
+
+
 def dedupe_by_hash(items: Sequence[ImageEvidence]) -> tuple[ImageEvidence, ...]:
     """Deduplicate exact byte-identical images; duplicates are not independent roots."""
-    seen: set[str] = set()
-    unique: list[ImageEvidence] = []
-    for item in items:
-        if item.sha256 in seen:
-            continue
-        seen.add(item.sha256)
-        unique.append(item)
-    return tuple(unique)
+    return tuple(group[0] for group in group_by_hash(items).values())
+
+
+def visual_near_duplicate_is_probative_match(*, exact_hash_equal: bool) -> bool:
+    """Visual similarity alone never establishes evidentiary identity.
+
+    Perceptual hashes, OCR similarity, same dimensions, or human visual similarity
+    are review signals only. Only exact byte identity (or a separately verified
+    derivation relation) may collapse two files into one evidence root.
+    """
+    return exact_hash_equal
