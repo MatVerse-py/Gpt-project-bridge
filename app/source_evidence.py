@@ -13,6 +13,9 @@ class RepresentationType(str, Enum):
     API_METADATA = "API_METADATA"
     SAVED_HTML = "SAVED_HTML"
     SAVED_PDF = "SAVED_PDF"
+    SAVED_IMAGE = "SAVED_IMAGE"
+    SCREENSHOT = "SCREENSHOT"
+    GENERATED_IMAGE = "GENERATED_IMAGE"
     DOI_METADATA = "DOI_METADATA"
     ORCID_SNAPSHOT = "ORCID_SNAPSHOT"
     REPOSITORY_FILE = "REPOSITORY_FILE"
@@ -44,6 +47,12 @@ STRUCTURED_REPRESENTATIONS = {
     RepresentationType.HF_SNAPSHOT,
 }
 
+IMAGE_REPRESENTATIONS = {
+    RepresentationType.SAVED_IMAGE,
+    RepresentationType.SCREENSHOT,
+    RepresentationType.GENERATED_IMAGE,
+}
+
 REPRESENTATION_PRIORITY: dict[RepresentationType, int] = {
     RepresentationType.API_METADATA: 100,
     RepresentationType.DOI_METADATA: 95,
@@ -54,8 +63,11 @@ REPRESENTATION_PRIORITY: dict[RepresentationType, int] = {
     RepresentationType.REPOSITORY_FILE: 80,
     RepresentationType.HF_SNAPSHOT: 75,
     RepresentationType.SAVED_PDF: 70,
+    RepresentationType.SAVED_IMAGE: 60,
+    RepresentationType.SCREENSHOT: 55,
     RepresentationType.CORPUS_COPY: 50,
     RepresentationType.MODEL_REPORT: 10,
+    RepresentationType.GENERATED_IMAGE: 0,
 }
 
 TIER_BY_PRIORITY = (
@@ -78,6 +90,10 @@ def canonical_json(value: Any) -> str:
 
 def sha256_text(value: str) -> str:
     return sha256(value.encode("utf-8")).hexdigest()
+
+
+def sha256_bytes(value: bytes) -> str:
+    return sha256(value).hexdigest()
 
 
 def normalize_identifier(key: str, value: str) -> str:
@@ -121,6 +137,31 @@ class SourceRepresentation:
             captured_at=captured_at,
         )
 
+    @classmethod
+    def from_bytes(
+        cls,
+        *,
+        kind: RepresentationType,
+        locator: str,
+        content: bytes,
+        metadata: Mapping[str, Any] | None = None,
+        captured_at: str | None = None,
+        expected_sha256: str | None = None,
+    ) -> "SourceRepresentation":
+        digest = sha256_bytes(content)
+        merged_metadata = dict(metadata or {})
+        if expected_sha256 is not None:
+            merged_metadata["tampered"] = digest != expected_sha256
+            merged_metadata["expected_sha256"] = expected_sha256
+        merged_metadata.setdefault("size_bytes", len(content))
+        return cls(
+            kind=kind,
+            locator=locator,
+            content_hash=digest,
+            metadata=merged_metadata,
+            captured_at=captured_at,
+        )
+
 
 @dataclass(frozen=True)
 class EvidenceConflict:
@@ -141,6 +182,16 @@ class SourceEvidence:
     state: EvidenceState
     evidence_tier: str
     evidence_hash: str
+
+    @property
+    def independent_evidence(self) -> bool:
+        if not self.representations:
+            return False
+        return any(
+            rep.kind is not RepresentationType.GENERATED_IMAGE
+            and rep.metadata.get("generated") is not True
+            for rep in self.representations
+        )
 
 
 def _tier(representations: Iterable[SourceRepresentation]) -> str:
@@ -194,18 +245,30 @@ def _resolve_identifier(
         other_priority = max(item[0] for item in other_entries)
         if other_norm == winner_norm:
             continue
-        structured_conflict = (
-            any(kind in STRUCTURED_REPRESENTATIONS for _, kind, _ in winner_entries)
-            and any(kind in STRUCTURED_REPRESENTATIONS for _, kind, _ in other_entries)
-        )
+
+        winner_structured = any(kind in STRUCTURED_REPRESENTATIONS for _, kind, _ in winner_entries)
+        other_structured = any(kind in STRUCTURED_REPRESENTATIONS for _, kind, _ in other_entries)
+        winner_image = any(kind in IMAGE_REPRESENTATIONS for _, kind, _ in winner_entries)
+        other_image = any(kind in IMAGE_REPRESENTATIONS for _, kind, _ in other_entries)
+
+        structured_conflict = winner_structured and other_structured
+        image_structured_conflict = (winner_structured and other_image) or (winner_image and other_structured)
         blocking = structured_conflict and other_priority >= 75 and winner_priority >= 75
+
+        if image_structured_conflict:
+            code = "IMAGE_METADATA_CONFLICT"
+            detail = f"Visual {key} disagrees with structured metadata; structured metadata retains identity precedence"
+        else:
+            code = "IDENTIFIER_CONFLICT" if blocking else "LOWER_PRIORITY_DISAGREEMENT"
+            detail = f"Conflicting {key} values across source representations"
+
         conflicts.append(
             EvidenceConflict(
-                code="IDENTIFIER_CONFLICT" if blocking else "LOWER_PRIORITY_DISAGREEMENT",
+                code=code,
                 field=key,
                 values=(winner_raw, max(other_entries, key=lambda item: item[0])[2]),
                 blocking=blocking,
-                detail=f"Conflicting {key} values across source representations",
+                detail=detail,
             )
         )
 
@@ -246,6 +309,21 @@ def _detect_stale_prose(representations: tuple[SourceRepresentation, ...], ident
                 )
             )
     return conflicts
+
+
+def _has_unverified_external_image_claim(representations: tuple[SourceRepresentation, ...]) -> bool:
+    for rep in representations:
+        if rep.kind not in IMAGE_REPRESENTATIONS:
+            continue
+        claims = rep.metadata.get("external_claims")
+        verified = rep.metadata.get("independently_verified_claims")
+        if not claims:
+            continue
+        claim_set = set(claims if isinstance(claims, (list, tuple, set)) else [claims])
+        verified_set = set(verified if isinstance(verified, (list, tuple, set)) else ([verified] if verified else []))
+        if claim_set - verified_set:
+            return True
+    return False
 
 
 def build_source_evidence(
@@ -303,8 +381,17 @@ def build_source_evidence(
     conflicts.extend(_detect_stale_prose(reps, identifiers))
     blocking = any(c.blocking for c in conflicts)
 
+    only_generated_images = all(
+        rep.kind is RepresentationType.GENERATED_IMAGE or rep.metadata.get("generated") is True
+        for rep in reps
+    )
+
     if blocking:
         state = EvidenceState.CONFLICT
+    elif only_generated_images:
+        state = EvidenceState.PARTIAL
+    elif _has_unverified_external_image_claim(reps) and not any(rep.kind in STRUCTURED_REPRESENTATIONS for rep in reps):
+        state = EvidenceState.PARTIAL
     elif any(rep.kind == RepresentationType.LIVE_HTML for rep in reps):
         state = EvidenceState.VERIFIED
     elif any(rep.kind in STRUCTURED_REPRESENTATIONS for rep in reps):
