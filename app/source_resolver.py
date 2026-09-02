@@ -19,6 +19,7 @@ DEFAULT_FALLBACK_ORDER: tuple[RepresentationType, ...] = (
     RepresentationType.LIVE_HTML,
     RepresentationType.API_METADATA,
     RepresentationType.SAVED_HTML,
+    RepresentationType.ARXIV_EPRINT_SOURCE,
     RepresentationType.LATEX_SOURCE,
     RepresentationType.SAVED_PDF,
     RepresentationType.SAVED_IMAGE,
@@ -103,10 +104,14 @@ def resolve_source(
             "resolved_url": evidence.resolved_url,
             "evidence_hash": evidence.evidence_hash,
             "evidence_tier": evidence.evidence_tier,
+            "authority": dict(evidence.authority),
             "independent_evidence": evidence.independent_evidence,
             "official_version_evidence": evidence.official_version_evidence,
             "admissible": _evidence_is_admissible(evidence),
             "identifiers": dict(evidence.identifiers),
+            "claimed_identifiers": {
+                key: list(values) for key, values in evidence.claimed_identifiers.items()
+            },
             "conflicts": [
                 {
                     "code": conflict.code,
@@ -121,6 +126,7 @@ def resolve_source(
                     "kind": rep.kind.value,
                     "locator": rep.locator,
                     "content_hash": rep.content_hash,
+                    "closure_complete": rep.metadata.get("closure_complete"),
                 }
                 for rep in evidence.representations
             ],
@@ -129,14 +135,30 @@ def resolve_source(
     return SourceResolution(evidence=evidence, attempts=tuple(attempts), receipt=receipt)
 
 
+def _partial_root_is_admissible(rep: SourceRepresentation) -> bool:
+    if rep.kind in {RepresentationType.GENERATED_IMAGE, RepresentationType.DOCUMENT_PAGE_RENDER}:
+        return False
+    if rep.metadata.get("generated") is True or rep.metadata.get("model_generated") is True:
+        return False
+
+    if rep.kind in {RepresentationType.LATEX_SOURCE, RepresentationType.ARXIV_EPRINT_SOURCE}:
+        return rep.metadata.get("closure_complete") is True
+
+    path = str(rep.metadata.get("path") or rep.locator).split("?", 1)[0].lower()
+    if rep.kind is RepresentationType.REPOSITORY_FILE and path.endswith(".tex"):
+        return rep.metadata.get("closure_complete") is True
+
+    return True
+
+
 def _evidence_is_admissible(evidence: SourceEvidence) -> bool:
     if evidence.state in {EvidenceState.VERIFIED, EvidenceState.VERIFIED_SNAPSHOT}:
         return evidence.independent_evidence
     if evidence.state is EvidenceState.PARTIAL:
-        # Partial can be admitted for bounded, explicitly partial use only when
-        # at least one independent root exists. Generated-only and derivative-
-        # only evidence remain non-admissible.
-        return evidence.independent_evidence
+        # Partial evidence may support explicitly bounded claims only when an
+        # admissible independent root exists. An incomplete TeX closure is a
+        # fragment: independent bytes, but not an admissible official source.
+        return any(_partial_root_is_admissible(rep) for rep in evidence.representations)
     return False
 
 
