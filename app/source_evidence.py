@@ -13,6 +13,7 @@ class RepresentationType(str, Enum):
     API_METADATA = "API_METADATA"
     SAVED_HTML = "SAVED_HTML"
     LATEX_SOURCE = "LATEX_SOURCE"
+    ARXIV_EPRINT_SOURCE = "ARXIV_EPRINT_SOURCE"
     SAVED_PDF = "SAVED_PDF"
     SAVED_IMAGE = "SAVED_IMAGE"
     SCREENSHOT = "SCREENSHOT"
@@ -43,6 +44,7 @@ STRUCTURED_REPRESENTATIONS = {
     RepresentationType.API_METADATA,
     RepresentationType.SAVED_HTML,
     RepresentationType.LATEX_SOURCE,
+    RepresentationType.ARXIV_EPRINT_SOURCE,
     RepresentationType.DOI_METADATA,
     RepresentationType.ORCID_SNAPSHOT,
     RepresentationType.REPOSITORY_FILE,
@@ -57,10 +59,14 @@ IMAGE_REPRESENTATIONS = {
     RepresentationType.GENERATED_IMAGE,
 }
 
+# Compatibility ranking used for fallback/tier summaries. Claim authority is
+# modeled separately below as a vector. A scalar tier must never be read as
+# universal truth strength.
 REPRESENTATION_PRIORITY: dict[RepresentationType, int] = {
     RepresentationType.API_METADATA: 100,
     RepresentationType.DOI_METADATA: 95,
     RepresentationType.GIT_COMMIT: 95,
+    RepresentationType.ARXIV_EPRINT_SOURCE: 90,
     RepresentationType.LIVE_HTML: 90,
     RepresentationType.SAVED_HTML: 85,
     RepresentationType.ORCID_SNAPSHOT: 85,
@@ -95,6 +101,157 @@ IDENTIFIER_KEYS = (
     "author",
     "version",
 )
+
+AUTHORITY_DOMAINS = (
+    "content",
+    "version",
+    "authorship",
+    "publication",
+    "timestamp",
+    "execution",
+)
+
+# Policy weights, NOT probabilities and NOT scientific confidence scores.
+# They exist to prevent one scalar evidence tier from leaking authority across
+# unrelated predicates (e.g. TeX content authority becoming publication proof).
+AUTHORITY_BY_REPRESENTATION: dict[RepresentationType, dict[str, float]] = {
+    RepresentationType.LATEX_SOURCE: {
+        "content": 1.00,
+        "version": 1.00,
+        "authorship": 0.30,
+        "publication": 0.00,
+        "timestamp": 0.00,
+        "execution": 0.00,
+    },
+    RepresentationType.ARXIV_EPRINT_SOURCE: {
+        "content": 1.00,
+        "version": 1.00,
+        "authorship": 0.60,
+        "publication": 0.70,
+        "timestamp": 0.90,
+        "execution": 0.00,
+    },
+    RepresentationType.SAVED_PDF: {
+        "content": 0.80,
+        "version": 0.60,
+        "authorship": 0.30,
+        "publication": 0.00,
+        "timestamp": 0.00,
+        "execution": 0.00,
+    },
+    RepresentationType.DOI_METADATA: {
+        "content": 0.20,
+        "version": 0.70,
+        "authorship": 0.60,
+        "publication": 1.00,
+        "timestamp": 0.90,
+        "execution": 0.00,
+    },
+    RepresentationType.GIT_COMMIT: {
+        "content": 0.90,
+        "version": 1.00,
+        "authorship": 0.60,
+        "publication": 0.00,
+        "timestamp": 0.85,
+        "execution": 0.00,
+    },
+    RepresentationType.API_METADATA: {
+        "content": 0.25,
+        "version": 0.75,
+        "authorship": 0.65,
+        "publication": 0.90,
+        "timestamp": 0.80,
+        "execution": 0.00,
+    },
+    RepresentationType.LIVE_HTML: {
+        "content": 0.80,
+        "version": 0.55,
+        "authorship": 0.40,
+        "publication": 0.70,
+        "timestamp": 0.50,
+        "execution": 0.00,
+    },
+    RepresentationType.SAVED_HTML: {
+        "content": 0.75,
+        "version": 0.55,
+        "authorship": 0.40,
+        "publication": 0.55,
+        "timestamp": 0.45,
+        "execution": 0.00,
+    },
+    RepresentationType.ORCID_SNAPSHOT: {
+        "content": 0.10,
+        "version": 0.20,
+        "authorship": 0.90,
+        "publication": 0.40,
+        "timestamp": 0.80,
+        "execution": 0.00,
+    },
+    RepresentationType.REPOSITORY_FILE: {
+        "content": 0.80,
+        "version": 0.80,
+        "authorship": 0.35,
+        "publication": 0.00,
+        "timestamp": 0.30,
+        "execution": 0.00,
+    },
+    RepresentationType.HF_SNAPSHOT: {
+        "content": 0.70,
+        "version": 0.70,
+        "authorship": 0.35,
+        "publication": 0.45,
+        "timestamp": 0.60,
+        "execution": 0.00,
+    },
+    RepresentationType.CORPUS_COPY: {
+        "content": 0.50,
+        "version": 0.30,
+        "authorship": 0.20,
+        "publication": 0.00,
+        "timestamp": 0.10,
+        "execution": 0.00,
+    },
+    RepresentationType.SAVED_IMAGE: {
+        "content": 0.35,
+        "version": 0.10,
+        "authorship": 0.05,
+        "publication": 0.00,
+        "timestamp": 0.05,
+        "execution": 0.00,
+    },
+    RepresentationType.SCREENSHOT: {
+        "content": 0.30,
+        "version": 0.05,
+        "authorship": 0.05,
+        "publication": 0.00,
+        "timestamp": 0.05,
+        "execution": 0.00,
+    },
+    RepresentationType.DOCUMENT_PAGE_RENDER: {
+        "content": 0.00,
+        "version": 0.00,
+        "authorship": 0.00,
+        "publication": 0.00,
+        "timestamp": 0.00,
+        "execution": 0.00,
+    },
+    RepresentationType.GENERATED_IMAGE: {
+        "content": 0.00,
+        "version": 0.00,
+        "authorship": 0.00,
+        "publication": 0.00,
+        "timestamp": 0.00,
+        "execution": 0.00,
+    },
+    RepresentationType.MODEL_REPORT: {
+        "content": 0.05,
+        "version": 0.00,
+        "authorship": 0.00,
+        "publication": 0.00,
+        "timestamp": 0.00,
+        "execution": 0.00,
+    },
+}
 
 _DOI_RE = re.compile(r"\b10\.\d{4,9}/[-._;()/:A-Za-z0-9]+\b")
 
@@ -193,6 +350,8 @@ class SourceEvidence:
     resolved_url: str | None
     representations: tuple[SourceRepresentation, ...]
     identifiers: Mapping[str, str]
+    claimed_identifiers: Mapping[str, tuple[str, ...]]
+    authority: Mapping[str, float]
     conflicts: tuple[EvidenceConflict, ...]
     state: EvidenceState
     evidence_tier: str
@@ -206,10 +365,11 @@ class SourceEvidence:
 
     @property
     def official_version_evidence(self) -> bool:
-        """True when an official TeX source is tied to a verified immutable anchor.
+        """True when an official TeX source has complete closure + verified anchor.
 
-        Scope is intentionally narrow: this proves source/version identity, not
-        external publication, peer review, or scientific validity.
+        Scope is intentionally narrow: source/version identity only. This does
+        not prove external publication, peer review, reproduction or scientific
+        validity.
         """
         return any(_representation_is_official_version_source(rep) for rep in self.representations)
 
@@ -227,10 +387,16 @@ def _representation_is_derivative(rep: SourceRepresentation) -> bool:
 
 
 def _representation_is_latex(rep: SourceRepresentation) -> bool:
-    if rep.kind is RepresentationType.LATEX_SOURCE:
+    if rep.kind in {RepresentationType.LATEX_SOURCE, RepresentationType.ARXIV_EPRINT_SOURCE}:
         return True
     path = str(rep.metadata.get("path") or rep.locator).split("?", 1)[0].lower()
     return rep.kind is RepresentationType.REPOSITORY_FILE and path.endswith(".tex")
+
+
+def _representation_has_complete_latex_closure(rep: SourceRepresentation) -> bool:
+    if not _representation_is_latex(rep):
+        return True
+    return rep.metadata.get("closure_complete") is True
 
 
 def _representation_declares_official_version(rep: SourceRepresentation) -> bool:
@@ -256,8 +422,24 @@ def _representation_has_verified_version_anchor(rep: SourceRepresentation) -> bo
     return False
 
 
+def _representation_has_verified_external_custody(rep: SourceRepresentation) -> bool:
+    if rep.kind is not RepresentationType.ARXIV_EPRINT_SOURCE:
+        return False
+    return (
+        rep.metadata.get("external_timestamp_verified") is True
+        and (
+            rep.metadata.get("canonical_verified") is True
+            or rep.metadata.get("signature_verified") is True
+        )
+    )
+
+
 def _representation_is_official_version_source(rep: SourceRepresentation) -> bool:
-    return _representation_declares_official_version(rep) and _representation_has_verified_version_anchor(rep)
+    return (
+        _representation_declares_official_version(rep)
+        and _representation_has_complete_latex_closure(rep)
+        and _representation_has_verified_version_anchor(rep)
+    )
 
 
 def _representation_is_independent(rep: SourceRepresentation) -> bool:
@@ -265,13 +447,15 @@ def _representation_is_independent(rep: SourceRepresentation) -> bool:
 
 
 def _effective_priority(rep: SourceRepresentation) -> int:
-    # Provenance dominates appearance. Generated visuals cannot gain authority by
-    # looking official; a TeX source gains P5 only for version identity when its
-    # official status is tied to a verified immutable provenance anchor.
+    # Provenance dominates appearance. Generated/derivative material cannot gain
+    # authority from presentation. Incomplete TeX is a fragment and is capped at
+    # P1 until the transitive source closure is resolved.
     if _representation_is_generated(rep):
         return 0
     if _representation_is_derivative(rep):
         return min(REPRESENTATION_PRIORITY[rep.kind], 45)
+    if _representation_is_latex(rep) and not _representation_has_complete_latex_closure(rep):
+        return 50
     if _representation_is_official_version_source(rep):
         return 95
     return REPRESENTATION_PRIORITY[rep.kind]
@@ -285,16 +469,49 @@ def _tier(representations: Iterable[SourceRepresentation]) -> str:
     return "P0"
 
 
+def _representation_authority(rep: SourceRepresentation) -> dict[str, float]:
+    zero = {domain: 0.0 for domain in AUTHORITY_DOMAINS}
+    if not _representation_is_independent(rep):
+        return zero
+    if _representation_is_latex(rep) and not _representation_has_complete_latex_closure(rep):
+        return zero
+
+    base = AUTHORITY_BY_REPRESENTATION.get(rep.kind, zero)
+    if rep.kind is RepresentationType.ARXIV_EPRINT_SOURCE and not _representation_has_verified_external_custody(rep):
+        # Without verified third-party custody, an arXiv-shaped source is only a
+        # TeX source. Naming/URL shape cannot manufacture publication authority.
+        base = AUTHORITY_BY_REPRESENTATION[RepresentationType.LATEX_SOURCE]
+    return {domain: float(base.get(domain, 0.0)) for domain in AUTHORITY_DOMAINS}
+
+
+def _aggregate_authority(representations: Iterable[SourceRepresentation]) -> dict[str, float]:
+    # Use max, not probabilistic noisy-OR. Derivational independence is not the
+    # same as statistical independence, so multiplying evidence weights would
+    # create false precision. Multiple corroborators may be recorded separately,
+    # but the policy authority ceiling for a domain is the strongest independent
+    # admissible representation.
+    out = {domain: 0.0 for domain in AUTHORITY_DOMAINS}
+    for rep in representations:
+        vector = _representation_authority(rep)
+        for domain in AUTHORITY_DOMAINS:
+            out[domain] = max(out[domain], vector[domain])
+    return out
+
+
 def _collect_values(
     representations: Iterable[SourceRepresentation],
     key: str,
 ) -> list[tuple[int, RepresentationType, str]]:
     values: list[tuple[int, RepresentationType, str]] = []
     for rep in representations:
-        # Generated images may contain strings resembling identifiers, but those
-        # remain visual claims until an independent representation resolves them.
         if _representation_is_generated(rep):
             continue
+
+        # DOI/ORCID text inside TeX remains a CLAIMED_IDENTIFIER. Resolution must
+        # come from an independent metadata/identity source.
+        if _representation_is_latex(rep) and key in {"doi", "orcid"}:
+            continue
+
         raw = rep.metadata.get(key)
         if raw is None:
             continue
@@ -304,6 +521,20 @@ def _collect_values(
                 continue
             values.append((_effective_priority(rep), rep.kind, item.strip()))
     return values
+
+
+def _collect_claimed_identifiers(representations: Iterable[SourceRepresentation]) -> dict[str, tuple[str, ...]]:
+    collected: dict[str, set[str]] = {}
+    for rep in representations:
+        claims = rep.metadata.get("claimed_identifiers")
+        if not isinstance(claims, Mapping):
+            continue
+        for key, raw_values in claims.items():
+            values = raw_values if isinstance(raw_values, (list, tuple, set)) else [raw_values]
+            for raw in values:
+                if isinstance(raw, str) and raw.strip():
+                    collected.setdefault(str(key), set()).add(raw.strip())
+    return {key: tuple(sorted(values)) for key, values in sorted(collected.items())}
 
 
 def _resolve_identifier(
@@ -367,20 +598,33 @@ def _official_version_conflicts(representations: tuple[SourceRepresentation, ...
     for rep in representations:
         if not _representation_declares_official_version(rep):
             continue
-        if _representation_has_verified_version_anchor(rep):
-            continue
-        conflicts.append(
-            EvidenceConflict(
-                code="OFFICIAL_VERSION_UNANCHORED",
-                field="version_authority",
-                values=(rep.locator,),
-                blocking=False,
-                detail=(
-                    "LaTeX source declares official_version but lacks a verified immutable "
-                    "commit/tag/manifest/canonical/signature anchor; it remains ordinary TeX evidence"
-                ),
+        if not _representation_has_complete_latex_closure(rep):
+            unresolved = rep.metadata.get("unresolved_references") or ()
+            conflicts.append(
+                EvidenceConflict(
+                    code="LATEX_CLOSURE_INCOMPLETE",
+                    field="version_authority",
+                    values=(rep.locator, *tuple(str(v) for v in unresolved)),
+                    blocking=False,
+                    detail=(
+                        "LaTeX source declares official_version but its transitive source closure "
+                        "is incomplete; it is a fragment and cannot establish official version"
+                    ),
+                )
             )
-        )
+        if not _representation_has_verified_version_anchor(rep):
+            conflicts.append(
+                EvidenceConflict(
+                    code="OFFICIAL_VERSION_UNANCHORED",
+                    field="version_authority",
+                    values=(rep.locator,),
+                    blocking=False,
+                    detail=(
+                        "LaTeX source declares official_version but lacks a verified immutable "
+                        "commit/tag/manifest/canonical/signature anchor"
+                    ),
+                )
+            )
     return conflicts
 
 
@@ -440,12 +684,21 @@ def _has_unverified_external_image_claim(representations: tuple[SourceRepresenta
     return False
 
 
+def _only_incomplete_latex_independent_roots(representations: tuple[SourceRepresentation, ...]) -> bool:
+    roots = tuple(rep for rep in representations if _representation_is_independent(rep))
+    if not roots:
+        return False
+    return all(_representation_is_latex(rep) and not _representation_has_complete_latex_closure(rep) for rep in roots)
+
+
 def build_source_evidence(
     *,
     original_url: str,
     representations: Iterable[SourceRepresentation],
 ) -> SourceEvidence:
     reps = tuple(representations)
+    empty_authority = {domain: 0.0 for domain in AUTHORITY_DOMAINS}
+
     if not reps:
         payload = {"original_url": original_url, "state": EvidenceState.UNAVAILABLE_AFTER_FALLBACK.value}
         return SourceEvidence(
@@ -453,6 +706,8 @@ def build_source_evidence(
             resolved_url=None,
             representations=(),
             identifiers={},
+            claimed_identifiers={},
+            authority=empty_authority,
             conflicts=(),
             state=EvidenceState.UNAVAILABLE_AFTER_FALLBACK,
             evidence_tier="P0",
@@ -470,6 +725,8 @@ def build_source_evidence(
             resolved_url=None,
             representations=reps,
             identifiers={},
+            claimed_identifiers=_collect_claimed_identifiers(reps),
+            authority=empty_authority,
             conflicts=(
                 EvidenceConflict(
                     code="TAMPER_SIGNAL",
@@ -492,6 +749,7 @@ def build_source_evidence(
             identifiers[key] = value
         conflicts.extend(field_conflicts)
 
+    claimed_identifiers = _collect_claimed_identifiers(reps)
     conflicts.extend(_official_version_conflicts(reps))
     conflicts.extend(_detect_stale_prose(reps, identifiers))
     blocking = any(c.blocking for c in conflicts)
@@ -501,6 +759,8 @@ def build_source_evidence(
     if blocking:
         state = EvidenceState.CONFLICT
     elif no_independent_root:
+        state = EvidenceState.PARTIAL
+    elif _only_incomplete_latex_independent_roots(reps):
         state = EvidenceState.PARTIAL
     elif _has_unverified_external_image_claim(reps) and not any(rep.kind in STRUCTURED_REPRESENTATIONS for rep in reps):
         state = EvidenceState.PARTIAL
@@ -516,6 +776,7 @@ def build_source_evidence(
         best = max(reps, key=_effective_priority)
         resolved_url = best.locator
 
+    authority = _aggregate_authority(reps)
     evidence_payload = {
         "original_url": original_url,
         "resolved_url": resolved_url,
@@ -527,11 +788,14 @@ def build_source_evidence(
                 "captured_at": rep.captured_at,
                 "metadata": dict(rep.metadata),
                 "effective_priority": _effective_priority(rep),
+                "authority": _representation_authority(rep),
                 "official_version_source": _representation_is_official_version_source(rep),
             }
             for rep in reps
         ],
         "identifiers": identifiers,
+        "claimed_identifiers": claimed_identifiers,
+        "authority": authority,
         "official_version_evidence": any(_representation_is_official_version_source(rep) for rep in reps),
         "conflicts": [
             {
@@ -551,6 +815,8 @@ def build_source_evidence(
         resolved_url=resolved_url,
         representations=reps,
         identifiers=identifiers,
+        claimed_identifiers=claimed_identifiers,
+        authority=authority,
         conflicts=tuple(conflicts),
         state=state,
         evidence_tier=_tier(reps),
