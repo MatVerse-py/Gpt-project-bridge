@@ -24,7 +24,12 @@ def catalog():
                     "claim_relation": "SUPPORTS",
                     "relation_claim_ref": "claim://bound",
                     "search_text": "MatVerse ARGUS factual integrity record",
-                    "metadata": {"title": "ARGUS factual integrity record"},
+                    "metadata": {
+                        "title": "ARGUS factual integrity record",
+                        # These must never bypass top-level claim binding.
+                        "claim_relation": "SUPPORTS",
+                        "context_status": "OUT_OF_CONTEXT",
+                    },
                 },
                 {
                     "locator": "image://generated",
@@ -46,15 +51,21 @@ def test_catalog_search_is_deterministic_and_does_not_emit_search_text_or_unboun
     assert result["schema"] == ARGUS_BATCH_SCHEMA
     assert result["state"] == "PARTIAL"
     assert result["catalog_match_count"] == 1
-    assert result["items"][0]["locator"] == "api://record/alpha"
-    assert "search_text" not in result["items"][0]
-    assert "relation_claim_ref" not in result["items"][0]
-    assert "claim_relation" not in result["items"][0]
+    item = result["items"][0]
+    assert item["locator"] == "api://record/alpha"
+    assert "search_text" not in item
+    assert "relation_claim_ref" not in item
+    assert "claim_relation" not in item
+    assert "claim_relation" not in item["metadata"]
+    assert "context_status" not in item["metadata"]
 
 
-def test_catalog_emits_relation_only_for_bound_claim():
+def test_catalog_emits_relation_only_for_bound_claim_and_still_strips_nested_control():
     result = catalog().search("ARGUS factual integrity", claim_ref="claim://bound")
-    assert result["items"][0]["claim_relation"] == "SUPPORTS"
+    item = result["items"][0]
+    assert item["claim_relation"] == "SUPPORTS"
+    assert "claim_relation" not in item["metadata"]
+    assert "context_status" not in item["metadata"]
 
 
 def test_catalog_no_match_fails_closed_as_unavailable():
