@@ -1,0 +1,29 @@
+{
+  "schema": "matverse.real-image-observations.v1",
+  "observations": [
+    {
+      "source_file": "4aba2f46-72a2-4a8a-ada6-0c558f581823.png",
+      "kind": "SCREENSHOT",
+      "observed": ["URANO OSX", "MatVerse Organism Console v2.0", "MNB Explorer", "Q-Gate PASS", "Ledger PASS", "Replay PASS", "Witness PASS", "Cassandra LINKED", "ACOA ACTIVE"],
+      "interpretation": "UI state only; backend truth not independently established by pixels"
+    },
+    {
+      "source_file": "chart-1(2).png",
+      "kind": "SAVED_IMAGE",
+      "observed": ["Production Gate v0.3", "PASS_LOCAL_PRODUCTION__HOLD_EXTERNAL_WITNESS", "M_global=0.7505", "M_local=0.8388"],
+      "interpretation": "artifact-reported operational state; external witness remains explicitly held"
+    },
+    {
+      "source_file": "chart-1(4).png",
+      "kind": "SAVED_IMAGE",
+      "observed": ["Production Gate v0.3", "No independent replay, no public production claim", "PASS_LOCAL_PRODUCTION__HOLD_EXTERNAL_WITNESS"],
+      "interpretation": "visual corroboration of the report's fail-closed public-production rule"
+    },
+    {
+      "source_file": "Implantação do SVCA Lab Genesis.png",
+      "kind": "GENERATED_IMAGE",
+      "observed": ["Ω-SEED Genesis Artifact Deployed", "GitHub DEPLOYED", "Hugging Face DEPLOYED", "Sepolia Blockchain DEPLOYED", "Zenodo Archive DOI PREPARED"],
+      "interpretation": "synthetic/generated visual; claims require GitHub/HF/chain/Zenodo independent verification and cannot be promoted from the image itself"
+    }
+  ]
+}
