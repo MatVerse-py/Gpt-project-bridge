@@ -4,24 +4,36 @@
     {
       "source_file": "4aba2f46-72a2-4a8a-ada6-0c558f581823.png",
       "kind": "SCREENSHOT",
+      "sha256": "5b998640e8593d4f12fc16a4d92a68491efd6e290958f9dfc0770d8fc28e8949",
+      "size_bytes": 201838,
+      "dimensions": [1352, 567],
       "observed": ["URANO OSX", "MatVerse Organism Console v2.0", "MNB Explorer", "Q-Gate PASS", "Ledger PASS", "Replay PASS", "Witness PASS", "Cassandra LINKED", "ACOA ACTIVE"],
       "interpretation": "UI state only; backend truth not independently established by pixels"
     },
     {
       "source_file": "chart-1(2).png",
       "kind": "SAVED_IMAGE",
+      "sha256": "993462fffa849a9e6c1afb7d97c344c4fac83d818a7295c1f21f9cbffbbd38e9",
+      "size_bytes": 256870,
+      "dimensions": [1547, 2002],
       "observed": ["Production Gate v0.3", "PASS_LOCAL_PRODUCTION__HOLD_EXTERNAL_WITNESS", "M_global=0.7505", "M_local=0.8388"],
       "interpretation": "artifact-reported operational state; external witness remains explicitly held"
     },
     {
       "source_file": "chart-1(4).png",
       "kind": "SAVED_IMAGE",
+      "sha256": "d1ab7be0323c303ea03b5e7166c9ff132689758c7f4876f2c9579c9018214b6a",
+      "size_bytes": 111422,
+      "dimensions": [1600, 900],
       "observed": ["Production Gate v0.3", "No independent replay, no public production claim", "PASS_LOCAL_PRODUCTION__HOLD_EXTERNAL_WITNESS"],
       "interpretation": "visual corroboration of the report's fail-closed public-production rule"
     },
     {
       "source_file": "Implantação do SVCA Lab Genesis.png",
       "kind": "GENERATED_IMAGE",
+      "sha256": "4e2ff13feb4e6118a35852f678fbff4d26ff156ed8beca1d473c77cd940c3d17",
+      "size_bytes": 1861821,
+      "dimensions": [1536, 1024],
       "observed": ["Ω-SEED Genesis Artifact Deployed", "GitHub DEPLOYED", "Hugging Face DEPLOYED", "Sepolia Blockchain DEPLOYED", "Zenodo Archive DOI PREPARED"],
       "interpretation": "synthetic/generated visual; claims require GitHub/HF/chain/Zenodo independent verification and cannot be promoted from the image itself"
     }
