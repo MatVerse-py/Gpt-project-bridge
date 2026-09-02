@@ -61,6 +61,10 @@ def _searchable_text(item: Mapping[str, Any]) -> str:
     return " ".join(parts)
 
 
+def _effective_claim_hash(*, claim_text: str, claim_sha256: str) -> str:
+    return claim_sha256 or (_claim_sha256(claim_text) if claim_text else "")
+
+
 def _scope_is_bound(
     item: Mapping[str, Any],
     *,
@@ -72,7 +76,7 @@ def _scope_is_bound(
     bound_hash = str(item.get("relation_claim_sha256") or "").strip().lower()
     if bound_ref and bound_ref == claim_ref:
         return True
-    effective_hash = claim_sha256 or (_claim_sha256(claim_text) if claim_text else "")
+    effective_hash = _effective_claim_hash(claim_text=claim_text, claim_sha256=claim_sha256)
     if bound_hash and effective_hash and bound_hash == effective_hash:
         return True
     return False
@@ -101,16 +105,12 @@ def _public_item(
     claim_text: str,
     claim_sha256: str,
 ) -> dict[str, Any]:
-    # Search/binding helpers are catalog-only and never emitted.
     result = {
         str(key): value
         for key, value in item.items()
         if str(key) not in {"search_text", *_BINDING_KEYS}
     }
 
-    # Nested metadata is informational only. Claim-scoped controls must never be
-    # smuggled through metadata because the consumer would otherwise be unable
-    # to prove that they were bound to the current claim.
     metadata = result.get("metadata")
     if isinstance(metadata, Mapping):
         result["metadata"] = {
@@ -129,6 +129,15 @@ def _public_item(
         result.pop("claim_relation", None)
     if "context_status" in result and not bound:
         result.pop("context_status", None)
+
+    # If a claim-scoped control survives, echo the effective binding so ARGUS can
+    # independently revalidate scope instead of trusting a bare control flag.
+    if bound and any(key in result for key in _CLAIM_SCOPED_KEYS):
+        if claim_ref:
+            result["relation_claim_ref"] = claim_ref
+        effective_hash = _effective_claim_hash(claim_text=claim_text, claim_sha256=claim_sha256)
+        if effective_hash:
+            result["relation_claim_sha256"] = effective_hash
     return result
 
 
