@@ -23,6 +23,8 @@ Raw HTML/PDF/PNG/JPG/WebP files remain outside the public repository by default.
 - same file size is insufficient to assert duplication.
 - unavailable raw backing bytes => `HOLD`, never an inferred hash/duplicate result.
 
+The June visual audit also found genuine screenshots of URANO/MatVerse UI, plugin availability and Crossref/Zenodo suggestions. These prove only rendered UI state. Model-generated `chart-*.png` files were explicitly downgraded and cannot independently corroborate runtime state.
+
 See:
 - `real_evidence_manifest.json`
 - `real_image_observations.json`
