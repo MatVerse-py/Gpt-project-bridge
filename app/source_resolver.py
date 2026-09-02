@@ -19,6 +19,7 @@ DEFAULT_FALLBACK_ORDER: tuple[RepresentationType, ...] = (
     RepresentationType.LIVE_HTML,
     RepresentationType.API_METADATA,
     RepresentationType.SAVED_HTML,
+    RepresentationType.LATEX_SOURCE,
     RepresentationType.SAVED_PDF,
     RepresentationType.SAVED_IMAGE,
     RepresentationType.SCREENSHOT,
@@ -103,6 +104,7 @@ def resolve_source(
             "evidence_hash": evidence.evidence_hash,
             "evidence_tier": evidence.evidence_tier,
             "independent_evidence": evidence.independent_evidence,
+            "official_version_evidence": evidence.official_version_evidence,
             "admissible": _evidence_is_admissible(evidence),
             "identifiers": dict(evidence.identifiers),
             "conflicts": [
