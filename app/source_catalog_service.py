@@ -34,6 +34,14 @@ def _tokens(value: str) -> set[str]:
     return {match.group(0).casefold() for match in _TOKEN_RE.finditer(value)}
 
 
+def _normalized_claim(value: str) -> str:
+    return " ".join(value.split())
+
+
+def _claim_sha256(value: str) -> str:
+    return sha256(_normalized_claim(value).encode("utf-8")).hexdigest()
+
+
 def _searchable_text(item: Mapping[str, Any]) -> str:
     parts = [
         str(item.get("locator") or ""),
@@ -48,9 +56,29 @@ def _searchable_text(item: Mapping[str, Any]) -> str:
     return " ".join(parts)
 
 
-def _public_item(item: Mapping[str, Any]) -> dict[str, Any]:
-    # `search_text` exists only to help retrieval and is never emitted.
-    return {str(key): value for key, value in item.items() if str(key) != "search_text"}
+def _relation_is_bound(item: Mapping[str, Any], *, claim_ref: str, claim_text: str) -> bool:
+    relation = str(item.get("claim_relation") or "").strip()
+    if not relation:
+        return False
+    bound_ref = str(item.get("relation_claim_ref") or "").strip()
+    bound_hash = str(item.get("relation_claim_sha256") or "").strip().lower()
+    if bound_ref and bound_ref == claim_ref:
+        return True
+    if bound_hash and bound_hash == _claim_sha256(claim_text):
+        return True
+    return False
+
+
+def _public_item(item: Mapping[str, Any], *, claim_ref: str, claim_text: str) -> dict[str, Any]:
+    # `search_text` and relation-binding helpers are catalog-only and never emitted.
+    result = {
+        str(key): value
+        for key, value in item.items()
+        if str(key) not in {"search_text", "relation_claim_ref", "relation_claim_sha256"}
+    }
+    if "claim_relation" in result and not _relation_is_bound(item, claim_ref=claim_ref, claim_text=claim_text):
+        result.pop("claim_relation", None)
+    return result
 
 
 @dataclass(frozen=True)
@@ -82,7 +110,7 @@ class BridgeEvidenceCatalog:
             raise ValueError("catalog JSON must be an object")
         return cls.from_payload(payload)
 
-    def search(self, claim_text: str, *, max_sources: int = 32) -> dict[str, Any]:
+    def search(self, claim_text: str, *, claim_ref: str = "", max_sources: int = 32) -> dict[str, Any]:
         query_tokens = _tokens(claim_text)
         scored: list[tuple[int, str, Mapping[str, Any]]] = []
         for item in self.items:
@@ -90,14 +118,17 @@ class BridgeEvidenceCatalog:
             hay_tokens = _tokens(haystack)
             overlap = len(query_tokens & hay_tokens)
             phrase_bonus = 3 if claim_text.strip() and claim_text.casefold() in haystack.casefold() else 0
-            explicit_relation_bonus = 1 if str(item.get("claim_relation") or "").strip() else 0
-            score = overlap + phrase_bonus + explicit_relation_bonus
+            relation_bonus = 1 if _relation_is_bound(item, claim_ref=claim_ref, claim_text=claim_text) else 0
+            score = overlap + phrase_bonus + relation_bonus
             if score <= 0:
                 continue
             scored.append((score, str(item.get("locator")), item))
 
         scored.sort(key=lambda row: (-row[0], row[1]))
-        selected = [_public_item(item) for _, _, item in scored[: max(0, max_sources)]]
+        selected = [
+            _public_item(item, claim_ref=claim_ref, claim_text=claim_text)
+            for _, _, item in scored[: max(0, max_sources)]
+        ]
         digest = sha256(_canonical(selected)).hexdigest()
 
         return {
@@ -147,7 +178,7 @@ def create_app(catalog_provider: CatalogProvider = environment_catalog) -> FastA
             raise HTTPException(status_code=422, detail="unsupported query schema")
         try:
             catalog = catalog_provider()
-            return catalog.search(req.claim_text, max_sources=req.max_sources)
+            return catalog.search(req.claim_text, claim_ref=req.claim_ref, max_sources=req.max_sources)
         except Exception as exc:
             raise HTTPException(status_code=503, detail=f"evidence catalog unavailable: {type(exc).__name__}") from exc
 
