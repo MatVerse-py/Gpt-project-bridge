@@ -25,6 +25,8 @@ CATALOG_SCHEMA = "matverse.bridge-evidence-catalog.v1"
 QUERY_SCHEMA = "matverse.argus-evidence-query.v1"
 _TOKEN_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ0-9_.:/-]{3,}")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_CLAIM_SCOPED_KEYS = {"claim_relation", "context_status"}
+_BINDING_KEYS = {"relation_claim_ref", "relation_claim_sha256"}
 
 
 def _canonical(value: Any) -> bytes:
@@ -52,9 +54,28 @@ def _searchable_text(item: Mapping[str, Any]) -> str:
     metadata = item.get("metadata")
     if isinstance(metadata, Mapping):
         for key, value in metadata.items():
+            if str(key) in _CLAIM_SCOPED_KEYS or str(key) in _BINDING_KEYS:
+                continue
             if isinstance(value, (str, int, float, bool)):
                 parts.append(f"{key} {value}")
     return " ".join(parts)
+
+
+def _scope_is_bound(
+    item: Mapping[str, Any],
+    *,
+    claim_ref: str,
+    claim_text: str,
+    claim_sha256: str,
+) -> bool:
+    bound_ref = str(item.get("relation_claim_ref") or "").strip()
+    bound_hash = str(item.get("relation_claim_sha256") or "").strip().lower()
+    if bound_ref and bound_ref == claim_ref:
+        return True
+    effective_hash = claim_sha256 or (_claim_sha256(claim_text) if claim_text else "")
+    if bound_hash and effective_hash and bound_hash == effective_hash:
+        return True
+    return False
 
 
 def _relation_is_bound(
@@ -65,16 +86,12 @@ def _relation_is_bound(
     claim_sha256: str,
 ) -> bool:
     relation = str(item.get("claim_relation") or "").strip()
-    if not relation:
-        return False
-    bound_ref = str(item.get("relation_claim_ref") or "").strip()
-    bound_hash = str(item.get("relation_claim_sha256") or "").strip().lower()
-    if bound_ref and bound_ref == claim_ref:
-        return True
-    effective_hash = claim_sha256 or (_claim_sha256(claim_text) if claim_text else "")
-    if bound_hash and effective_hash and bound_hash == effective_hash:
-        return True
-    return False
+    return bool(relation) and _scope_is_bound(
+        item,
+        claim_ref=claim_ref,
+        claim_text=claim_text,
+        claim_sha256=claim_sha256,
+    )
 
 
 def _public_item(
@@ -88,15 +105,30 @@ def _public_item(
     result = {
         str(key): value
         for key, value in item.items()
-        if str(key) not in {"search_text", "relation_claim_ref", "relation_claim_sha256"}
+        if str(key) not in {"search_text", *_BINDING_KEYS}
     }
-    if "claim_relation" in result and not _relation_is_bound(
+
+    # Nested metadata is informational only. Claim-scoped controls must never be
+    # smuggled through metadata because the consumer would otherwise be unable
+    # to prove that they were bound to the current claim.
+    metadata = result.get("metadata")
+    if isinstance(metadata, Mapping):
+        result["metadata"] = {
+            str(key): value
+            for key, value in metadata.items()
+            if str(key) not in _CLAIM_SCOPED_KEYS and str(key) not in _BINDING_KEYS
+        }
+
+    bound = _scope_is_bound(
         item,
         claim_ref=claim_ref,
         claim_text=claim_text,
         claim_sha256=claim_sha256,
-    ):
+    )
+    if "claim_relation" in result and not bound:
         result.pop("claim_relation", None)
+    if "context_status" in result and not bound:
+        result.pop("context_status", None)
     return result
 
 
