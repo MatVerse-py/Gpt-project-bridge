@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from hashlib import sha256
 from typing import Mapping
-import json
 
 from app.source_evidence import RepresentationType, SourceEvidence, SourceRepresentation
 
@@ -36,9 +35,10 @@ _SAFE_METADATA_KEYS = {
     "derived_representation",
     "evidence_root_id",
     "derived_from_root",
-    "context_status",
+    # integrity_status describes the source artifact itself and is not a claim
+    # relation. Claim-scoped controls such as claim_relation/context_status are
+    # deliberately excluded from nested metadata.
     "integrity_status",
-    "claim_relation",
     "content_type",
     "captured_at",
     "published_at",
@@ -69,18 +69,27 @@ def source_evidence_to_argus_batch(
     *,
     observed_text_by_locator: Mapping[str, str] | None = None,
     claim_relation_by_locator: Mapping[str, str] | None = None,
+    claim_ref: str | None = None,
+    claim_sha256: str | None = None,
     max_items: int = 32,
 ) -> dict[str, object]:
     """Serialize SourceEvidence into the ARGUS wire contract.
 
     `observed_text_by_locator` is opt-in because SourceEvidence intentionally
     stores hashes/metadata rather than retaining arbitrary source bodies.
-    `claim_relation_by_locator`, when supplied by an upstream adjudicator, is
-    transported as an explicit relation and is never inferred here.
+
+    Claim relations are never emitted as generic source metadata. If a caller
+    supplies `claim_relation_by_locator`, it must also provide a `claim_ref` or
+    normalized `claim_sha256` so the relation remains explicitly claim-scoped.
     """
 
     observed_text_by_locator = dict(observed_text_by_locator or {})
     claim_relation_by_locator = dict(claim_relation_by_locator or {})
+    claim_ref = str(claim_ref or "").strip()
+    claim_sha256 = str(claim_sha256 or "").strip().lower()
+    if claim_relation_by_locator and not (claim_ref or claim_sha256):
+        raise ValueError("claim relations require claim_ref or claim_sha256 binding")
+
     items: list[dict[str, object]] = []
 
     for rep in evidence.representations[: max(0, max_items)]:
@@ -102,6 +111,10 @@ def source_evidence_to_argus_batch(
         relation = claim_relation_by_locator.get(rep.locator)
         if relation:
             item["claim_relation"] = relation
+            if claim_ref:
+                item["relation_claim_ref"] = claim_ref
+            if claim_sha256:
+                item["relation_claim_sha256"] = claim_sha256
 
         observed_text = observed_text_by_locator.get(rep.locator)
         if observed_text is not None:
