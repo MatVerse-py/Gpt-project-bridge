@@ -12,6 +12,7 @@ class RepresentationType(str, Enum):
     LIVE_HTML = "LIVE_HTML"
     API_METADATA = "API_METADATA"
     SAVED_HTML = "SAVED_HTML"
+    LATEX_SOURCE = "LATEX_SOURCE"
     SAVED_PDF = "SAVED_PDF"
     SAVED_IMAGE = "SAVED_IMAGE"
     SCREENSHOT = "SCREENSHOT"
@@ -41,6 +42,7 @@ STRUCTURED_REPRESENTATIONS = {
     RepresentationType.LIVE_HTML,
     RepresentationType.API_METADATA,
     RepresentationType.SAVED_HTML,
+    RepresentationType.LATEX_SOURCE,
     RepresentationType.DOI_METADATA,
     RepresentationType.ORCID_SNAPSHOT,
     RepresentationType.REPOSITORY_FILE,
@@ -62,6 +64,7 @@ REPRESENTATION_PRIORITY: dict[RepresentationType, int] = {
     RepresentationType.LIVE_HTML: 90,
     RepresentationType.SAVED_HTML: 85,
     RepresentationType.ORCID_SNAPSHOT: 85,
+    RepresentationType.LATEX_SOURCE: 80,
     RepresentationType.REPOSITORY_FILE: 80,
     RepresentationType.HF_SNAPSHOT: 75,
     RepresentationType.SAVED_PDF: 70,
@@ -82,7 +85,16 @@ TIER_BY_PRIORITY = (
     (0, "P0"),
 )
 
-IDENTIFIER_KEYS = ("doi", "orcid", "repo", "commit_sha", "canonical_url", "title", "author")
+IDENTIFIER_KEYS = (
+    "doi",
+    "orcid",
+    "repo",
+    "commit_sha",
+    "canonical_url",
+    "title",
+    "author",
+    "version",
+)
 
 _DOI_RE = re.compile(r"\b10\.\d{4,9}/[-._;()/:A-Za-z0-9]+\b")
 
@@ -109,7 +121,7 @@ def normalize_identifier(key: str, value: str) -> str:
         return value.upper()
     if key in {"canonical_url", "repo"}:
         return value.rstrip("/")
-    if key in {"title", "author"}:
+    if key in {"title", "author", "version"}:
         return " ".join(value.split()).casefold()
     return value
 
@@ -192,13 +204,60 @@ class SourceEvidence:
             return False
         return any(_representation_is_independent(rep) for rep in self.representations)
 
+    @property
+    def official_version_evidence(self) -> bool:
+        """True when an official TeX source is tied to a verified immutable anchor.
+
+        Scope is intentionally narrow: this proves source/version identity, not
+        external publication, peer review, or scientific validity.
+        """
+        return any(_representation_is_official_version_source(rep) for rep in self.representations)
+
 
 def _representation_is_generated(rep: SourceRepresentation) -> bool:
-    return rep.kind is RepresentationType.GENERATED_IMAGE or rep.metadata.get("generated") is True or rep.metadata.get("model_generated") is True
+    return (
+        rep.kind is RepresentationType.GENERATED_IMAGE
+        or rep.metadata.get("generated") is True
+        or rep.metadata.get("model_generated") is True
+    )
 
 
 def _representation_is_derivative(rep: SourceRepresentation) -> bool:
     return rep.kind is RepresentationType.DOCUMENT_PAGE_RENDER
+
+
+def _representation_is_latex(rep: SourceRepresentation) -> bool:
+    if rep.kind is RepresentationType.LATEX_SOURCE:
+        return True
+    path = str(rep.metadata.get("path") or rep.locator).split("?", 1)[0].lower()
+    return rep.kind is RepresentationType.REPOSITORY_FILE and path.endswith(".tex")
+
+
+def _representation_declares_official_version(rep: SourceRepresentation) -> bool:
+    return _representation_is_latex(rep) and rep.metadata.get("official_version") is True
+
+
+def _representation_has_verified_version_anchor(rep: SourceRepresentation) -> bool:
+    """Require verification of the anchor, not merely an anchor-shaped string."""
+    if rep.metadata.get("signature_verified") is True:
+        return True
+
+    anchor_checks = (
+        ("commit_sha", "commit_verified"),
+        ("source_commit", "commit_verified"),
+        ("release_tag", "tag_verified"),
+        ("manifest_sha256", "manifest_verified"),
+        ("canonical_url", "canonical_verified"),
+    )
+    for anchor_key, verified_key in anchor_checks:
+        value = rep.metadata.get(anchor_key)
+        if isinstance(value, str) and value.strip() and rep.metadata.get(verified_key) is True:
+            return True
+    return False
+
+
+def _representation_is_official_version_source(rep: SourceRepresentation) -> bool:
+    return _representation_declares_official_version(rep) and _representation_has_verified_version_anchor(rep)
 
 
 def _representation_is_independent(rep: SourceRepresentation) -> bool:
@@ -206,12 +265,15 @@ def _representation_is_independent(rep: SourceRepresentation) -> bool:
 
 
 def _effective_priority(rep: SourceRepresentation) -> int:
-    # Provenance dominates visual appearance. A model-generated PNG does not gain
-    # P2 authority merely because it visually resembles a saved report.
+    # Provenance dominates appearance. Generated visuals cannot gain authority by
+    # looking official; a TeX source gains P5 only for version identity when its
+    # official status is tied to a verified immutable provenance anchor.
     if _representation_is_generated(rep):
         return 0
     if _representation_is_derivative(rep):
         return min(REPRESENTATION_PRIORITY[rep.kind], 45)
+    if _representation_is_official_version_source(rep):
+        return 95
     return REPRESENTATION_PRIORITY[rep.kind]
 
 
@@ -229,9 +291,8 @@ def _collect_values(
 ) -> list[tuple[int, RepresentationType, str]]:
     values: list[tuple[int, RepresentationType, str]] = []
     for rep in representations:
-        # Generated images may contain text that looks like DOI/ORCID/repo data,
-        # but those strings remain visual claims and must not become resolved
-        # identifiers without an independent representation.
+        # Generated images may contain strings resembling identifiers, but those
+        # remain visual claims until an independent representation resolves them.
         if _representation_is_generated(rep):
             continue
         raw = rep.metadata.get(key)
@@ -301,7 +362,32 @@ def _resolve_identifier(
     return winner_raw, conflicts
 
 
-def _detect_stale_prose(representations: tuple[SourceRepresentation, ...], identifiers: Mapping[str, str]) -> list[EvidenceConflict]:
+def _official_version_conflicts(representations: tuple[SourceRepresentation, ...]) -> list[EvidenceConflict]:
+    conflicts: list[EvidenceConflict] = []
+    for rep in representations:
+        if not _representation_declares_official_version(rep):
+            continue
+        if _representation_has_verified_version_anchor(rep):
+            continue
+        conflicts.append(
+            EvidenceConflict(
+                code="OFFICIAL_VERSION_UNANCHORED",
+                field="version_authority",
+                values=(rep.locator,),
+                blocking=False,
+                detail=(
+                    "LaTeX source declares official_version but lacks a verified immutable "
+                    "commit/tag/manifest/canonical/signature anchor; it remains ordinary TeX evidence"
+                ),
+            )
+        )
+    return conflicts
+
+
+def _detect_stale_prose(
+    representations: tuple[SourceRepresentation, ...],
+    identifiers: Mapping[str, str],
+) -> list[EvidenceConflict]:
     conflicts: list[EvidenceConflict] = []
     resolved_doi = identifiers.get("doi")
     if not resolved_doi:
@@ -406,6 +492,7 @@ def build_source_evidence(
             identifiers[key] = value
         conflicts.extend(field_conflicts)
 
+    conflicts.extend(_official_version_conflicts(reps))
     conflicts.extend(_detect_stale_prose(reps, identifiers))
     blocking = any(c.blocking for c in conflicts)
 
@@ -440,10 +527,12 @@ def build_source_evidence(
                 "captured_at": rep.captured_at,
                 "metadata": dict(rep.metadata),
                 "effective_priority": _effective_priority(rep),
+                "official_version_source": _representation_is_official_version_source(rep),
             }
             for rep in reps
         ],
         "identifiers": identifiers,
+        "official_version_evidence": any(_representation_is_official_version_source(rep) for rep in reps),
         "conflicts": [
             {
                 "code": c.code,
