@@ -25,8 +25,8 @@
   "risks": [
     {"id":"R-001","severity":"P0","class":"SEMANTIC_COLLISION","state":"CONTROLLED","automatic_promotion":false},
     {"id":"R-002","severity":"P0","class":"EPISTEMIC_PROMOTION","state":"CONTROLLED","automatic_promotion":false},
-    {"id":"R-003","severity":"P0","class":"RUNTIME_SPLIT_BRAIN","state":"OPEN","automatic_promotion":false},
-    {"id":"R-004","severity":"P0","class":"STALE_LIVENESS","state":"OPEN","automatic_promotion":false},
+    {"id":"R-003","severity":"P0","class":"RUNTIME_SPLIT_BRAIN","state":"HOLD_WRITER_EXCLUSIVITY_UNVERIFIED","automatic_promotion":false},
+    {"id":"R-004","severity":"P0","class":"STALE_LIVENESS","state":"CONTROLLED_FAIL_CLOSED_CURRENT_PROJECTION","automatic_promotion":false},
     {"id":"R-005","severity":"P0","class":"EVIDENCE_LAUNDERING","state":"FIXED_CURRENT_PATH","automatic_promotion":false},
     {"id":"R-006","severity":"P0","class":"CLAIM_SCOPE_LAUNDERING","state":"FIXED_CURRENT_PATH","automatic_promotion":false},
     {"id":"R-007","severity":"P1","class":"SIMULATION_AS_EMPIRICAL","state":"HOLD_PER_ARTIFACT","automatic_promotion":false},
