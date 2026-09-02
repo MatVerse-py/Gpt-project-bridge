@@ -1,1 +1,0 @@
-The image observations in this directory were derived from preserved PNG artifacts in the user's library. They are intentionally classified by evidence kind: screenshot, saved image/document rendering, or generated image. Visual observations never upgrade external deployment/publication claims without independent source resolution.
