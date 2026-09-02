@@ -146,7 +146,7 @@ A failed derivation does not erase the TeX source. It means the source and depos
 
 ## 7. Current implementation boundary
 
-Implemented now:
+Implemented and covered by the current PR CI:
 
 - `LATEX_SOURCE`;
 - `ARXIV_EPRINT_SOURCE` classification;
@@ -157,13 +157,22 @@ Implemented now:
 - official-version P5 only with complete closure + verified anchor;
 - claim-scoped authority vector;
 - fail-closed conflicts for unanchored/incomplete official TeX;
-- receipts expose authority, claimed identifiers and closure status.
+- receipts commit by hash to authority, claimed identifiers and closure status;
+- dedicated `LaTeX closure diagnostic v1` workflow.
+
+The dedicated TeX policy suite reports **12/12 tests PASS**. The current PR head also reports all six configured PR workflows PASS.
 
 Not yet promoted to operational PASS:
 
-- reproducible LaTeX→PDF derivation CI over real deposited paper pairs.
+- reproducible LaTeX→PDF derivation over real deposited paper pairs.
 
 Reason: the Bridge repository currently has no declared canonical paper `.tex` → deposited `.pdf` pairs. Those mappings must be supplied in `evidence/latex_roots.json` before expensive compilation verification is meaningful.
+
+The diagnostic therefore reports:
+
+`HOLD_NO_DECLARED_CANONICAL_ROOTS`
+
+This HOLD is an evidence-state result, not a CI failure.
 
 ## 8. Recommended chain
 
