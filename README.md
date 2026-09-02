@@ -1,3 +1,3 @@
-# GPT Project Bridge
+# Gpt-project-bridge
 
-Repository initialized. The complete full-stack implementation is being proposed through a reviewable branch and pull request.
+A ponte entre a intenção humana e a execução tecnológica, redefinindo a interação com sistemas.
