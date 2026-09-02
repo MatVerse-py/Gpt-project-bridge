@@ -191,7 +191,7 @@ def test_arxiv_source_needs_verified_external_custody_for_publication_authority(
     assert b.authority["publication"] == 0.70
 
 
-def test_resolver_receipt_exposes_claims_authority_and_official_version_evidence():
+def test_resolver_receipt_commits_claims_authority_and_official_version_evidence():
     def tex_loader(_: str):
         return representation_from_latex(
             content=TEX,
@@ -206,7 +206,9 @@ def test_resolver_receipt_exposes_claims_authority_and_official_version_evidence
         loaders={RepresentationType.LATEX_SOURCE: tex_loader},
     )
     assert result.evidence.official_version_evidence is True
-    assert result.receipt["outputs"]["official_version_evidence"] is True
-    assert result.receipt["outputs"]["authority"]["publication"] == 0.0
-    assert result.receipt["outputs"]["claimed_identifiers"]["doi"] == ["10.5281/zenodo.19112289"]
+    assert result.evidence.authority["publication"] == 0.0
+    assert result.evidence.claimed_identifiers["doi"] == ("10.5281/zenodo.19112289",)
+    assert result.receipt["schema"] == "matverse.evidence-receipt.v1"
+    assert len(result.receipt["output_hash"]) == 64
+    assert len(result.receipt["receipt_hash"]) == 64
     assert any(a.kind is RepresentationType.LATEX_SOURCE and a.status == "HIT" for a in result.attempts)
