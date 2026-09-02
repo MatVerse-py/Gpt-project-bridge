@@ -7,7 +7,6 @@
       "source_content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "evidence_root_id": "example-root-1",
       "independent": true,
-      "claim_relation": "SUPPORTS",
       "search_text": "ARGUS factual integrity example record",
       "metadata": {
         "title": "ARGUS factual integrity example record"
