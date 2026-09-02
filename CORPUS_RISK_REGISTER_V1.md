@@ -23,8 +23,8 @@ This register does not rewrite historical corpus material. It classifies promoti
 |---|---|---|---|---|---|
 | R-001 | P0 | Semantic collision / silent merge | COG, ACOA, PoSE, PoLE, LUA, ARGUS/ARGOS, MNB family have historical forks or reused labels | SILR-style identity, actor/speech-act provenance, alias/supersession links, HOLD on unresolved origin/meaning | CONTROLLED / ongoing recovery |
 | R-002 | P0 | Epistemic promotion | PASS_LOCAL, CI, DOI, hash, receipt or preprint can be phrased as external/scientific validation | promotion lattice + Evidence Boundary; no external/scientific label without external evidence | CONTROLLED |
-| R-003 | P0 | Runtime state split-brain | physiology data appeared in multiple apps with divergent counts and boot-local cycle ids | one canonical authority per plane; boot/session identity + globally unique cycle ids; reconciliation is append-only | OPEN outside current PRs |
-| R-004 | P0 | Stale liveness masquerading as current | file-sync can continue after loop death | heartbeat freshness/TTL and liveness attestation separate from data availability | OPEN outside current PRs |
+| R-003 | P0 | Runtime state split-brain | physiology data appeared in multiple projections with divergent counts and boot-local cycle ids | one canonical authority per plane; boot/session identity + globally unique cycle ids; reconciliation is append-only | HOLD_WRITER_EXCLUSIVITY_UNVERIFIED — canonical projection declared, exclusivity attestation still required |
+| R-004 | P0 | Stale liveness masquerading as current | persisted/synced data can outlive the producing runtime | freshness predicate and liveness attestation separate from data availability | CONTROLLED_FAIL_CLOSED on current MatVerse OS projection; transport-wide freshness enforcement still required |
 | R-005 | P0 | Evidence laundering | derivative representations or neutral high-authority sources can inflate support | relation-scoped independent roots + relation-specific authority aggregation | FIXED in urano-os PR #5 |
 | R-006 | P0 | Claim-scope laundering | relation/context can be reused across claims or hidden in metadata | claim_ref/claim_sha256 binding; consumer revalidation; nested controls forbidden | FIXED in PR #5 + Bridge PR #23 |
 | R-007 | P1 | Simulated metrics presented as empirical | fixed-seed/f-string/random placeholder stages, synthetic Monte Carlo, heuristic Omega/Psi/CVaR | store model id, equations, priors, seed, sample size, calibration source; label SIMULATED unless measured | HOLD until per-artifact calibration |
@@ -39,6 +39,10 @@ This register does not rewrite historical corpus material. It classifies promoti
 | R-016 | P2 | Unbounded ingestion / resource exhaustion | large evidence payloads, many claims or remote response bodies | transport + runtime + source bounds, timeouts, max items/bytes | FIXED in current ARGUS/Bridge path |
 | R-017 | P2 | Legal/compliance overclaim | forensics, custody or signed URLs may be described as legal admissibility/LGPD compliance by implementation alone | `FORENSIC_VERIFIED != LEGAL_ADMISSIBILITY`; compliance requires domain/legal review and operational controls | CONTROLLED by policy wording |
 | R-018 | P2 | Quantum/biological metaphor promotion | simulation/QPU, organism/homeostasis/physiology language can become empirical claim | explicit metaphor/model boundary; `SIMULATION != QPU`, bookkeeping latency != recovery physiology, computational organism != biological organism | OPEN per paper/product |
+
+## Current physiology remediation note
+
+The canonical MatVerse OS projection now records liveness and writer-exclusivity as explicit predicates rather than inferring them from the latest persisted heartbeat/state label. Schema identity fields already present in records were formalized without deleting history. This **does not** establish current liveness or writer exclusivity: current canonical state remains fail-closed/HOLD where evidence is absent.
 
 ## Immediate corpus-wide sanitization rules
 
