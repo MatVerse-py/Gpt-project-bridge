@@ -1,5 +1,5 @@
 {
-  "schema": "matverse.real-evidence-fixtures.v1",
+  "schema": "matverse.real-evidence-fixtures.v2",
   "fixtures": [
     {
       "id": "zenodo-paper-03-mnb-html",
@@ -62,42 +62,48 @@
       "id": "urano-osx-console-image",
       "representation": "SCREENSHOT",
       "source_file": "4aba2f46-72a2-4a8a-ada6-0c558f581823.png",
-      "expected_visible": [
-        "URANO OSX",
-        "MatVerse Organism Console",
-        "MNB Explorer",
-        "Q-Gate",
-        "Ledger",
-        "Replay",
-        "Witness",
-        "Cassandra",
-        "ACOA"
-      ],
+      "model_generated": false,
+      "expected_visible": ["URANO OSX", "MatVerse Organism Console", "MNB Explorer", "Q-Gate", "Ledger", "Replay", "Witness", "Cassandra", "ACOA"],
       "evidence_rule": "visual_observation_only"
     },
     {
-      "id": "production-gate-v03-image",
+      "id": "matverse-entry-system-image",
       "representation": "SCREENSHOT",
+      "source_file": "409e021b-93f4-46c0-986e-172d89dcac2f.png",
+      "model_generated": false,
+      "expected_visible": ["MATVERSE", "ENTRY SYSTEM V1.0", "CASSANDRA DISPONÍVEL", "DOMÍNIO ATIVO"],
+      "evidence_rule": "visual_observation_only"
+    },
+    {
+      "id": "plugin-options-image",
+      "representation": "SCREENSHOT",
+      "source_file": "cd6f2db3-7559-476e-8aea-d3aa9bf88c11.png",
+      "model_generated": false,
+      "expected_visible": ["Meus plugins", "GitHub", "Hugging Face"],
+      "evidence_rule": "ui_availability_not_account_authorization"
+    },
+    {
+      "id": "crossref-zenodo-suggestion-image",
+      "representation": "SCREENSHOT",
+      "source_file": "Screenshot 2026-06-20 01.53.39.png",
+      "model_generated": false,
+      "expected_visible": ["Crossref", "Zenodo"],
+      "evidence_rule": "ui_context_only_no_external_payload"
+    },
+    {
+      "id": "production-gate-v03-generated-report-image",
+      "representation": "GENERATED_IMAGE",
       "source_file": "chart-1(2).png",
-      "expected_visible": [
-        "Production Gate v0.3",
-        "PASS_LOCAL_PRODUCTION__HOLD_EXTERNAL_WITNESS",
-        "M_global=0.7505",
-        "M_local=0.8388"
-      ],
-      "evidence_rule": "artifact_reported_state"
+      "model_generated": true,
+      "expected_visible": ["Production Gate v0.3", "PASS_LOCAL_PRODUCTION__HOLD_EXTERNAL_WITNESS", "M_global=0.7505", "M_local=0.8388"],
+      "evidence_rule": "generated_visual_not_independent"
     },
     {
       "id": "omega-seed-genesis-image",
       "representation": "GENERATED_IMAGE",
       "source_file": "Implantação do SVCA Lab Genesis.png",
-      "expected_visible": [
-        "Ω-SEED Genesis Artifact Deployed",
-        "GitHub",
-        "Hugging Face",
-        "Sepolia Blockchain",
-        "Zenodo Archive"
-      ],
+      "model_generated": true,
+      "expected_visible": ["Ω-SEED Genesis Artifact Deployed", "GitHub", "Hugging Face", "Sepolia Blockchain", "Zenodo Archive"],
       "evidence_rule": "not_independent_external_evidence"
     }
   ]
