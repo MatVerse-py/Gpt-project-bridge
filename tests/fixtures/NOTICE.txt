@@ -1,0 +1,1 @@
+Real raw evidence remains outside the public repository unless explicitly authorized; manifest-driven tests preserve provenance boundaries.
