@@ -84,7 +84,7 @@ def test_official_tex_conflict_with_other_high_priority_structured_metadata_fail
     assert any(c.code == "IDENTIFIER_CONFLICT" and c.field == "version" and c.blocking for c in evidence.conflicts)
 
 
-def test_resolver_can_use_latex_and_receipt_exposes_official_version_evidence():
+def test_resolver_can_use_latex_and_receipt_hashes_official_version_decision():
     def tex_loader(_: str):
         return representation_from_latex(
             content=TEX,
@@ -99,5 +99,6 @@ def test_resolver_can_use_latex_and_receipt_exposes_official_version_evidence():
         loaders={RepresentationType.LATEX_SOURCE: tex_loader},
     )
     assert result.evidence.official_version_evidence is True
-    assert result.receipt["outputs"]["official_version_evidence"] is True
+    assert result.receipt["schema"] == "matverse.evidence-receipt.v1"
+    assert result.receipt["output_hash"]
     assert any(a.kind is RepresentationType.LATEX_SOURCE and a.status == "HIT" for a in result.attempts)
