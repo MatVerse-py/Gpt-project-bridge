@@ -1,3 +1,3 @@
-# Gpt-project-bridge
+# GPT Project Bridge
 
-A ponte entre a intenção humana e a execução tecnológica, redefinindo a interação com sistemas.
+Repository initialized. The complete full-stack implementation is being proposed through a reviewable branch and pull request.
