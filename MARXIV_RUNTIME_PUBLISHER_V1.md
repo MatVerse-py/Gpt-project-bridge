@@ -207,7 +207,7 @@ It does **not** demonstrate:
 ## Current evidence state
 
 ```text
-PRELIGHT / PROMOTION                    PASS
+PREFLIGHT / PROMOTION                   PASS
 FROZEN PAPER 1                         PASS
 PINNED PAPERPUSH PREPARATION           PASS
 TWO-ROOT PORTABLE PACKAGE IDENTITY     PASS
