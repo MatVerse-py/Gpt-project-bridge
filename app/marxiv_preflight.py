@@ -144,9 +144,9 @@ def promote(preflight_path: Path, output_path: Path) -> MarxivScientificObject:
 
     obj = load_preflight(preflight_path)
     intent = obj.publication_intent
-    manuscript = Path(intent.manuscript_file or "")
-    if not manuscript.is_absolute():
-        manuscript = (preflight_path.parent / manuscript).resolve()
+    manuscript_reference = (intent.manuscript_file or "").strip()
+    if not manuscript_reference:
+        raise RuntimeError("preflight manuscript reference is missing")
 
     scientific_object = MarxivScientificObject.model_validate(
         {
@@ -163,7 +163,7 @@ def promote(preflight_path: Path, output_path: Path) -> MarxivScientificObject:
                 for author in (intent.authors or [])
             ],
             "abstract": obj.abstract,
-            "manuscript_file": str(manuscript),
+            "manuscript_file": manuscript_reference,
             "keywords": obj.keywords,
             "claims": [f"{item.id}: {item.name}" for item in obj.contributions],
             "evidence_refs": obj.evidence_refs,
