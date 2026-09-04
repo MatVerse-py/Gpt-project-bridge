@@ -7,6 +7,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Literal
@@ -209,6 +210,15 @@ def _resolve_manuscript(object_path: Path, manuscript_file: str) -> Path:
     return candidate
 
 
+def _resolve_manifest_manuscript(manifest_path: Path, manuscript_file: str) -> Path:
+    candidate = Path(manuscript_file).expanduser()
+    if not candidate.is_absolute():
+        candidate = (manifest_path.resolve().parent / candidate).resolve()
+    else:
+        candidate = candidate.resolve()
+    return candidate
+
+
 def _publication_id(obj: MarxivScientificObject) -> str:
     return f"{obj.object_id}-{obj.version}-arxiv"
 
@@ -245,17 +255,26 @@ def _package_hash(core: dict[str, str]) -> str:
 def prepare_sandbox(object_path: Path, sandbox_root: Path) -> PublisherState:
     object_path = object_path.resolve()
     obj = _load_object(object_path)
-    manuscript = _resolve_manuscript(object_path, obj.manuscript_file)
+    source_manuscript = _resolve_manuscript(object_path, obj.manuscript_file)
     sandbox = (sandbox_root.resolve() / obj.object_id / obj.version).resolve()
     sandbox.mkdir(parents=True, exist_ok=True)
 
+    staged_dir = sandbox / "manuscript"
+    staged_dir.mkdir(parents=True, exist_ok=True)
+    staged_manuscript = staged_dir / source_manuscript.name
+    if staged_manuscript.resolve() != source_manuscript.resolve():
+        shutil.copyfile(source_manuscript, staged_manuscript)
+    manuscript_hash = _sha256_file(staged_manuscript)
+    if manuscript_hash != _sha256_file(source_manuscript):
+        raise MarxivPublisherError("staged manuscript hash mismatch")
+
     object_snapshot = obj.model_dump(mode="json")
     object_hash = sha256_text(canonical_json(object_snapshot))
-    manuscript_hash = _sha256_file(manuscript)
     object_snapshot_path = sandbox / "scientific-object.snapshot.json"
     _write_json(object_snapshot_path, object_snapshot)
 
-    arxiv_manifest = build_arxiv_manifest(obj, manuscript)
+    stable_manuscript_ref = Path("manuscript") / staged_manuscript.name
+    arxiv_manifest = build_arxiv_manifest(obj, stable_manuscript_ref)
     arxiv_manifest_path = sandbox / "arxiv-manifest.json"
     _write_json(arxiv_manifest_path, arxiv_manifest.model_dump(mode="json"))
     manifest_hash = sha256_text(canonical_json(arxiv_manifest.model_dump(mode="json")))
@@ -346,7 +365,7 @@ def _current_package_checks(state: PublisherState) -> dict[str, bool]:
             "review_packet_exists": review_path.is_file(),
         }
     manifest = ArxivManifest.model_validate(_read_json(manifest_path))
-    manuscript = Path(manifest.manuscript_file).resolve()
+    manuscript = _resolve_manifest_manuscript(manifest_path, manifest.manuscript_file)
     if not manuscript.is_file():
         return {"manuscript_exists": False}
     bridge_state = _read_json(arxiv_state_path)
@@ -609,7 +628,12 @@ def publish(
     if state.status != "APPROVED":
         raise MarxivPublisherError(f"publication blocked from status {state.status}")
 
-    manifest = ArxivManifest.model_validate(_read_json(Path(state.arxiv_manifest_path)))
+    manifest_path = Path(state.arxiv_manifest_path)
+    manifest = ArxivManifest.model_validate(_read_json(manifest_path))
+    resolved_manuscript = _resolve_manifest_manuscript(manifest_path, manifest.manuscript_file)
+    if not resolved_manuscript.is_file():
+        raise MarxivPublisherError(f"prepared manuscript missing: {resolved_manuscript}")
+    transport_manifest = manifest.model_copy(update={"manuscript_file": str(resolved_manuscript)})
     workdir = Path(state.arxiv_state_path).parent
     authorize_login(workdir)
     submitting_receipt = evidence_receipt(
@@ -621,7 +645,7 @@ def publish(
     _save_state(sandbox, state)
 
     try:
-        result = transport(manifest) if transport is not None else _execute_arxiv_submission(manifest, headless=headless)
+        result = transport(transport_manifest) if transport is not None else _execute_arxiv_submission(transport_manifest, headless=headless)
     except ArxivSubmissionError as exc:
         status = "HOLD_RECONCILIATION_REQUIRED" if exc.final_click_performed else "HOLD_PRE_SUBMIT"
         receipt = evidence_receipt(
