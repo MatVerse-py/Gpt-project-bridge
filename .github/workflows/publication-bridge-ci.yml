@@ -6,11 +6,16 @@ on:
     paths:
       - 'app/publication_bridge.py'
       - 'app/marxiv_runtime_publisher.py'
+      - 'app/marxiv_preflight.py'
       - 'tests/test_publication_bridge.py'
       - 'tests/test_marxiv_runtime_publisher.py'
+      - 'tests/test_marxiv_preflight.py'
       - 'requirements-publication.txt'
       - 'PUBLICATION_BRIDGE_V1.md'
       - 'MARXIV_RUNTIME_PUBLISHER_V1.md'
+      - 'MARXIV_CANON_V1.md'
+      - 'MARXIV_PAPER1_DRY_RUN.md'
+      - 'examples/marxiv/**'
       - '.gitignore'
       - '.github/workflows/publication-bridge-ci.yml'
   push:
@@ -18,11 +23,16 @@ on:
     paths:
       - 'app/publication_bridge.py'
       - 'app/marxiv_runtime_publisher.py'
+      - 'app/marxiv_preflight.py'
       - 'tests/test_publication_bridge.py'
       - 'tests/test_marxiv_runtime_publisher.py'
+      - 'tests/test_marxiv_preflight.py'
       - 'requirements-publication.txt'
       - 'PUBLICATION_BRIDGE_V1.md'
       - 'MARXIV_RUNTIME_PUBLISHER_V1.md'
+      - 'MARXIV_CANON_V1.md'
+      - 'MARXIV_PAPER1_DRY_RUN.md'
+      - 'examples/marxiv/**'
       - '.gitignore'
       - '.github/workflows/publication-bridge-ci.yml'
 
@@ -36,9 +46,23 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.txt
       - name: Compile publisher modules
-        run: python -m py_compile app/publication_bridge.py app/marxiv_runtime_publisher.py
+        run: python -m py_compile app/publication_bridge.py app/marxiv_runtime_publisher.py app/marxiv_preflight.py
       - name: Run publication tests
-        run: pytest -q tests/test_publication_bridge.py tests/test_marxiv_runtime_publisher.py
+        run: pytest -q tests/test_publication_bridge.py tests/test_marxiv_runtime_publisher.py tests/test_marxiv_preflight.py
+      - name: Assess real Paper 1 preflight is fail-closed
+        shell: bash
+        run: |
+          set +e
+          python -m app.marxiv_preflight assess --preflight examples/marxiv/matverse-2.0/paper1-preflight.json > /tmp/paper1-preflight.json
+          code=$?
+          set -e
+          test "$code" -eq 2
+          python - <<'PY'
+          import json
+          data = json.load(open('/tmp/paper1-preflight.json', encoding='utf-8'))
+          assert data['status'] == 'HOLD_PREPARE'
+          assert data['blockers']
+          PY
       - name: Install pinned publication transport
         run: pip install -r requirements-publication.txt
       - name: Import pinned arXiv finalizer
