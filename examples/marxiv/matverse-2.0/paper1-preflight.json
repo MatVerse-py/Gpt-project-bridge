@@ -1,0 +1,92 @@
+{
+  "schema": "marxiv.paper-preflight.v1",
+  "status": "HOLD_PREPARE",
+  "object_id": "matverse-2.0",
+  "version": "v1",
+  "title": "MATVERSE 2.0: A Constitutional Architecture for Governed Informational Transformation in Federated Research Systems",
+  "abstract": "Scientific AI systems increasingly combine interpretation, decision support, tool execution, memory, and automated knowledge transformation. When these functions are concentrated within the same operational authority, it becomes difficult to distinguish what was proposed, authorized, executed, preserved, or subsequently reconstructed. We introduce MATVERSE 2.0, a constitutional architecture for governed informational transformations in federated research systems. The architecture explicitly separates identity, authorship, semantic transformation, admissibility, execution, persistent memory, provenance, and replay. It further represents epistemic status and coherence as multidimensional structures rather than single confidence scores. We describe the constitutional model, its federated authority structure, the Ω-Gate admissibility mechanism, EvidenceOS provenance and replay, and a reference end-to-end implementation that distinguishes decision receipt, execution receipt, memory commitment, and replay receipt. A local vertical slice demonstrates fail-closed behavior under missing authorship and exact reconstruction within the declared deterministic scope. The work makes no claim that replay establishes ontological informational primacy or that the architecture constitutes biological life, consciousness, clinical efficacy, or quantum advantage. Instead, MATVERSE is presented as an engineering and research infrastructure for studying how informational transformations can remain governable, attributable, and reconstructible as scientific systems increase in complexity.",
+  "keywords": [
+    "governed informational transformation",
+    "federated research systems",
+    "provenance",
+    "replay",
+    "epistemic governance",
+    "fail-closed systems"
+  ],
+  "contributions": [
+    {
+      "id": "C1",
+      "name": "Constitutional Separation",
+      "status": "SUPPORTED_BY_CORPUS"
+    },
+    {
+      "id": "C2",
+      "name": "Federated Epistemic Authority",
+      "status": "SUPPORTED_BY_CORPUS"
+    },
+    {
+      "id": "C3",
+      "name": "Multidimensional Coherence",
+      "status": "SUPPORTED_BY_CORPUS"
+    },
+    {
+      "id": "C4",
+      "name": "Evidence and Replay Architecture",
+      "status": "SUPPORTED_BY_CORPUS"
+    },
+    {
+      "id": "C5",
+      "name": "Reference Vertical Slice",
+      "status": "PASS_LOCAL_ONLY"
+    }
+  ],
+  "blocked_result_claims": [
+    "MATVERSE proves that information precedes physical reality",
+    "MATVERSE demonstrates digital life",
+    "Replay proves ontological informational precedence",
+    "MATVERSE is an artificial organism in the biological sense",
+    "MATVERSE demonstrates consciousness",
+    "MATVERSE demonstrates human-machine symbiosis",
+    "NeuroFlow demonstrates therapeutic efficacy",
+    "MATVERSE demonstrates quantum advantage",
+    "UMJAM is an experimentally established primitive of reality",
+    "CPO is an already validated universal organizational metric"
+  ],
+  "publication_intent": {
+    "venue": "arxiv",
+    "authors": null,
+    "manuscript_file": null,
+    "primary_archive": null,
+    "primary_category": null,
+    "crosslist_archives": [],
+    "crosslist_categories": [],
+    "license": null,
+    "comments": "Preprint candidate; not authorized for external submission from this preflight object."
+  },
+  "required_inputs_before_runtime_prepare": [
+    "final manuscript bundle/file",
+    "verified author list",
+    "author ORCID values when applicable",
+    "author affiliations when claimed",
+    "explicit arXiv primary archive and category",
+    "explicit cross-list decision",
+    "explicit publication license",
+    "final abstract confirmation against manuscript"
+  ],
+  "authority": {
+    "external_submission_authorized": false,
+    "reason": "Preflight records corpus-supported content only. Required human publication metadata and the final manuscript bundle are not yet frozen."
+  },
+  "evidence_boundary": {
+    "paper_type": [
+      "architecture",
+      "method",
+      "reference implementation",
+      "extensible research program"
+    ],
+    "reference_vertical_slice": "PASS_LOCAL",
+    "external_reproduction": "HOLD",
+    "live_arxiv_publication": "HOLD",
+    "scientific_novelty": "HOLD_PRIOR_ART_REVIEW"
+  }
+}
