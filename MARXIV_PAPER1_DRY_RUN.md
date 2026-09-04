@@ -1,10 +1,8 @@
-# MARXIV Paper 1 — Governed Dry-Run Evidence
+# MARXIV Paper 1 — Governed Dry-Run and Approval Intent
 
 ## Status
 
-`MANUSCRIPT_FROZEN / SCIENTIFIC_OBJECT_PROMOTED / PORTABLE_DRY_RUN_PASS / HUMAN_REVIEW_REQUIRED`
-
-This record applies the MARXIV fail-closed publication boundary to the first public MATVERSE paper and records the completed no-side-effect dry-run.
+`REAL_OBJECT_PASS / PORTABLE_PACKAGE_PASS / APPROVAL_INTENT_CONFIRMED / CRYPTOGRAPHIC_APPROVAL_HOLD / LIVE_ARXIV_HOLD`
 
 ## Paper 1
 
@@ -12,90 +10,59 @@ This record applies the MARXIV fail-closed publication boundary to the first pub
 
 `MATVERSE 2.0: A Constitutional Architecture for Governed Informational Transformation in Federated Research Systems`
 
-**Scientific Object**
+**Object id**: `matverse-2.0`
 
-`matverse-2.0 / v1`
+**Version**: `v1`
 
-**Frozen manuscript**
+**Manuscript version**: `v0.1`
 
-`papers/matverse-2.0/main.tex` — manuscript label `v0.1`
+**Author**: `Mateus Alves Arêas`
 
-**Author**
+**ORCID**: `0009-0008-2973-4047`
 
-`Mateus Alves Arêas` — ORCID `0009-0008-2973-4047`
+**Affiliation**: intentionally `null`
 
-Affiliation is intentionally `null`.
+**Primary category**: `cs.SE`
 
-## Human-confirmed freeze
+**Cross-list**: `cs.AI`
 
-The human authority confirmed the exact dry-run configuration:
+**License**: `CC BY 4.0`
 
-```text
-affiliation = null
-primary     = cs.SE
-cross-list  = cs.AI
-license     = CC BY 4.0
-abstract    = current manuscript abstract
-```
+The paper remains deliberately narrow. Broad OCG, digital-life, consciousness, clinical, quantum-advantage and ontological claims remain outside its Results boundary.
 
-The authority scope is strictly:
+## Freeze and Scientific Object
 
-```text
-FREEZE_AND_DRY_RUN_ONLY
-```
-
-It does not authorize arXiv login, approval challenge creation, package approval, final submission, or any external publication side effect.
-
-The durable freeze record is:
+The manuscript freeze is recorded in:
 
 `papers/matverse-2.0/FREEZE_v0.1.json`
 
-## Promotion
-
-The governed preflight:
+The governed preflight is:
 
 `examples/marxiv/matverse-2.0/paper1-preflight.json`
 
-now evaluates to:
-
-```text
-READY_FOR_PROMOTION
-```
-
-with no blockers.
-
-The deterministic promotion result is committed as:
+The deterministic promoted object is:
 
 `examples/marxiv/matverse-2.0/scientific-object.v1.json`
 
-CI independently regenerates the Scientific Object from the preflight and requires exact JSON equality with the committed object.
+Preflight status:
 
-## Portable real dry-run
+`READY_FOR_PROMOTION`
 
-Publication Bridge CI run `33828742642` (`run_number=83`) on head:
+with zero blockers.
 
-`01adc23c39c2653aa0fafe54e429242500d0fd9e`
+## Real governed dry-run
 
-executed the frozen Paper 1 twice using the pinned PaperPush transport commit:
+Publication Bridge CI executed the promoted Scientific Object with the pinned PaperPush transport at commit:
 
 `3cc701d91bf78c046f008477baad40e7fa53ff4f`
 
-The two preparations used distinct sandbox roots:
+The same object was prepared in two distinct sandbox roots. Both preparations stopped exactly at:
 
-```text
-.marxiv/run-a
-.marxiv/run-b
-```
+`HUMAN_REVIEW_REQUIRED`
 
-Both produced the same six canonical package hashes and both stopped exactly at:
+No credentials, approval challenge, approval artifact, browser submission or external side effect were used.
 
-```text
-HUMAN_REVIEW_REQUIRED
-```
-
-No arXiv credentials were present. No approval challenge, human approval, submission-result artifact, browser submission, or other external side effect was created.
-
-## Canonical dry-run hashes
+The two sandbox roots produced identical values for all six canonical package components:
 
 ```text
 object_hash
@@ -117,63 +84,79 @@ package_hash
 4ef1c650ccf52054cb77adc5d1a1e8d5a19785bcdbe23a644470ee707e97b2aa
 ```
 
-The machine-readable evidence summary is committed at:
+This establishes package portability only within the declared CI/runtime scope. It is not independent external reproduction.
 
-`examples/marxiv/matverse-2.0/dry-run-result.v1.json`
+## Human approval intent
 
-## Portability correction discovered by the test
+After the exact package hash and the `HUMAN_REVIEW_REQUIRED -> APPROVED` transition were presented, the human authority explicitly confirmed approval intent for that exact package.
 
-The stronger two-root test exposed path dependence in the original transport package. PaperPush resolves filemap fields against the `-d` manuscript directory and serializes the resulting path into the `.sub` file. Passing an absolute manuscript directory therefore caused `arxiv_subfile_sha256` to differ between otherwise identical sandboxes.
+The intent record is:
 
-The bridge was corrected so that:
+`examples/marxiv/matverse-2.0/approval-intent.v1.json`
 
-1. the Scientific Object preserves a portable manuscript reference;
-2. the Runtime Publisher stages the manuscript under `sandbox/manuscript/`;
-3. the arXiv manifest uses a stable relative manuscript reference;
-4. Publication Bridge supplies PaperPush a manuscript `-d` relative to its transport workdir;
-5. only the actual execution boundary rehydrates a runtime-local absolute path when needed.
+Authority scope:
 
-The real two-root CI then produced identical `object_hash`, `manifest_hash`, `manuscript_sha256`, `arxiv_subfile_sha256`, `review_packet_hash`, and `package_hash`.
+`APPROVE_EXACT_PACKAGE_ONLY`
 
-## Dry-run acceptance criteria
+This confirmation does **not** authorize arXiv login, browser submit or any external publication effect.
 
-| Criterion | State |
-|---|---|
-| Human manuscript freeze | PASS |
-| Verified author identity | PASS |
-| ORCID | PASS |
-| Explicit category decision | PASS |
-| Explicit cross-list decision | PASS |
-| Explicit license decision | PASS |
-| Final abstract confirmation | PASS |
-| Preflight `READY_FOR_PROMOTION` | PASS |
-| Deterministic Scientific Object promotion | PASS |
-| Real PaperPush transport preparation | PASS |
-| Two-root portable package identity | PASS |
-| Sandbox state `HUMAN_REVIEW_REQUIRED` | PASS |
-| Credentials absent | PASS |
-| Approval absent | PASS |
-| External side effect absent | PASS |
-| Live arXiv publication | HOLD |
-| External arXiv identifier | HOLD |
-| Independent external reproduction | HOLD |
-| Scientific novelty of complete MARXIV composition | HOLD / prior-art review required |
+## Why runtime state is still HUMAN_REVIEW_REQUIRED
 
-## State transition achieved
+The Runtime Publisher deliberately distinguishes:
 
 ```text
-PREFLIGHT_RECORDED
-      -> MANUSCRIPT_FROZEN
-      -> READY_FOR_PROMOTION
-      -> SCIENTIFIC_OBJECT_V1
-      -> PREPARE x 2
-      -> PORTABLE_PACKAGE_IDENTITY_PASS
-      -> HUMAN_REVIEW_REQUIRED
+ApprovalIntent != CryptographicApproval
 ```
 
-The transition stops here by authority design.
+Runtime `APPROVED` requires all of the following:
 
-No `request-approval`, `approve`, `login`, `publish`, or `reconcile` action is authorized by the freeze decision.
+1. current sandbox integrity PASS;
+2. a fresh `approval-challenge.json` generated from that sandbox;
+3. the exact confirmation phrase for the package;
+4. local `MARXIV_APPROVAL_SECRET` of at least 32 bytes;
+5. HMAC-SHA256 `marxiv.human-approval.v1` artifact;
+6. subsequent `verify-approval` PASS.
+
+The approval secret must remain local and must not be committed or pasted into chat.
+
+The current exact confirmation string for package identity is:
+
+```text
+PUBLISH matverse-2.0-v1-arxiv 4ef1c650ccf5
+```
+
+A fresh challenge still has to be generated locally because it contains a nonce and expiration and must be bound to the actual live sandbox being approved.
+
+Therefore the correct current state is:
+
+```text
+HUMAN_APPROVAL_INTENT = CONFIRMED
+RUNTIME_APPROVAL       = HOLD_LOCAL_CRYPTOGRAPHIC_SEAL
+EXTERNAL_SUBMISSION    = HOLD
+```
+
+## Local sealing ceremony
+
+On the author's controlled runtime, with the already prepared sandbox present:
+
+```bash
+export MARXIV_APPROVAL_SECRET='<local secret of at least 32 bytes>'
+
+python -m app.marxiv_runtime_publisher request-approval \
+  --sandbox .marxiv/matverse-2.0/v1
+
+python -m app.marxiv_runtime_publisher approve \
+  --sandbox .marxiv/matverse-2.0/v1 \
+  --approver human-authority \
+  --confirm 'PUBLISH matverse-2.0-v1-arxiv 4ef1c650ccf5'
+
+python -m app.marxiv_runtime_publisher verify-approval \
+  --sandbox .marxiv/matverse-2.0/v1
+```
+
+The secret stays outside source control. The exact confirmation emitted by the fresh challenge must match before the approve command is accepted.
+
+Successful verification may promote runtime state to `APPROVED`, but **still does not authorize `publish`**. Live external publication requires a separate explicit authorization.
 
 ## Scientific boundary
 
@@ -182,9 +165,8 @@ Publication != ScientificTruth
 PASS_LOCAL != ExternalReproduction
 ManuscriptCandidate != FrozenManuscript
 FrozenManuscript != ApprovedPublicationPackage
+ApprovalIntent != CryptographicApproval
 Prepared != Approved
 Approved != Submitted
 Submitted != Moderated/Announced
 ```
-
-This dry-run demonstrates the governed preparation and portable package-identity path within the declared CI/runtime scope. It does not demonstrate live arXiv publication, external scientific validation, independent reproduction, or any organism-level claim.
