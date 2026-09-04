@@ -1,0 +1,45 @@
+name: organism-real-bench
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'benchmarks/**'
+      - '.github/workflows/organism-real-bench.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    strategy:
+      fail-fast: false
+      matrix:
+        workers: [1, 4]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install package/test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest
+      - name: Regression tests
+        run: pytest -q tests/test_organism_loop.py tests/test_constitutional_dependency_contract.py
+      - name: Real code-path benchmark
+        run: |
+          PYTHONPATH=. python benchmarks/organism_real_bench.py \
+            --iterations 2000 \
+            --workers ${{ matrix.workers }} \
+            --output organism-real-bench-w${{ matrix.workers }}.json
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: organism-real-bench-w${{ matrix.workers }}
+          path: organism-real-bench-w${{ matrix.workers }}.json
+          if-no-files-found: error
