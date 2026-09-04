@@ -222,6 +222,11 @@ def _field(field_id: str, value: Any, source: str = "publication manifest") -> d
 
 
 def build_values(manifest: ArxivManifest, manuscript_path: Path) -> dict[str, Any]:
+    # PaperPush receives manuscript_path.parent through --data-dir/-d, so the
+    # manuscript field only needs the basename. Persisting the resolved absolute
+    # path here would leak host/sandbox paths into arxiv.sub and make an otherwise
+    # identical publication package hash differently across runtimes.
+    stable_manuscript_name = manuscript_path.name
     fields: list[dict[str, Any]] = [
         _field("primary_archive", manifest.primary_archive),
         _field("primary_category", manifest.primary_category),
@@ -229,7 +234,7 @@ def build_values(manifest: ArxivManifest, manuscript_path: Path) -> dict[str, An
         _field("title", manifest.title),
         _field("authors", "\n".join(manifest.authors)),
         _field("abstract", manifest.abstract),
-        _field("manuscript_file", str(manuscript_path), "resolved manuscript path"),
+        _field("manuscript_file", stable_manuscript_name, "filename relative to PaperPush data directory"),
     ]
     if manifest.crosslist_archives:
         fields.append(_field("crosslist_archives", ", ".join(manifest.crosslist_archives)))
