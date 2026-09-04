@@ -14,31 +14,11 @@
     "fail-closed systems"
   ],
   "contributions": [
-    {
-      "id": "C1",
-      "name": "Constitutional Separation",
-      "status": "SUPPORTED_BY_CORPUS"
-    },
-    {
-      "id": "C2",
-      "name": "Federated Epistemic Authority",
-      "status": "SUPPORTED_BY_CORPUS"
-    },
-    {
-      "id": "C3",
-      "name": "Multidimensional Coherence",
-      "status": "SUPPORTED_BY_CORPUS"
-    },
-    {
-      "id": "C4",
-      "name": "Evidence and Replay Architecture",
-      "status": "SUPPORTED_BY_CORPUS"
-    },
-    {
-      "id": "C5",
-      "name": "Reference Vertical Slice",
-      "status": "PASS_LOCAL_ONLY"
-    }
+    {"id": "C1", "name": "Constitutional Separation", "status": "SUPPORTED_BY_CORPUS"},
+    {"id": "C2", "name": "Federated Epistemic Authority", "status": "SUPPORTED_BY_CORPUS"},
+    {"id": "C3", "name": "Multidimensional Coherence", "status": "SUPPORTED_BY_CORPUS"},
+    {"id": "C4", "name": "Evidence and Replay Architecture", "status": "SUPPORTED_BY_CORPUS"},
+    {"id": "C5", "name": "Reference Vertical Slice", "status": "PASS_LOCAL_ONLY"}
   ],
   "blocked_result_claims": [
     "MATVERSE proves that information precedes physical reality",
@@ -52,38 +32,66 @@
     "UMJAM is an experimentally established primitive of reality",
     "CPO is an already validated universal organizational metric"
   ],
+  "evidence_refs": [
+    "evidence://matverse/reference-vertical-slice/pass-local",
+    "evidence://matverse/replay/exact-match",
+    "evidence://matverse/authorship/fail-closed"
+  ],
   "publication_intent": {
     "venue": "arxiv",
-    "authors": null,
+    "authors": [
+      {
+        "name": "Mateus Alves Arêas",
+        "orcid": "0009-0008-2973-4047",
+        "affiliation": null,
+        "verified": true
+      }
+    ],
     "manuscript_file": null,
     "primary_archive": null,
     "primary_category": null,
     "crosslist_archives": [],
     "crosslist_categories": [],
     "license": null,
-    "comments": "Preprint candidate; not authorized for external submission from this preflight object."
+    "comments": "Preprint candidate; not authorized for external submission from this preflight object.",
+    "category_confirmed": false,
+    "crosslist_confirmed": false,
+    "license_confirmed": false,
+    "final_abstract_confirmed": false
+  },
+  "recommendations": {
+    "arxiv_primary": {
+      "archive": "cs",
+      "category": "cs.SE",
+      "status": "PROPOSED_NOT_CONFIRMED",
+      "reason": "Paper 1 is primarily an architecture, implementation, testing, provenance and software-governance paper."
+    },
+    "arxiv_crosslist": {
+      "archive": "cs",
+      "category": "cs.AI",
+      "status": "PROPOSED_NOT_CONFIRMED",
+      "reason": "The architecture is explicitly motivated by AI systems and AI-assisted scientific workflows."
+    },
+    "publication_license": {
+      "license": "CC BY 4.0",
+      "status": "PROPOSED_NOT_CONFIRMED",
+      "reason": "Open preprint reuse with attribution; final selection is irrevocable on arXiv and remains a human decision."
+    }
   },
   "required_inputs_before_runtime_prepare": [
     "final manuscript bundle/file",
-    "verified author list",
-    "author ORCID values when applicable",
-    "author affiliations when claimed",
-    "explicit arXiv primary archive and category",
+    "affiliation decision: explicitly set or intentionally remain null",
+    "explicit arXiv primary archive and category confirmation",
     "explicit cross-list decision",
-    "explicit publication license",
+    "explicit publication license confirmation",
     "final abstract confirmation against manuscript"
   ],
   "authority": {
     "external_submission_authorized": false,
-    "reason": "Preflight records corpus-supported content only. Required human publication metadata and the final manuscript bundle are not yet frozen."
+    "reason": "Identity is resolved, but the final manuscript and human-controlled publication selections are not yet frozen."
   },
   "evidence_boundary": {
-    "paper_type": [
-      "architecture",
-      "method",
-      "reference implementation",
-      "extensible research program"
-    ],
+    "paper_type": ["architecture", "method", "reference implementation", "extensible research program"],
     "reference_vertical_slice": "PASS_LOCAL",
     "external_reproduction": "HOLD",
     "live_arxiv_publication": "HOLD",
