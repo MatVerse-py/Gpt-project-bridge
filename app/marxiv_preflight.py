@@ -25,6 +25,7 @@ class PreflightPublicationIntent(BaseModel):
     venue: Literal["arxiv"] = "arxiv"
     authors: list[PreflightAuthor] | None = None
     manuscript_file: str | None = None
+    manuscript_confirmed: bool = False
     primary_archive: str | None = None
     primary_category: str | None = None
     crosslist_archives: list[str] = Field(default_factory=list)
@@ -97,12 +98,14 @@ def assess(path: Path) -> PreflightAssessment:
 
     manuscript_path: Path | None = None
     if not intent.manuscript_file:
-        blockers.append("final manuscript file is missing")
+        blockers.append("manuscript file is missing")
     else:
         candidate = Path(intent.manuscript_file).expanduser()
         manuscript_path = candidate if candidate.is_absolute() else (path.parent / candidate).resolve()
         if not manuscript_path.is_file():
-            blockers.append(f"final manuscript file does not exist: {manuscript_path}")
+            blockers.append(f"manuscript file does not exist: {manuscript_path}")
+        if not intent.manuscript_confirmed:
+            blockers.append("manuscript has not been explicitly frozen/confirmed for publication")
 
     if not intent.primary_archive:
         blockers.append("arXiv primary archive is missing")
