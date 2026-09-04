@@ -105,6 +105,7 @@ def test_complete_preflight_promotes_without_external_effect(tmp_path: Path) -> 
     assert output.is_file()
     assert scientific_object.authors[0].name == "Mateus Alves Arêas"
     assert scientific_object.authors[0].orcid == "0009-0008-2973-4047"
+    assert scientific_object.manuscript_file == "paper.pdf"
     assert scientific_object.publication.primary_category == "cs.SE"
     assert scientific_object.publication.crosslist_categories == ["cs.AI"]
     assert scientific_object.publication.license == "CC BY 4.0"
