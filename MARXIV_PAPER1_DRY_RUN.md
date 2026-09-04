@@ -2,9 +2,9 @@
 
 ## Status
 
-`REAL_OBJECT_IDENTIFIED / PREFLIGHT_RECORDED / RUNTIME_PREPARE_HOLD`
+`REAL_OBJECT_IDENTIFIED / MANUSCRIPT_CANDIDATE_CREATED / RUNTIME_PREPARE_HOLD`
 
-This record applies the MARXIV fail-closed publication boundary to the first public MATVERSE paper without fabricating missing author or venue metadata.
+This record applies the MARXIV fail-closed publication boundary to the first public MATVERSE paper without fabricating missing publication authority.
 
 ## Paper 1
 
@@ -20,112 +20,148 @@ This record applies the MARXIV fail-closed publication boundary to the first pub
 
 `v1`
 
-The corpus positions Paper 1 as a deliberately narrow founder paper treating MATVERSE as architecture, method, reference implementation and extensible research program. Broad OCG, digital-life, consciousness, clinical, quantum-advantage and ontological claims are outside its demonstrated Results boundary.
+**Author identity resolved**
 
-The corpus-supported preflight object is committed at:
+`Mateus Alves Arêas` — ORCID `0009-0008-2973-4047`
+
+Affiliation remains intentionally unset rather than choosing among historical labels in the corpus.
+
+The paper is deliberately narrow: MATVERSE is treated as architecture, method, reference implementation and extensible research program. Broad OCG, digital-life, consciousness, clinical, quantum-advantage and ontological claims remain outside its Results boundary.
+
+## Manuscript candidate
+
+A complete LaTeX manuscript candidate now exists at:
+
+`papers/matverse-2.0/main.tex`
+
+The candidate includes:
+
+- the corpus-supported abstract and central thesis;
+- C1–C5 as bounded architectural contributions;
+- the informational-transformation model;
+- federated authorship/source classes;
+- multidimensional coherence;
+- Ω-Gate admissibility;
+- explicit decision/execution/commit/replay separation;
+- the local reference vertical-slice results;
+- a distinction between observed E1/E2/replay results and specified-but-not-promoted E3/E4 tests;
+- limitations and blocked overclaims;
+- a related-work boundary covering W3C PROV, RO-Crate, Whole Tale, SLSA and the 2026 LATTICE governance-first architecture.
+
+The manuscript is `CANDIDATE_v0.1`, not yet a publication-frozen manuscript.
+
+## Preflight object
+
+The governed preflight is:
 
 `examples/marxiv/matverse-2.0/paper1-preflight.json`
 
-## Why runtime prepare intentionally did not execute
-
-`app.marxiv_runtime_publisher.prepare_sandbox()` requires a valid `marxiv.scientific-object.v1` with at least:
-
-- one verified author;
-- a real manuscript file that exists on disk;
-- explicit arXiv primary archive/category;
-- an explicit license;
-- a publication target that passes transport validation.
-
-The current corpus establishes the paper title, abstract seed, scope, contributions and blocked claims, but does not establish a final manuscript bundle plus all human-controlled publication metadata.
-
-Therefore the correct result is:
+It now points to the real LaTeX manuscript candidate. MARXIV distinguishes:
 
 ```text
-PREPARE_SCIENTIFIC_OBJECT = HOLD
-EXTERNAL_SIDE_EFFECT = BLOCK
+manuscript absent
+!= manuscript candidate exists
+!= manuscript frozen for publication
 ```
 
-Creating a fake author, placeholder manuscript, assumed license or silently selecting an arXiv category merely to obtain a green sandbox would violate the MARXIV canon.
+`app/marxiv_preflight.py` therefore requires an explicit `manuscript_confirmed=true` before promotion.
 
-## Preflight result
-
-### PASS
+## Current PASS
 
 - Paper 1 identity selected.
 - Canonical title identified.
-- Corpus-supported abstract seed preserved.
-- C1–C5 contribution structure recorded.
-- `PASS_LOCAL` boundary for the reference vertical slice preserved.
-- Broad unsupported scientific claims explicitly blocked.
-- Publication destination intent recorded as arXiv.
-- No external side effect performed.
+- Author identity resolved.
+- ORCID resolved.
+- Corpus-supported abstract preserved.
+- C1–C5 structure recorded.
+- Reference vertical-slice boundary remains `PASS_LOCAL`.
+- Broad unsupported scientific claims are blocked from Results/Conclusion.
+- External related-work boundary has been added to the manuscript candidate.
+- Manuscript candidate exists as a tracked LaTeX source.
+- Publication destination intent is arXiv.
+- No external side effect has been performed.
 
-### HOLD before `prepare`
+## Current HOLD before promotion
 
-1. Final manuscript bundle/file.
-2. Verified author list.
-3. ORCID values when applicable and explicitly verified.
-4. Affiliations only if explicitly claimed and verified.
-5. arXiv primary archive and category.
-6. Cross-list decision.
-7. Publication license.
-8. Final abstract confirmation against the frozen manuscript.
+1. Human freeze/confirmation that `papers/matverse-2.0/main.tex` is the submission manuscript.
+2. Affiliation decision: explicitly set a verified affiliation or intentionally keep it null.
+3. Explicit arXiv primary archive/category decision.
+4. Explicit cross-list decision.
+5. Explicit publication-license decision.
+6. Final abstract confirmation against the frozen manuscript.
+
+Current recommendations, not authority:
+
+```text
+primary:   cs.SE
+cross-list: cs.AI
+license:   CC BY 4.0
+```
+
+These remain `PROPOSED_NOT_CONFIRMED` until explicitly accepted as publication metadata.
+
+## Why runtime `prepare` still does not execute
+
+The runtime must not interpret the existence of a manuscript candidate as publication authority. The transition is intentionally blocked until the manuscript and venue choices are frozen by the human authority.
+
+Therefore the correct state remains:
+
+```text
+PREFLIGHT_ASSESSMENT = HOLD_PREPARE
+EXTERNAL_SIDE_EFFECT = BLOCK
+```
 
 ## Promotion rule
 
-The preflight object MUST NOT be passed directly to the runtime publisher.
+Once all HOLD fields are resolved, execute:
 
-Once the HOLD fields are resolved, construct a new exact `marxiv.scientific-object.v1` from the same object identity and version candidate, then execute:
+```bash
+python -m app.marxiv_preflight promote \
+  --preflight examples/marxiv/matverse-2.0/paper1-preflight.json \
+  --output examples/marxiv/matverse-2.0/scientific-object.json
+```
+
+Only a successful promotion creates a valid `marxiv.scientific-object.v1` candidate for the Runtime Publisher.
+
+Then execute the no-side-effect dry-run:
 
 ```bash
 python -m app.marxiv_runtime_publisher prepare \
-  --object /absolute/path/scientific-object.json \
+  --object examples/marxiv/matverse-2.0/scientific-object.json \
   --sandbox-root .marxiv
 ```
 
-Expected successful dry-run state:
+Expected state:
 
 ```text
 HUMAN_REVIEW_REQUIRED
 ```
 
-At that point the sandbox must contain the frozen object snapshot, arXiv manifest, review packet, transport package, publisher state and package hashes. No approval and no arXiv submission should occur during the dry-run.
+At that point the sandbox must contain the frozen object snapshot, arXiv manifest, review packet, transport package, publisher state and package hashes. No approval and no arXiv submission should occur during this dry-run.
 
 ## Dry-run acceptance criteria
 
 The real-object dry-run becomes `PASS` only when all of the following are true:
 
-1. `MarxivScientificObject` validation passes.
-2. The final manuscript file exists and hashes successfully.
-3. Publication Bridge validation succeeds for the chosen arXiv metadata.
-4. Sandbox state is exactly `HUMAN_REVIEW_REQUIRED`.
-5. `package_hash` is generated from the frozen package components.
-6. Integrity re-check passes before any approval challenge.
-7. No publication credentials are required for the preparation step.
-8. No external side effect is performed.
-
-## Next state transition
-
-```text
-PREFLIGHT_RECORDED
-      -> resolve human-controlled metadata
-      -> freeze final manuscript
-      -> create marxiv.scientific-object.v1
-      -> PREPARE
-      -> HUMAN_REVIEW_REQUIRED
-      -> human review
-```
-
-Only after this dry-run evidence exists should the project proceed to an author-authorized live arXiv pilot.
+1. The preflight assessor returns `READY_FOR_PROMOTION`.
+2. `MarxivScientificObject` validation passes.
+3. The frozen manuscript file exists and hashes successfully.
+4. Publication Bridge validation succeeds for the human-confirmed arXiv metadata.
+5. Sandbox state is exactly `HUMAN_REVIEW_REQUIRED`.
+6. `package_hash` is generated from the frozen package components.
+7. Integrity re-check passes before any approval challenge.
+8. No publication credentials are required for preparation.
+9. No external side effect is performed.
 
 ## Scientific boundary
 
 ```text
 Publication != ScientificTruth
 PASS_LOCAL != ExternalReproduction
+ManuscriptCandidate != FrozenManuscript
 Prepared != Approved
 Approved != Submitted
 Submitted != Moderated/Announced
 ```
 
-This dry-run intentionally treats missing information as a governed HOLD rather than as permission to infer it.
+The dry-run treats missing authority as a governed HOLD rather than permission to infer it.
