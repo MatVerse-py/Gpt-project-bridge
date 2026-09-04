@@ -77,14 +77,17 @@ def test_crosslist_lengths_must_match() -> None:
         ArxivManifest.model_validate(raw)
 
 
-def test_build_values_preserves_explicit_license_and_author(tmp_path: Path) -> None:
-    manuscript = tmp_path / "paper.pdf"
+def test_build_values_preserves_explicit_license_author_and_portable_manuscript_name(tmp_path: Path) -> None:
+    manuscript = tmp_path / "nested" / "paper.pdf"
+    manuscript.parent.mkdir()
     manuscript.write_bytes(b"pdf-fixture")
     manifest = ArxivManifest.model_validate(_manifest())
-    values = build_values(manifest, manuscript)
+    values = build_values(manifest, manuscript.resolve())
     by_id = {item["id"]: item for item in values["fields"]}
     assert by_id["license"]["value"] == "CC BY 4.0"
     assert by_id["authors"]["value"] == "Mateus Alves Areas"
+    assert by_id["manuscript_file"]["value"] == "paper.pdf"
+    assert str(tmp_path) not in by_id["manuscript_file"]["value"]
     assert values["unfilled"][0]["id"] == "final_submission_confirmation"
 
 
@@ -99,9 +102,12 @@ def test_prepare_and_verify_are_deterministic(tmp_path: Path, monkeypatch: pytes
 
     state = prepare(manifest_path, tmp_path / "work")
     state_path = tmp_path / "work" / "matverse-paper-001" / "publication-state.json"
+    values = json.loads((tmp_path / "work" / "matverse-paper-001" / "values.json").read_text(encoding="utf-8"))
+    by_id = {item["id"]: item for item in values["fields"]}
 
     assert state.status == "VALIDATED"
     assert state.receipt["schema"] == "matverse.evidence-receipt.v1"
+    assert by_id["manuscript_file"]["value"] == "paper.pdf"
     result = verify(state_path, manifest_path)
     assert result["ok"] is True
 
