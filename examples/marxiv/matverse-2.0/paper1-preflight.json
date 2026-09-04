@@ -1,6 +1,6 @@
 {
   "schema": "marxiv.paper-preflight.v1",
-  "status": "HOLD_PREPARE",
+  "status": "READY_FOR_PROMOTION",
   "object_id": "matverse-2.0",
   "version": "v1",
   "title": "MATVERSE 2.0: A Constitutional Architecture for Governed Informational Transformation in Federated Research Systems",
@@ -48,48 +48,50 @@
       }
     ],
     "manuscript_file": "../../../papers/matverse-2.0/main.tex",
-    "manuscript_confirmed": false,
-    "primary_archive": null,
-    "primary_category": null,
-    "crosslist_archives": [],
-    "crosslist_categories": [],
-    "license": null,
-    "comments": "Preprint candidate; not authorized for external submission from this preflight object.",
-    "category_confirmed": false,
-    "crosslist_confirmed": false,
-    "license_confirmed": false,
-    "final_abstract_confirmed": false
+    "manuscript_confirmed": true,
+    "primary_archive": "cs",
+    "primary_category": "cs.SE",
+    "crosslist_archives": ["cs"],
+    "crosslist_categories": ["cs.AI"],
+    "license": "CC BY 4.0",
+    "comments": "Preprint candidate v0.1; frozen for governed dry-run only. External arXiv submission is not authorized by this freeze.",
+    "category_confirmed": true,
+    "crosslist_confirmed": true,
+    "license_confirmed": true,
+    "final_abstract_confirmed": true
+  },
+  "editorial_confirmation": {
+    "scope": "FREEZE_AND_DRY_RUN_ONLY",
+    "manuscript": "papers/matverse-2.0/main.tex",
+    "manuscript_version_label": "v0.1",
+    "affiliation": null,
+    "primary": "cs.SE",
+    "crosslist": "cs.AI",
+    "license": "CC BY 4.0",
+    "abstract": "current",
+    "external_submission_authorized": false,
+    "source": "explicit interactive user confirmation immediately following the exact proposed freeze configuration"
   },
   "recommendations": {
     "arxiv_primary": {
       "archive": "cs",
       "category": "cs.SE",
-      "status": "PROPOSED_NOT_CONFIRMED",
-      "reason": "Paper 1 is primarily an architecture, implementation, testing, provenance and software-governance paper."
+      "status": "CONFIRMED_FOR_DRY_RUN"
     },
     "arxiv_crosslist": {
       "archive": "cs",
       "category": "cs.AI",
-      "status": "PROPOSED_NOT_CONFIRMED",
-      "reason": "The architecture is explicitly motivated by AI systems and AI-assisted scientific workflows."
+      "status": "CONFIRMED_FOR_DRY_RUN"
     },
     "publication_license": {
       "license": "CC BY 4.0",
-      "status": "PROPOSED_NOT_CONFIRMED",
-      "reason": "Open preprint reuse with attribution; final selection remains a human publication decision."
+      "status": "CONFIRMED_FOR_DRY_RUN"
     }
   },
-  "required_inputs_before_runtime_prepare": [
-    "human freeze/confirmation of papers/matverse-2.0/main.tex as the submission manuscript",
-    "affiliation decision: explicitly set or intentionally remain null",
-    "explicit arXiv primary archive and category confirmation",
-    "explicit cross-list decision",
-    "explicit publication license confirmation",
-    "final abstract confirmation against the frozen manuscript"
-  ],
+  "required_inputs_before_runtime_prepare": [],
   "authority": {
     "external_submission_authorized": false,
-    "reason": "A manuscript candidate now exists, but the manuscript freeze and human-controlled publication selections are not yet confirmed."
+    "reason": "The user authorized manuscript/venue freeze and governed dry-run only. No arXiv login, approval challenge signing, final submit, or other external side effect is authorized."
   },
   "evidence_boundary": {
     "paper_type": ["architecture", "method", "reference implementation", "extensible research program"],
