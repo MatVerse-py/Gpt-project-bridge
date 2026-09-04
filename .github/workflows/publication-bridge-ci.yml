@@ -39,6 +39,10 @@ jobs:
         run: python -m py_compile app/publication_bridge.py app/marxiv_runtime_publisher.py
       - name: Run publication tests
         run: pytest -q tests/test_publication_bridge.py tests/test_marxiv_runtime_publisher.py
+      - name: Install pinned publication transport
+        run: pip install -r requirements-publication.txt
+      - name: Import pinned arXiv finalizer
+        run: python -c "from paperpush.venues.arxiv.arxiv import ArxivVenue, license_url; assert ArxivVenue.slug == 'arxiv'; assert license_url('CC BY 4.0')"
       - name: Secret-boundary static check
         shell: bash
         run: |
