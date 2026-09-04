@@ -2,7 +2,7 @@
 
 ## Status
 
-`CANONICAL_SPEC / IMPLEMENTATION_PARTIAL_PASS / LIVE_PUBLICATION_PILOT_HOLD`
+`CANONICAL_SPEC / IMPLEMENTATION_PASS_IN_DECLARED_SCOPE / LIVE_PUBLICATION_PILOT_HOLD`
 
 This document freezes the current defensible definition of MARXIV without promoting hypotheses beyond available evidence.
 
@@ -25,21 +25,19 @@ MARXIV = ScientificObject
        + ExternalReconciliation
 ```
 
-## Core invariant
+## Core invariants
 
 ```text
 Publication != ScientificTruth
+DESCRIPTION != SPEC != CODE != EXECUTION != RESULT != REPRODUCTION
+ManuscriptCandidate != FrozenManuscript
+FrozenManuscript != ApprovedPublicationPackage
+Prepared != Approved
+Approved != Submitted
+Submitted != Moderated/Announced
 ```
 
 Publication changes publication state. It does not automatically promote the epistemic state of any claim.
-
-Likewise:
-
-```text
-DESCRIPTION != SPEC != CODE != EXECUTION != RESULT != REPRODUCTION
-```
-
-MARXIV must preserve these boundaries in every projection and receipt.
 
 ## Scientific Object
 
@@ -63,7 +61,9 @@ A venue is never the canonical source of this object.
 The Runtime Publisher implements a controlled external transition:
 
 ```text
-Scientific Object
+Paper Preflight
+      -> Frozen Manuscript
+      -> Scientific Object
       -> Publication Projection
       -> Sandbox
       -> HUMAN_REVIEW_REQUIRED
@@ -96,6 +96,27 @@ Capability(agent, P') = BLOCK                          if P' != approved P
 ```
 
 Human authorization is a capability grant, not a generic statement such as "publish this paper".
+
+A manuscript freeze authorizes neither approval nor submission. The freeze can be scoped to preparation only, as demonstrated by Paper 1.
+
+## Portable package identity
+
+The runtime must not allow host-local filesystem paths to alter the canonical identity of an otherwise identical publication package.
+
+The current preparation boundary therefore stages the frozen manuscript into the sandbox and uses stable relative transport references. For the same Scientific Object and pinned transport, distinct sandbox roots must preserve:
+
+```text
+object_hash
+manifest_hash
+manuscript_sha256
+arxiv_subfile_sha256
+review_packet_hash
+package_hash
+```
+
+Paper 1 passed this two-root discriminant in Publication Bridge CI run `33828742642` on head `01adc23c39c2653aa0fafe54e429242500d0fd9e`.
+
+This is portability evidence within the declared runtime/CI scope, not independent external reproduction.
 
 ## Package-bound approval
 
@@ -215,24 +236,39 @@ Any organism-level interpretation remains a higher-order hypothesis unless indep
 
 ## Evidence classes
 
-### PASS / implemented in the current publication branch
+### PASS / implemented and exercised in the declared scope
 
+- paper preflight assessment;
+- explicit manuscript freeze boundary;
+- deterministic preflight -> Scientific Object promotion;
 - MARXIV Scientific Object -> venue projection;
-- deterministic publication sandbox;
-- review packet;
+- deterministic publication sandbox/review packet;
+- frozen-manuscript byte hashing and staging;
 - package hashing;
-- human approval challenge;
-- package-bound authorization;
-- mutation invalidation;
-- authority gate before external effects;
-- publication state machine;
+- two-root portable package identity with pinned PaperPush transport;
+- `HUMAN_REVIEW_REQUIRED` real-object preparation without credentials;
+- human approval challenge/approval machinery in automated tests;
+- mutation invalidation in automated tests;
+- authority gate before external effects in automated tests;
+- publication state machine in automated tests;
 - EvidenceOS publication receipts;
 - no-auto-retry on uncertain post-submit state;
-- external identifier reconciliation.
+- external identifier reconciliation logic in automated tests.
+
+Paper 1 evidence:
+
+```text
+manuscript        papers/matverse-2.0/main.tex (v0.1)
+scientific object examples/marxiv/matverse-2.0/scientific-object.v1.json
+dry-run evidence  examples/marxiv/matverse-2.0/dry-run-result.v1.json
+state             HUMAN_REVIEW_REQUIRED
+package hash      4ef1c650ccf52054cb77adc5d1a1e8d5a19785bcdbe23a644470ee707e97b2aa
+```
 
 ### HOLD
 
-- live author-authorized end-to-end arXiv pilot through this runtime;
+- live author-authorized end-to-end arXiv publication through this runtime;
+- external arXiv identifier for Paper 1;
 - independent external reproduction of the MARXIV publisher workflow;
 - multi-venue production validation;
 - scientific novelty claim for the full MARXIV composition;
@@ -253,7 +289,7 @@ These may be experiment targets, not evidence.
 
 ## EvidenceOS event boundary
 
-The current publisher emits or is designed around distinct events such as:
+The publisher emits or is designed around distinct events such as:
 
 ```text
 MARXIV_PUBLICATION_SANDBOX_PREPARED
@@ -266,15 +302,27 @@ MARXIV_PUBLICATION_RECONCILED
 
 No event named `PUBLISHED` should be emitted solely because a browser automation step completed. External publication/announcement state must be independently observed and reconciled.
 
-## Next validation sequence
+## Current validation sequence
 
-1. CI must pass on the exact PR head.
-2. Run a complete dry-run with a real Scientific Object and no final external side effect.
-3. Execute one author-authorized live arXiv pilot.
-4. Reconcile the real external arXiv identifier into MARXIV state.
-5. Archive the full evidence pack: object snapshot, package hashes, approval receipt, transport receipt, external identity and reconciliation receipt.
-6. Add Zenodo/DOI as an independent transport rather than conflating venue authority.
-7. Submit the MARXIV paper using MARXIV itself as a self-hosting demonstration, while keeping scientific claims separately adjudicated.
+Completed:
+
+1. real Paper 1 manuscript candidate;
+2. explicit human freeze for dry-run-only scope;
+3. preflight promotion;
+4. real pinned-PaperPush preparation;
+5. two-root portable package-identity proof;
+6. `HUMAN_REVIEW_REQUIRED` without credentials, approval or external side effect;
+7. committed machine-readable dry-run evidence.
+
+Still requiring separate authority/evidence:
+
+1. package review;
+2. optional approval challenge;
+3. explicit exact-package publication approval;
+4. live author-authorized arXiv pilot;
+5. external-ID reconciliation;
+6. archived post-publication EvidencePack;
+7. independent reproduction / additional venue adapters.
 
 ## Canonical short form
 
@@ -288,4 +336,5 @@ RuntimePublisher = PublicationProjection
                  + Reconciliation
 
 Publication != ScientificTruth
+Prepared != Approved
 ```
