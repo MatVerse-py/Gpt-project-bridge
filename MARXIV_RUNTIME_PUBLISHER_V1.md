@@ -4,6 +4,20 @@
 
 `IMPLEMENTED / LIVE_ARXIV_FINALIZER_NOT_YET_PILOTED`
 
+## Canonical scientific boundary
+
+This runtime is governed by [`MARXIV_CANON_V1.md`](./MARXIV_CANON_V1.md).
+
+The canonical invariants are:
+
+```text
+MARXIV = Governed Lifecycle Runtime for Scientific Objects
+Publication != ScientificTruth
+Organizer != Authorizer != Publication Authority
+```
+
+The Runtime Publisher is an implemented governed external-effector subsystem. It is **not** evidence by itself that OCG, digital life, autopoiesis, consciousness or a new biological class has been demonstrated. Claims about measured publication speed, error-rate reduction, Monte Carlo reliability or operational cost remain inadmissible as factual results unless an experiment artifact is attached.
+
 This runtime couples MARXIV Scientific Objects to the governed MatVerse Publication Bridge. It is deliberately split into two planes:
 
 - **MARXIV plane** — scientific object, metadata organization, claims/evidence/lineage, sandbox, approval, state and reconciliation.
@@ -147,7 +161,7 @@ Pre-submit failure -> `HOLD_PRE_SUBMIT`.
 
 Uncertain state after final external click -> `HOLD_RECONCILIATION_REQUIRED` with **no automatic retry**.
 
-`SUBMITTED_TO_ARXIV` is not a claim that arXiv moderation/announcement has accepted the paper.
+`SUBMITTED_TO_ARXIV` is not a claim that arXiv moderation/announcement has accepted the paper and never promotes the scientific truth-state of its claims automatically.
 
 ## Reconcile external identity
 
@@ -176,6 +190,7 @@ The external identifier is written back into publisher state with an EvidenceOS 
 6. Unknown post-click state is HOLD, never retry.
 7. External identity is reconciled only after an external effect exists.
 8. `.marxiv/` and approval artifacts are excluded from Git.
+9. Publication state never silently promotes epistemic claim state.
 
 ## Current evidence boundary
 
