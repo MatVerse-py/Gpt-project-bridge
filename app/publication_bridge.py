@@ -286,12 +286,18 @@ def prepare(manifest_path: Path, work_root: Path) -> PublicationState:
     if not subfile_path.is_file():
         raise PublicationBridgeError("paperpush did not create arxiv.sub")
 
+    # PaperPush's filemap resolver serializes manuscript_dir / filename into the
+    # .sub file. Supplying an absolute -d therefore makes an otherwise identical
+    # transport artifact host-path-dependent. Keep -d relative to the PaperPush
+    # cwd; its relative relationship to the staged manuscript is stable across
+    # sandbox roots while still resolving to the same bytes.
+    paperpush_data_dir = os.path.relpath(manuscript_path.parent, start=workdir)
     _run(
         [
             "autofill",
             str(subfile_path),
             "-d",
-            str(manuscript_path.parent),
+            paperpush_data_dir,
             "--engine",
             "manual",
             "--values",
