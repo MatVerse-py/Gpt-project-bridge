@@ -106,6 +106,28 @@ def test_sandbox_organizes_scientific_object_and_publication_metadata(
     assert manifest["primary_category"] == "cs.AI"
     assert manifest["crosslist_categories"] == ["cs.SE"]
     assert manifest["license"] == "CC BY 4.0"
+    assert manifest["manuscript_file"] == "manuscript/paper.pdf"
+    assert (sandbox / "manuscript" / "paper.pdf").read_bytes() == b"pdf-fixture"
+
+
+def test_package_identity_is_stable_across_sandbox_roots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(publisher, "prepare_arxiv", _fake_prepare)
+    manuscript = tmp_path / "paper.pdf"
+    manuscript.write_bytes(b"pdf-fixture")
+    object_path = tmp_path / "scientific-object.json"
+    object_path.write_text(json.dumps(_object()), encoding="utf-8")
+
+    first = publisher.prepare_sandbox(object_path, tmp_path / ".marxiv-a")
+    second = publisher.prepare_sandbox(object_path, tmp_path / ".marxiv-b")
+
+    assert first.object_hash == second.object_hash
+    assert first.manifest_hash == second.manifest_hash
+    assert first.manuscript_sha256 == second.manuscript_sha256
+    assert first.arxiv_subfile_sha256 == second.arxiv_subfile_sha256
+    assert first.review_packet_hash == second.review_packet_hash
+    assert first.package_hash == second.package_hash
 
 
 def test_human_approval_is_bound_to_exact_prepared_package(
@@ -132,9 +154,9 @@ def test_human_approval_is_bound_to_exact_prepared_package(
 def test_manuscript_change_invalidates_existing_human_approval(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    sandbox, manuscript = _prepared(tmp_path, monkeypatch)
+    sandbox, _ = _prepared(tmp_path, monkeypatch)
     _approve(sandbox, monkeypatch)
-    manuscript.write_bytes(b"changed-after-human-approval")
+    (sandbox / "manuscript" / "paper.pdf").write_bytes(b"changed-after-human-approval")
 
     verification = publisher.verify_approval(sandbox)
 
@@ -168,10 +190,11 @@ def test_approved_agent_can_publish_then_reconcile_external_identifier(
 
     submitted = publisher.publish(
         sandbox,
-        transport=lambda _: {
+        transport=lambda manifest: {
             "final_click_performed": True,
             "portal_confirmation_observed": True,
             "external_identifier": None,
+            "manuscript_is_absolute_for_transport": Path(manifest.manuscript_file).is_absolute(),
         },
     )
     reconciled = publisher.reconcile(sandbox, "2609.12345")
