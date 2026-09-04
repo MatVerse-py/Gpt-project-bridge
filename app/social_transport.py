@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Mapping
+from typing import Any, Mapping, TYPE_CHECKING
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+if TYPE_CHECKING:
+    from app.social_credentials import CredentialBroker, CredentialRef
+    from app.social_manifest import SourceCapabilityManifest
 
 
 class SocialCapability(str, Enum):
@@ -45,12 +48,7 @@ class TransportResult:
 
 
 class MetaInstagramTransport:
-    """Minimal authorized transport for the Instagram API.
-
-    The transport owns network access and authorization. Domain normalization
-    remains in ``InstagramAdapter``. Access tokens are carried only in the
-    Authorization header and are never inserted into returned payloads or URLs.
-    """
+    """Authorized Instagram transport with capability and credential boundaries."""
 
     name = "meta.instagram.v1"
     _MEDIA_ID = re.compile(r"^[0-9]{1,64}$")
@@ -58,14 +56,7 @@ class MetaInstagramTransport:
     _DEFAULT_TIMEOUT = 15.0
     _MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
-    def __init__(
-        self,
-        *,
-        access_token: str,
-        capabilities: CapabilityPolicy,
-        base_url: str = _DEFAULT_BASE_URL,
-        timeout: float = _DEFAULT_TIMEOUT,
-    ) -> None:
+    def __init__(self, *, access_token: str, capabilities: CapabilityPolicy, base_url: str = _DEFAULT_BASE_URL, timeout: float = _DEFAULT_TIMEOUT) -> None:
         token = access_token.strip()
         if not token:
             raise ValueError("Instagram access token is required")
@@ -80,34 +71,33 @@ class MetaInstagramTransport:
         self._timeout = float(timeout)
 
     @classmethod
-    def from_env(cls, *, capabilities: CapabilityPolicy) -> "MetaInstagramTransport":
-        token = os.environ.get("INSTAGRAM_ACCESS_TOKEN", "").strip()
-        if not token:
-            raise RuntimeError("INSTAGRAM_ACCESS_TOKEN is not configured")
-        base_url = os.environ.get("INSTAGRAM_API_BASE_URL", cls._DEFAULT_BASE_URL)
-        timeout_raw = os.environ.get("INSTAGRAM_API_TIMEOUT_SECONDS", str(cls._DEFAULT_TIMEOUT))
-        try:
-            timeout = float(timeout_raw)
-        except ValueError as exc:
-            raise RuntimeError("INSTAGRAM_API_TIMEOUT_SECONDS must be numeric") from exc
-        return cls(access_token=token, capabilities=capabilities, base_url=base_url, timeout=timeout)
+    def from_manifest(
+        cls,
+        *,
+        manifest: "SourceCapabilityManifest",
+        credential: "CredentialRef",
+        broker: "CredentialBroker",
+        base_url: str = _DEFAULT_BASE_URL,
+        timeout: float = _DEFAULT_TIMEOUT,
+    ) -> "MetaInstagramTransport":
+        if manifest.provider != "meta":
+            raise ValueError("manifest provider must be meta")
+        if credential.provider != manifest.provider or credential.account_id != manifest.account_id:
+            raise PermissionError("credential identity does not match source manifest")
+        if credential.secret_ref != manifest.credential_ref:
+            raise PermissionError("credential reference does not match source manifest")
+        policy = CapabilityPolicy(frozenset(manifest.capabilities))
+        token = broker.access_token(credential)
+        return cls(access_token=token, capabilities=policy, base_url=base_url, timeout=timeout)
 
     def _get_json(self, path: str, *, fields: tuple[str, ...]) -> dict[str, Any]:
         if not path.startswith("/") or ".." in path or "?" in path or "#" in path:
             raise ValueError("unsafe Instagram API path")
         query = urlencode({"fields": ",".join(fields)}) if fields else ""
         url = f"{self._base_url}{path}" + (f"?{query}" if query else "")
-        request = Request(
-            url,
-            method="GET",
-            headers={
-                "Authorization": f"Bearer {self._access_token}",
-                "Accept": "application/json",
-                "User-Agent": "MatVerse-Governed-Bridge/1.0",
-            },
-        )
+        request = Request(url, method="GET", headers={"Authorization": f"Bearer {self._access_token}", "Accept": "application/json", "User-Agent": "MatVerse-Governed-Bridge/1.0"})
         try:
-            with urlopen(request, timeout=self._timeout) as response:  # nosec B310 - fixed HTTPS base enforced above
+            with urlopen(request, timeout=self._timeout) as response:  # nosec B310
                 raw = response.read(self._MAX_RESPONSE_BYTES + 1)
         except HTTPError as exc:
             raise RuntimeError(f"Instagram API HTTP error: {exc.code}") from exc
@@ -137,40 +127,19 @@ class MetaInstagramTransport:
         self._capabilities.require(SocialCapability.READ_SELF)
         payload = self._get_json("/me", fields=("id", "username", "name", "biography"))
         username = payload.get("username") if isinstance(payload.get("username"), str) else None
-        return TransportResult(
-            url=self._profile_url(username),
-            payload={**payload, "_acquisition_mode": "official_api", "_transport": self.name},
-            authorized=True,
-            transport=self.name,
-        )
+        return TransportResult(url=self._profile_url(username), payload={**payload, "_acquisition_mode": "official_api", "_transport": self.name}, authorized=True, transport=self.name)
 
     def read_media(self) -> TransportResult:
         self._capabilities.require(SocialCapability.READ_MEDIA)
-        payload = self._get_json(
-            "/me/media",
-            fields=("id", "caption", "media_type", "media_url", "permalink", "thumbnail_url", "timestamp", "username"),
-        )
-        return TransportResult(
-            url="https://www.instagram.com/",
-            payload={**payload, "_acquisition_mode": "official_api", "_transport": self.name},
-            authorized=True,
-            transport=self.name,
-        )
+        payload = self._get_json("/me/media", fields=("id", "caption", "media_type", "media_url", "permalink", "thumbnail_url", "timestamp", "username"))
+        return TransportResult(url="https://www.instagram.com/", payload={**payload, "_acquisition_mode": "official_api", "_transport": self.name}, authorized=True, transport=self.name)
 
     def read_media_detail(self, media_id: str) -> TransportResult:
         self._capabilities.require(SocialCapability.READ_MEDIA_DETAIL)
         value = str(media_id).strip()
         if not self._MEDIA_ID.fullmatch(value):
             raise ValueError("invalid Instagram media id")
-        payload = self._get_json(
-            f"/{value}",
-            fields=("id", "caption", "media_type", "media_url", "permalink", "thumbnail_url", "timestamp", "username", "children"),
-        )
+        payload = self._get_json(f"/{value}", fields=("id", "caption", "media_type", "media_url", "permalink", "thumbnail_url", "timestamp", "username", "children"))
         permalink = payload.get("permalink")
         url = permalink if isinstance(permalink, str) and permalink.startswith("https://www.instagram.com/") else "https://www.instagram.com/"
-        return TransportResult(
-            url=url,
-            payload={**payload, "_acquisition_mode": "official_api", "_transport": self.name},
-            authorized=True,
-            transport=self.name,
-        )
+        return TransportResult(url=url, payload={**payload, "_acquisition_mode": "official_api", "_transport": self.name}, authorized=True, transport=self.name)
