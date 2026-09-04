@@ -47,7 +47,8 @@
         "verified": true
       }
     ],
-    "manuscript_file": null,
+    "manuscript_file": "../../../papers/matverse-2.0/main.tex",
+    "manuscript_confirmed": false,
     "primary_archive": null,
     "primary_category": null,
     "crosslist_archives": [],
@@ -75,20 +76,20 @@
     "publication_license": {
       "license": "CC BY 4.0",
       "status": "PROPOSED_NOT_CONFIRMED",
-      "reason": "Open preprint reuse with attribution; final selection is irrevocable on arXiv and remains a human decision."
+      "reason": "Open preprint reuse with attribution; final selection remains a human publication decision."
     }
   },
   "required_inputs_before_runtime_prepare": [
-    "final manuscript bundle/file",
+    "human freeze/confirmation of papers/matverse-2.0/main.tex as the submission manuscript",
     "affiliation decision: explicitly set or intentionally remain null",
     "explicit arXiv primary archive and category confirmation",
     "explicit cross-list decision",
     "explicit publication license confirmation",
-    "final abstract confirmation against manuscript"
+    "final abstract confirmation against the frozen manuscript"
   ],
   "authority": {
     "external_submission_authorized": false,
-    "reason": "Identity is resolved, but the final manuscript and human-controlled publication selections are not yet frozen."
+    "reason": "A manuscript candidate now exists, but the manuscript freeze and human-controlled publication selections are not yet confirmed."
   },
   "evidence_boundary": {
     "paper_type": ["architecture", "method", "reference implementation", "extensible research program"],
