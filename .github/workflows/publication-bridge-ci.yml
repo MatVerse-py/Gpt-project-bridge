@@ -5,17 +5,25 @@ on:
     branches: [main]
     paths:
       - 'app/publication_bridge.py'
+      - 'app/marxiv_runtime_publisher.py'
       - 'tests/test_publication_bridge.py'
+      - 'tests/test_marxiv_runtime_publisher.py'
       - 'requirements-publication.txt'
       - 'PUBLICATION_BRIDGE_V1.md'
+      - 'MARXIV_RUNTIME_PUBLISHER_V1.md'
+      - '.gitignore'
       - '.github/workflows/publication-bridge-ci.yml'
   push:
     branches: [publication-bridge/v1]
     paths:
       - 'app/publication_bridge.py'
+      - 'app/marxiv_runtime_publisher.py'
       - 'tests/test_publication_bridge.py'
+      - 'tests/test_marxiv_runtime_publisher.py'
       - 'requirements-publication.txt'
       - 'PUBLICATION_BRIDGE_V1.md'
+      - 'MARXIV_RUNTIME_PUBLISHER_V1.md'
+      - '.gitignore'
       - '.github/workflows/publication-bridge-ci.yml'
 
 jobs:
@@ -27,13 +35,20 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
-      - run: pytest -q tests/test_publication_bridge.py
+      - name: Compile publisher modules
+        run: python -m py_compile app/publication_bridge.py app/marxiv_runtime_publisher.py
+      - name: Run publication tests
+        run: pytest -q tests/test_publication_bridge.py tests/test_marxiv_runtime_publisher.py
       - name: Secret-boundary static check
         shell: bash
         run: |
           set -euo pipefail
-          if grep -RIn --exclude-dir=.git --exclude='PUBLICATION_BRIDGE_V1.md' \
-            -E '(ARXIV_PASSWORD[[:space:]]*=.+|PAPERPUSH_PASSWORD[[:space:]]*=.+)' .; then
+          if grep -RIn --exclude-dir=.git --exclude='PUBLICATION_BRIDGE_V1.md' --exclude='MARXIV_RUNTIME_PUBLISHER_V1.md' \
+            -E '(ARXIV_PASSWORD[[:space:]]*=.+|PAPERPUSH_PASSWORD[[:space:]]*=.+|MARXIV_APPROVAL_SECRET[[:space:]]*=.+)' .; then
             echo 'Credential-like assignment found in tracked runtime/test files.' >&2
+            exit 1
+          fi
+          if find . -type f \( -name 'human-approval.json' -o -name 'approval-challenge.json' -o -name 'publisher-state.json' \) -not -path './.git/*' | grep -q .; then
+            echo 'Runtime approval/sandbox artifact committed to repository.' >&2
             exit 1
           fi
