@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# MatVerse Publication Bridge local state
+.publication/
+.marxiv/
+playwright/.auth/
+auth.json
+*.sub
+values.json
+publication-state.json
+publisher-state.json
+approval-challenge.json
+human-approval.json
+review-packet.json
+submission-result.json
+scientific-object.snapshot.json
+arxiv-manifest.json
+
+# Local environment / secrets
+.env
+.env.*
+!.env.example

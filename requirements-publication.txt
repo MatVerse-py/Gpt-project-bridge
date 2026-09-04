@@ -1,0 +1,2 @@
+-r requirements.txt
+paperpush @ git+https://github.com/pachterlab/paperpush.git@3cc701d91bf78c046f008477baad40e7fa53ff4f

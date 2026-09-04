@@ -1,0 +1,51 @@
+{
+  "schema": "marxiv.scientific-object.v1",
+  "object_id": "matverse-2.0",
+  "version": "v1",
+  "title": "MATVERSE 2.0: A Constitutional Architecture for Governed Informational Transformation in Federated Research Systems",
+  "authors": [
+    {
+      "name": "Mateus Alves Arêas",
+      "orcid": "0009-0008-2973-4047",
+      "affiliation": null
+    }
+  ],
+  "abstract": "Scientific AI systems increasingly combine interpretation, decision support, tool execution, memory, and automated knowledge transformation. When these functions are concentrated within the same operational authority, it becomes difficult to distinguish what was proposed, authorized, executed, preserved, or subsequently reconstructed. We introduce MATVERSE 2.0, a constitutional architecture for governed informational transformations in federated research systems. The architecture explicitly separates identity, authorship, semantic transformation, admissibility, execution, persistent memory, provenance, and replay. It further represents epistemic status and coherence as multidimensional structures rather than single confidence scores. We describe the constitutional model, its federated authority structure, the Ω-Gate admissibility mechanism, EvidenceOS provenance and replay, and a reference end-to-end implementation that distinguishes decision receipt, execution receipt, memory commitment, and replay receipt. A local vertical slice demonstrates fail-closed behavior under missing authorship and exact reconstruction within the declared deterministic scope. The work makes no claim that replay establishes ontological informational primacy or that the architecture constitutes biological life, consciousness, clinical efficacy, or quantum advantage. Instead, MATVERSE is presented as an engineering and research infrastructure for studying how informational transformations can remain governable, attributable, and reconstructible as scientific systems increase in complexity.",
+  "manuscript_file": "../../../papers/matverse-2.0/main.tex",
+  "keywords": [
+    "governed informational transformation",
+    "federated research systems",
+    "provenance",
+    "replay",
+    "epistemic governance",
+    "fail-closed systems"
+  ],
+  "claims": [
+    "C1: Constitutional Separation",
+    "C2: Federated Epistemic Authority",
+    "C3: Multidimensional Coherence",
+    "C4: Evidence and Replay Architecture",
+    "C5: Reference Vertical Slice"
+  ],
+  "evidence_refs": [
+    "evidence://matverse/reference-vertical-slice/pass-local",
+    "evidence://matverse/replay/exact-match",
+    "evidence://matverse/authorship/fail-closed"
+  ],
+  "parent_object_id": null,
+  "publication": {
+    "venue": "arxiv",
+    "primary_archive": "cs",
+    "primary_category": "cs.SE",
+    "crosslist_archives": ["cs"],
+    "crosslist_categories": ["cs.AI"],
+    "license": "CC BY 4.0",
+    "keep_all_files": null,
+    "comments": "Preprint candidate v0.1; frozen for governed dry-run only. External arXiv submission is not authorized by this freeze.",
+    "report_number": null,
+    "journal_reference": null,
+    "acm_class": null,
+    "msc_class": null,
+    "doi": null
+  }
+}

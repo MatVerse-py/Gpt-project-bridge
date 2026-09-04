@@ -1,0 +1,103 @@
+{
+  "schema": "marxiv.paper-preflight.v1",
+  "status": "READY_FOR_PROMOTION",
+  "object_id": "matverse-2.0",
+  "version": "v1",
+  "title": "MATVERSE 2.0: A Constitutional Architecture for Governed Informational Transformation in Federated Research Systems",
+  "abstract": "Scientific AI systems increasingly combine interpretation, decision support, tool execution, memory, and automated knowledge transformation. When these functions are concentrated within the same operational authority, it becomes difficult to distinguish what was proposed, authorized, executed, preserved, or subsequently reconstructed. We introduce MATVERSE 2.0, a constitutional architecture for governed informational transformations in federated research systems. The architecture explicitly separates identity, authorship, semantic transformation, admissibility, execution, persistent memory, provenance, and replay. It further represents epistemic status and coherence as multidimensional structures rather than single confidence scores. We describe the constitutional model, its federated authority structure, the Ω-Gate admissibility mechanism, EvidenceOS provenance and replay, and a reference end-to-end implementation that distinguishes decision receipt, execution receipt, memory commitment, and replay receipt. A local vertical slice demonstrates fail-closed behavior under missing authorship and exact reconstruction within the declared deterministic scope. The work makes no claim that replay establishes ontological informational primacy or that the architecture constitutes biological life, consciousness, clinical efficacy, or quantum advantage. Instead, MATVERSE is presented as an engineering and research infrastructure for studying how informational transformations can remain governable, attributable, and reconstructible as scientific systems increase in complexity.",
+  "keywords": [
+    "governed informational transformation",
+    "federated research systems",
+    "provenance",
+    "replay",
+    "epistemic governance",
+    "fail-closed systems"
+  ],
+  "contributions": [
+    {"id": "C1", "name": "Constitutional Separation", "status": "SUPPORTED_BY_CORPUS"},
+    {"id": "C2", "name": "Federated Epistemic Authority", "status": "SUPPORTED_BY_CORPUS"},
+    {"id": "C3", "name": "Multidimensional Coherence", "status": "SUPPORTED_BY_CORPUS"},
+    {"id": "C4", "name": "Evidence and Replay Architecture", "status": "SUPPORTED_BY_CORPUS"},
+    {"id": "C5", "name": "Reference Vertical Slice", "status": "PASS_LOCAL_ONLY"}
+  ],
+  "blocked_result_claims": [
+    "MATVERSE proves that information precedes physical reality",
+    "MATVERSE demonstrates digital life",
+    "Replay proves ontological informational precedence",
+    "MATVERSE is an artificial organism in the biological sense",
+    "MATVERSE demonstrates consciousness",
+    "MATVERSE demonstrates human-machine symbiosis",
+    "NeuroFlow demonstrates therapeutic efficacy",
+    "MATVERSE demonstrates quantum advantage",
+    "UMJAM is an experimentally established primitive of reality",
+    "CPO is an already validated universal organizational metric"
+  ],
+  "evidence_refs": [
+    "evidence://matverse/reference-vertical-slice/pass-local",
+    "evidence://matverse/replay/exact-match",
+    "evidence://matverse/authorship/fail-closed"
+  ],
+  "publication_intent": {
+    "venue": "arxiv",
+    "authors": [
+      {
+        "name": "Mateus Alves Arêas",
+        "orcid": "0009-0008-2973-4047",
+        "affiliation": null,
+        "verified": true
+      }
+    ],
+    "manuscript_file": "../../../papers/matverse-2.0/main.tex",
+    "manuscript_confirmed": true,
+    "primary_archive": "cs",
+    "primary_category": "cs.SE",
+    "crosslist_archives": ["cs"],
+    "crosslist_categories": ["cs.AI"],
+    "license": "CC BY 4.0",
+    "comments": "Preprint candidate v0.1; frozen for governed dry-run only. External arXiv submission is not authorized by this freeze.",
+    "category_confirmed": true,
+    "crosslist_confirmed": true,
+    "license_confirmed": true,
+    "final_abstract_confirmed": true
+  },
+  "editorial_confirmation": {
+    "scope": "FREEZE_AND_DRY_RUN_ONLY",
+    "manuscript": "papers/matverse-2.0/main.tex",
+    "manuscript_version_label": "v0.1",
+    "affiliation": null,
+    "primary": "cs.SE",
+    "crosslist": "cs.AI",
+    "license": "CC BY 4.0",
+    "abstract": "current",
+    "external_submission_authorized": false,
+    "source": "explicit interactive user confirmation immediately following the exact proposed freeze configuration"
+  },
+  "recommendations": {
+    "arxiv_primary": {
+      "archive": "cs",
+      "category": "cs.SE",
+      "status": "CONFIRMED_FOR_DRY_RUN"
+    },
+    "arxiv_crosslist": {
+      "archive": "cs",
+      "category": "cs.AI",
+      "status": "CONFIRMED_FOR_DRY_RUN"
+    },
+    "publication_license": {
+      "license": "CC BY 4.0",
+      "status": "CONFIRMED_FOR_DRY_RUN"
+    }
+  },
+  "required_inputs_before_runtime_prepare": [],
+  "authority": {
+    "external_submission_authorized": false,
+    "reason": "The user authorized manuscript/venue freeze and governed dry-run only. No arXiv login, approval challenge signing, final submit, or other external side effect is authorized."
+  },
+  "evidence_boundary": {
+    "paper_type": ["architecture", "method", "reference implementation", "extensible research program"],
+    "reference_vertical_slice": "PASS_LOCAL",
+    "external_reproduction": "HOLD",
+    "live_arxiv_publication": "HOLD",
+    "scientific_novelty": "HOLD_PRIOR_ART_REVIEW"
+  }
+}
