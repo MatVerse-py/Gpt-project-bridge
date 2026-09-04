@@ -7,6 +7,7 @@ on:
       - 'app/publication_bridge.py'
       - 'app/marxiv_runtime_publisher.py'
       - 'app/marxiv_preflight.py'
+      - 'app/marxiv_approval_seal.py'
       - 'tests/test_publication_bridge.py'
       - 'tests/test_marxiv_runtime_publisher.py'
       - 'tests/test_marxiv_preflight.py'
@@ -19,12 +20,14 @@ on:
       - 'papers/matverse-2.0/**'
       - '.gitignore'
       - '.github/workflows/publication-bridge-ci.yml'
+      - '.github/workflows/marxiv-approval-seal.yml'
   push:
     branches: [publication-bridge/v1]
     paths:
       - 'app/publication_bridge.py'
       - 'app/marxiv_runtime_publisher.py'
       - 'app/marxiv_preflight.py'
+      - 'app/marxiv_approval_seal.py'
       - 'tests/test_publication_bridge.py'
       - 'tests/test_marxiv_runtime_publisher.py'
       - 'tests/test_marxiv_preflight.py'
@@ -37,6 +40,7 @@ on:
       - 'papers/matverse-2.0/**'
       - '.gitignore'
       - '.github/workflows/publication-bridge-ci.yml'
+      - '.github/workflows/marxiv-approval-seal.yml'
 
 jobs:
   test:
@@ -48,7 +52,7 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.txt
       - name: Compile publisher modules
-        run: python -m py_compile app/publication_bridge.py app/marxiv_runtime_publisher.py app/marxiv_preflight.py
+        run: python -m py_compile app/publication_bridge.py app/marxiv_runtime_publisher.py app/marxiv_preflight.py app/marxiv_approval_seal.py
       - name: Run publication tests
         run: pytest -q tests/test_publication_bridge.py tests/test_marxiv_runtime_publisher.py tests/test_marxiv_preflight.py
       - name: Assess and promote frozen Paper 1
@@ -163,6 +167,40 @@ jobs:
               'external_side_effect': False,
               'approval_created': False
           }, sort_keys=True))
+          PY
+      - name: Simulate package-bound approval seal without submission
+        shell: bash
+        env:
+          ARXIV_EMAIL: ''
+          ARXIV_PASSWORD: ''
+          MARXIV_APPROVAL_SECRET: 'ci-ephemeral-approval-secret-not-production-2026'
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/marxiv-approval-seal /tmp/marxiv-approval-evidence
+          python -m app.marxiv_approval_seal \
+            --intent examples/marxiv/matverse-2.0/approval-intent.v1.json \
+            --object examples/marxiv/matverse-2.0/scientific-object.generated.json \
+            --sandbox-root /tmp/marxiv-approval-seal \
+            --approver ci-ephemeral-test \
+            --evidence-dir /tmp/marxiv-approval-evidence \
+            --ttl-seconds 7200 > /tmp/marxiv-approval-summary.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          summary = json.loads(Path('/tmp/marxiv-approval-summary.json').read_text(encoding='utf-8'))
+          assert summary['status'] == 'APPROVED'
+          assert summary['approval_verified'] is True
+          assert summary['package_hash'] == '4ef1c650ccf52054cb77adc5d1a1e8d5a19785bcdbe23a644470ee707e97b2aa'
+          assert summary['external_side_effect'] is False
+          assert summary['external_identifier'] is None
+          assert summary['secret_persisted'] is False
+          assert summary['submission_authorized'] is False
+
+          root = Path('/tmp/marxiv-approval-seal/matverse-2.0/v1')
+          assert (root / 'approval-challenge.json').is_file()
+          assert (root / 'human-approval.json').is_file()
+          assert not (root / 'submission-result.json').exists()
           PY
       - name: Secret-boundary static check
         shell: bash
