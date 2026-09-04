@@ -32,6 +32,7 @@ Publication != ScientificTruth
 DESCRIPTION != SPEC != CODE != EXECUTION != RESULT != REPRODUCTION
 ManuscriptCandidate != FrozenManuscript
 FrozenManuscript != ApprovedPublicationPackage
+ApprovalIntent != CryptographicApproval
 Prepared != Approved
 Approved != Submitted
 Submitted != Moderated/Announced
@@ -43,16 +44,7 @@ Publication changes publication state. It does not automatically promote the epi
 
 A MARXIV Scientific Object is the canonical longitudinal object. Venue-specific submissions are projections of it.
 
-The canonical object may contain:
-
-- identity and version;
-- title, abstract, authors, ORCID and affiliations;
-- claims and claim-state references;
-- evidence references;
-- lineage and parent-object references;
-- reproduction state;
-- publication intents and external identities;
-- negative-result and retraction relationships where applicable.
+The canonical object may contain identity and version; title, abstract, authors, ORCID and affiliations; claims and claim-state references; evidence references; lineage and parent-object references; reproduction state; publication intents and external identities; and negative-result and retraction relationships where applicable.
 
 A venue is never the canonical source of this object.
 
@@ -67,7 +59,8 @@ Paper Preflight
       -> Publication Projection
       -> Sandbox
       -> HUMAN_REVIEW_REQUIRED
-      -> Package-bound Human Approval
+      -> Approval Intent
+      -> Cryptographic Package-bound Human Approval
       -> Delegated Execution
       -> External Side Effect
       -> External Identity
@@ -97,7 +90,9 @@ Capability(agent, P') = BLOCK                          if P' != approved P
 
 Human authorization is a capability grant, not a generic statement such as "publish this paper".
 
-A manuscript freeze authorizes neither approval nor submission. The freeze can be scoped to preparation only, as demonstrated by Paper 1.
+A manuscript freeze authorizes neither approval nor submission. An approval-intent record expresses the human decision for an exact package, but it is **not** sufficient to enter runtime state `APPROVED`. Runtime `APPROVED` requires the live challenge, exact confirmation phrase and locally generated cryptographic approval artifact defined by the Runtime Publisher.
+
+Paper 1 currently has `APPROVAL_INTENT_CONFIRMED` for package `4ef1c650ccf52054cb77adc5d1a1e8d5a19785bcdbe23a644470ee707e97b2aa`, while `CRYPTOGRAPHIC_APPROVAL = HOLD_LOCAL_CRYPTOGRAPHIC_SEAL` and external submission authority remains false.
 
 ## Portable package identity
 
@@ -133,17 +128,20 @@ package_hash = H(
 )
 ```
 
-Any material mutation invalidates the approval, including changes to:
-
-- manuscript bytes;
-- authors;
-- title or abstract;
-- primary category;
-- cross-lists;
-- license;
-- destination metadata.
+Any material mutation invalidates the approval, including changes to manuscript bytes; authors; title or abstract; primary category; cross-lists; license; or destination metadata.
 
 A changed package returns to `HUMAN_REVIEW_REQUIRED`.
+
+Runtime approval additionally requires:
+
+```text
+approval-challenge.json
++ exact required confirmation phrase
++ MARXIV_APPROVAL_SECRET (local, >= 32 bytes)
++ HMAC-SHA256 human-approval artifact
+```
+
+The approval secret is never committed and must not be pasted into publication metadata or chat transcripts.
 
 ## Publication state machine
 
@@ -156,6 +154,8 @@ HUMAN_REVIEW_REQUIRED
       -> SUBMITTED_TO_ARXIV
       -> RECONCILED
 ```
+
+`APPROVAL_INTENT_CONFIRMED` is an authority/evidence fact outside the runtime state machine; it does not substitute for `APPROVED`.
 
 Failure before the final external effect:
 
@@ -214,11 +214,7 @@ A useful current discriminant is:
 D_M = L AND G AND R
 ```
 
-where:
-
-- `L` = longitudinal scientific state;
-- `G` = governed publication transition;
-- `R` = external-state reconciliation.
+where `L` = longitudinal scientific state, `G` = governed publication transition, and `R` = external-state reconciliation.
 
 This is a design discriminant, not yet a novelty claim. Prior-art review is required before claiming originality for the composition.
 
@@ -236,39 +232,28 @@ Any organism-level interpretation remains a higher-order hypothesis unless indep
 
 ## Evidence classes
 
-### PASS / implemented and exercised in the declared scope
+### PASS / implemented in the current publication branch
 
-- paper preflight assessment;
-- explicit manuscript freeze boundary;
-- deterministic preflight -> Scientific Object promotion;
 - MARXIV Scientific Object -> venue projection;
-- deterministic publication sandbox/review packet;
-- frozen-manuscript byte hashing and staging;
+- deterministic publication sandbox;
+- review packet;
 - package hashing;
-- two-root portable package identity with pinned PaperPush transport;
-- `HUMAN_REVIEW_REQUIRED` real-object preparation without credentials;
-- human approval challenge/approval machinery in automated tests;
-- mutation invalidation in automated tests;
-- authority gate before external effects in automated tests;
-- publication state machine in automated tests;
+- human approval challenge;
+- package-bound authorization logic;
+- mutation invalidation;
+- authority gate before external effects;
+- publication state machine;
 - EvidenceOS publication receipts;
 - no-auto-retry on uncertain post-submit state;
-- external identifier reconciliation logic in automated tests.
-
-Paper 1 evidence:
-
-```text
-manuscript        papers/matverse-2.0/main.tex (v0.1)
-scientific object examples/marxiv/matverse-2.0/scientific-object.v1.json
-dry-run evidence  examples/marxiv/matverse-2.0/dry-run-result.v1.json
-state             HUMAN_REVIEW_REQUIRED
-package hash      4ef1c650ccf52054cb77adc5d1a1e8d5a19785bcdbe23a644470ee707e97b2aa
-```
+- external identifier reconciliation;
+- Paper 1 real-object preparation;
+- two-root portable package identity;
+- explicit Paper 1 package-bound human approval intent record.
 
 ### HOLD
 
-- live author-authorized end-to-end arXiv publication through this runtime;
-- external arXiv identifier for Paper 1;
+- Paper 1 live cryptographic approval seal with the author's local runtime secret;
+- live author-authorized end-to-end arXiv pilot through this runtime;
 - independent external reproduction of the MARXIV publisher workflow;
 - multi-venue production validation;
 - scientific novelty claim for the full MARXIV composition;
@@ -276,20 +261,13 @@ package hash      4ef1c650ccf52054cb77adc5d1a1e8d5a19785bcdbe23a644470ee707e97b2
 
 ### Not admissible as factual results without experiments
 
-The following must not be stated as measured results unless an evidence artifact is attached:
-
-- preparation time `<5 s`;
-- submission time `<30 s`;
-- metadata error rate `<1%`;
-- 80–90% workflow time reduction;
-- Monte Carlo publication reliability figures;
-- cost claims presented as measured operational results.
+The following must not be stated as measured results unless an evidence artifact is attached: preparation time `<5 s`; submission time `<30 s`; metadata error rate `<1%`; 80–90% workflow time reduction; Monte Carlo publication reliability figures; cost claims presented as measured operational results.
 
 These may be experiment targets, not evidence.
 
 ## EvidenceOS event boundary
 
-The publisher emits or is designed around distinct events such as:
+The current publisher emits or is designed around distinct events such as:
 
 ```text
 MARXIV_PUBLICATION_SANDBOX_PREPARED
@@ -302,27 +280,17 @@ MARXIV_PUBLICATION_RECONCILED
 
 No event named `PUBLISHED` should be emitted solely because a browser automation step completed. External publication/announcement state must be independently observed and reconciled.
 
-## Current validation sequence
+## Next validation sequence
 
-Completed:
-
-1. real Paper 1 manuscript candidate;
-2. explicit human freeze for dry-run-only scope;
-3. preflight promotion;
-4. real pinned-PaperPush preparation;
-5. two-root portable package-identity proof;
-6. `HUMAN_REVIEW_REQUIRED` without credentials, approval or external side effect;
-7. committed machine-readable dry-run evidence.
-
-Still requiring separate authority/evidence:
-
-1. package review;
-2. optional approval challenge;
-3. explicit exact-package publication approval;
-4. live author-authorized arXiv pilot;
-5. external-ID reconciliation;
-6. archived post-publication EvidencePack;
-7. independent reproduction / additional venue adapters.
+1. CI must pass on the exact PR head.
+2. Paper 1 real-object no-side-effect dry-run — **PASS in declared scope**.
+3. Human package-bound approval intent — **CONFIRMED** for package `4ef1c650ccf52054cb77adc5d1a1e8d5a19785bcdbe23a644470ee707e97b2aa`.
+4. Seal that exact approval in the author's local runtime using a fresh challenge and local `MARXIV_APPROVAL_SECRET` — **HOLD**.
+5. Only after a separately explicit external-publication authorization, execute one live arXiv pilot.
+6. Reconcile the real external arXiv identifier into MARXIV state.
+7. Archive the full evidence pack: object snapshot, package hashes, approval receipt, transport receipt, external identity and reconciliation receipt.
+8. Add Zenodo/DOI as an independent transport rather than conflating venue authority.
+9. Submit the MARXIV paper using MARXIV itself as a self-hosting demonstration, while keeping scientific claims separately adjudicated.
 
 ## Canonical short form
 
@@ -336,5 +304,5 @@ RuntimePublisher = PublicationProjection
                  + Reconciliation
 
 Publication != ScientificTruth
-Prepared != Approved
+ApprovalIntent != CryptographicApproval
 ```
