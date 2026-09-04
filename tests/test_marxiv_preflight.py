@@ -33,6 +33,7 @@ def _preflight() -> dict:
                 }
             ],
             "manuscript_file": None,
+            "manuscript_confirmed": False,
             "primary_archive": None,
             "primary_category": None,
             "crosslist_archives": [],
@@ -53,9 +54,24 @@ def test_incomplete_real_object_stays_hold(tmp_path: Path) -> None:
     result = assess(path)
 
     assert result.status == "HOLD_PREPARE"
-    assert "final manuscript file is missing" in result.blockers
+    assert "manuscript file is missing" in result.blockers
     assert "arXiv primary category is missing" in result.blockers
     assert "publication license is missing" in result.blockers
+
+
+def test_existing_but_unfrozen_manuscript_stays_hold(tmp_path: Path) -> None:
+    payload = _preflight()
+    manuscript = tmp_path / "paper.tex"
+    manuscript.write_text("candidate", encoding="utf-8")
+    payload["publication_intent"]["manuscript_file"] = "paper.tex"
+    path = tmp_path / "preflight.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = assess(path)
+
+    assert result.status == "HOLD_PREPARE"
+    assert "manuscript has not been explicitly frozen/confirmed for publication" in result.blockers
+    assert result.manuscript_resolved_path == str(manuscript.resolve())
 
 
 def test_complete_preflight_promotes_without_external_effect(tmp_path: Path) -> None:
@@ -66,6 +82,7 @@ def test_complete_preflight_promotes_without_external_effect(tmp_path: Path) -> 
     intent.update(
         {
             "manuscript_file": "paper.pdf",
+            "manuscript_confirmed": True,
             "primary_archive": "cs",
             "primary_category": "cs.SE",
             "crosslist_archives": ["cs"],
