@@ -7,7 +7,7 @@ Core bridge, federation, evidence and publication runtimes.
 Governed scientific publication flow:
 
 ```text
-Scientific Object -> sandbox -> human approval -> agent publish -> external reconciliation
+Scientific Object -> metadata projection -> sandbox -> human approval -> agent publish -> external reconciliation
 ```
 
 See `MARXIV_RUNTIME_PUBLISHER_V1.md` and `app/marxiv_runtime_publisher.py`.
