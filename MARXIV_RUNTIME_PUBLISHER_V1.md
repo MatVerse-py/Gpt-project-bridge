@@ -62,6 +62,8 @@ object_hash
 
 Any changed byte, author list, abstract, category, cross-list, license or venue metadata invalidates the approval and returns the workflow to human review.
 
+The approval phrase is an explicit delegation to submit the reviewed package to the named destination under the publication metadata and license visible in `review-packet.json`. Before approving, the human must also review the venue's current submission terms/attestations that the runtime will encounter. A generic old approval is not authority to accept materially changed terms.
+
 ## Scientific Object input
 
 Example `scientific-object.json`:
@@ -149,7 +151,7 @@ This emits an expiring challenge with a random nonce and the exact confirmation 
 PUBLISH matverse-2.0-v1-arxiv 4f9a8b31d21c
 ```
 
-The human reviews `review-packet.json`, the rendered/source manuscript, authors, abstract, categories, cross-lists and selected license before approving.
+The human reviews `review-packet.json`, the rendered/source manuscript, authors, abstract, categories, cross-lists, selected license and applicable venue submission terms before approving.
 
 ## 3. Human approval
 
@@ -197,7 +199,7 @@ python -m app.marxiv_runtime_publisher publish \
 
 The runtime re-verifies the approval and every package hash **before authentication and before external effects**. If verification passes, delegated authority is active for that exact package and destination.
 
-The arXiv finalizer then executes the venue workflow using the current pinned PaperPush/Playwright transport and performs the final `Submit Article` action.
+The arXiv finalizer then executes the venue workflow using the current pinned PaperPush/Playwright transport and performs the final `Submit Article` action under the author's explicit delegated authorization.
 
 ### State semantics
 
