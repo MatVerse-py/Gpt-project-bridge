@@ -51,7 +51,7 @@ jobs:
         run: python -m py_compile app/publication_bridge.py app/marxiv_runtime_publisher.py app/marxiv_preflight.py
       - name: Run publication tests
         run: pytest -q tests/test_publication_bridge.py tests/test_marxiv_runtime_publisher.py tests/test_marxiv_preflight.py
-      - name: Assess frozen Paper 1 is ready for promotion
+      - name: Assess and promote frozen Paper 1
         shell: bash
         run: |
           set -euo pipefail
@@ -67,7 +67,15 @@ jobs:
           PY
           python -m app.marxiv_preflight promote \
             --preflight examples/marxiv/matverse-2.0/paper1-preflight.json \
-            --output /tmp/paper1-scientific-object.json > /tmp/paper1-promote-output.json
+            --output examples/marxiv/matverse-2.0/scientific-object.generated.json > /tmp/paper1-promote-output.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          generated = json.loads(Path('examples/marxiv/matverse-2.0/scientific-object.generated.json').read_text(encoding='utf-8'))
+          canonical = json.loads(Path('examples/marxiv/matverse-2.0/scientific-object.v1.json').read_text(encoding='utf-8'))
+          assert generated == canonical
+          assert generated['manuscript_file'] == '../../../papers/matverse-2.0/main.tex'
+          PY
       - name: Manuscript/preflight identity consistency
         shell: bash
         run: |
@@ -100,7 +108,7 @@ jobs:
         run: pip install -r requirements-publication.txt
       - name: Import pinned arXiv finalizer
         run: python -c "from paperpush.venues.arxiv.arxiv import ArxivVenue, license_url; assert ArxivVenue.slug == 'arxiv'; assert license_url('CC BY 4.0')"
-      - name: Governed Paper 1 dry-run to HUMAN_REVIEW_REQUIRED
+      - name: Governed Paper 1 dry-run is portable and stops at HUMAN_REVIEW_REQUIRED
         shell: bash
         env:
           ARXIV_EMAIL: ''
@@ -110,37 +118,48 @@ jobs:
           set -euo pipefail
           rm -rf .marxiv
           python -m app.marxiv_runtime_publisher prepare \
-            --object /tmp/paper1-scientific-object.json \
-            --sandbox-root .marxiv > /tmp/paper1-publisher-state.json
+            --object examples/marxiv/matverse-2.0/scientific-object.generated.json \
+            --sandbox-root .marxiv/run-a > /tmp/paper1-state-a.json
+          python -m app.marxiv_runtime_publisher prepare \
+            --object examples/marxiv/matverse-2.0/scientific-object.generated.json \
+            --sandbox-root .marxiv/run-b > /tmp/paper1-state-b.json
           python - <<'PY'
           import json
           from pathlib import Path
 
-          state = json.load(open('/tmp/paper1-publisher-state.json', encoding='utf-8'))
-          sandbox = Path('.marxiv/matverse-2.0/v1')
-          assert state['status'] == 'HUMAN_REVIEW_REQUIRED'
-          assert len(state['package_hash']) == 64
-          assert len(state['object_hash']) == 64
-          assert len(state['manifest_hash']) == 64
-          assert len(state['manuscript_sha256']) == 64
-          assert len(state['arxiv_subfile_sha256']) == 64
-          assert len(state['review_packet_hash']) == 64
-          assert (sandbox / 'scientific-object.snapshot.json').is_file()
-          assert (sandbox / 'arxiv-manifest.json').is_file()
-          assert (sandbox / 'review-packet.json').is_file()
-          assert (sandbox / 'publisher-state.json').is_file()
-          assert not (sandbox / 'approval-challenge.json').exists()
-          assert not (sandbox / 'human-approval.json').exists()
-          assert not (sandbox / 'submission-result.json').exists()
+          a = json.load(open('/tmp/paper1-state-a.json', encoding='utf-8'))
+          b = json.load(open('/tmp/paper1-state-b.json', encoding='utf-8'))
+          stable_fields = [
+              'object_hash',
+              'manifest_hash',
+              'manuscript_sha256',
+              'arxiv_subfile_sha256',
+              'review_packet_hash',
+              'package_hash',
+          ]
+          for key in stable_fields:
+              assert a[key] == b[key], (key, a[key], b[key])
+          assert a['status'] == b['status'] == 'HUMAN_REVIEW_REQUIRED'
+          assert a['publication_id'] == b['publication_id'] == 'matverse-2.0-v1-arxiv'
+          for root in (Path('.marxiv/run-a/matverse-2.0/v1'), Path('.marxiv/run-b/matverse-2.0/v1')):
+              assert (root / 'scientific-object.snapshot.json').is_file()
+              assert (root / 'arxiv-manifest.json').is_file()
+              assert (root / 'review-packet.json').is_file()
+              assert (root / 'publisher-state.json').is_file()
+              assert (root / 'manuscript' / 'main.tex').is_file()
+              assert not (root / 'approval-challenge.json').exists()
+              assert not (root / 'human-approval.json').exists()
+              assert not (root / 'submission-result.json').exists()
           print(json.dumps({
-              'status': state['status'],
-              'publication_id': state['publication_id'],
-              'package_hash': state['package_hash'],
-              'object_hash': state['object_hash'],
-              'manifest_hash': state['manifest_hash'],
-              'manuscript_sha256': state['manuscript_sha256'],
-              'arxiv_subfile_sha256': state['arxiv_subfile_sha256'],
-              'review_packet_hash': state['review_packet_hash'],
+              'status': a['status'],
+              'publication_id': a['publication_id'],
+              'portable_package_identity': True,
+              'package_hash': a['package_hash'],
+              'object_hash': a['object_hash'],
+              'manifest_hash': a['manifest_hash'],
+              'manuscript_sha256': a['manuscript_sha256'],
+              'arxiv_subfile_sha256': a['arxiv_subfile_sha256'],
+              'review_packet_hash': a['review_packet_hash'],
               'external_side_effect': False,
               'approval_created': False
           }, sort_keys=True))
