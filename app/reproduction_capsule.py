@@ -50,7 +50,14 @@ def _safe_relative(root: Path, candidate: str | os.PathLike[str]) -> Path:
     relative = Path(candidate)
     if relative.is_absolute():
         raise ValueError("capsule paths must be relative")
-    resolved = (root / relative).resolve()
+    if ".." in relative.parts:
+        raise ValueError("capsule path escapes root")
+    current = root
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError(f"symlinks are not allowed in capsules: {candidate}")
+    resolved = current.resolve()
     try:
         resolved.relative_to(root)
     except ValueError as exc:
@@ -64,15 +71,18 @@ def _collect_files(root: Path, include: Iterable[str | os.PathLike[str]]) -> tup
         resolved = _safe_relative(root, raw)
         if not resolved.exists():
             raise FileNotFoundError(str(raw))
-        if resolved.is_symlink():
-            raise ValueError(f"symlinks are not allowed in capsules: {raw}")
         if resolved.is_dir():
             for child in sorted(resolved.rglob("*")):
                 if child.is_symlink():
                     raise ValueError(f"symlinks are not allowed in capsules: {child}")
                 if child.is_file():
-                    rel = child.relative_to(root).as_posix()
-                    files[rel] = child
+                    child_resolved = child.resolve()
+                    try:
+                        child_resolved.relative_to(root)
+                    except ValueError as exc:
+                        raise ValueError("capsule path escapes root") from exc
+                    rel = child_resolved.relative_to(root).as_posix()
+                    files[rel] = child_resolved
         elif resolved.is_file():
             rel = resolved.relative_to(root).as_posix()
             files[rel] = resolved
