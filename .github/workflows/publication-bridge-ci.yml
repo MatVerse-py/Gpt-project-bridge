@@ -16,6 +16,7 @@ on:
       - 'MARXIV_CANON_V1.md'
       - 'MARXIV_PAPER1_DRY_RUN.md'
       - 'examples/marxiv/**'
+      - 'papers/matverse-2.0/**'
       - '.gitignore'
       - '.github/workflows/publication-bridge-ci.yml'
   push:
@@ -33,6 +34,7 @@ on:
       - 'MARXIV_CANON_V1.md'
       - 'MARXIV_PAPER1_DRY_RUN.md'
       - 'examples/marxiv/**'
+      - 'papers/matverse-2.0/**'
       - '.gitignore'
       - '.github/workflows/publication-bridge-ci.yml'
 
@@ -49,7 +51,7 @@ jobs:
         run: python -m py_compile app/publication_bridge.py app/marxiv_runtime_publisher.py app/marxiv_preflight.py
       - name: Run publication tests
         run: pytest -q tests/test_publication_bridge.py tests/test_marxiv_runtime_publisher.py tests/test_marxiv_preflight.py
-      - name: Assess real Paper 1 preflight is fail-closed
+      - name: Assess real Paper 1 preflight is fail-closed at human freeze boundary
         shell: bash
         run: |
           set +e
@@ -59,9 +61,28 @@ jobs:
           test "$code" -eq 2
           python - <<'PY'
           import json
+          from pathlib import Path
           data = json.load(open('/tmp/paper1-preflight.json', encoding='utf-8'))
           assert data['status'] == 'HOLD_PREPARE'
-          assert data['blockers']
+          assert data['manuscript_resolved_path'] is not None
+          assert Path(data['manuscript_resolved_path']).is_file()
+          blockers = set(data['blockers'])
+          assert 'manuscript has not been explicitly frozen/confirmed for publication' in blockers
+          assert 'manuscript file is missing' not in blockers
+          PY
+      - name: Manuscript/preflight identity consistency
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path('examples/marxiv/matverse-2.0/paper1-preflight.json').read_text(encoding='utf-8'))
+          tex = Path('papers/matverse-2.0/main.tex').read_text(encoding='utf-8')
+          assert p['title'] in tex
+          assert p['abstract'] in tex
+          assert p['publication_intent']['authors'][0]['name'].replace('ê', r'\^e') in tex or 'Mateus Alves Ar' in tex
+          assert p['publication_intent']['authors'][0]['orcid'] in tex
+          assert '\\begin{document}' in tex and '\\end{document}' in tex
           PY
       - name: Install pinned publication transport
         run: pip install -r requirements-publication.txt
