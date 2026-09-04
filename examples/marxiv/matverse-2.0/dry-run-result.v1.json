@@ -17,6 +17,9 @@
   "review_packet_hash": "c95b77fbd18b9e468e741d747b86cbe9c43a6fcf79094ce5f9c98c0239be2ffe",
   "package_hash": "4ef1c650ccf52054cb77adc5d1a1e8d5a19785bcdbe23a644470ee707e97b2aa",
   "credentials_present": false,
+  "approval_intent": "CONFIRMED_FOR_EXACT_PACKAGE",
+  "approval_intent_artifact": "approval-intent.v1.json",
+  "cryptographic_approval": "HOLD_LOCAL_CRYPTOGRAPHIC_SEAL",
   "approval_created": false,
   "approval_challenge_created": false,
   "external_side_effect": false,
@@ -24,6 +27,7 @@
   "live_arxiv_publication": "HOLD",
   "independent_external_reproduction": "HOLD",
   "scientific_novelty": "HOLD_PRIOR_ART_REVIEW",
-  "authority_scope": "FREEZE_AND_DRY_RUN_ONLY",
-  "evidence_note": "Two real preparations using the pinned PaperPush transport at commit 3cc701d91bf78c046f008477baad40e7fa53ff4f were executed in distinct sandbox roots. The six canonical package components were identical and both stopped at HUMAN_REVIEW_REQUIRED. No arXiv credentials, approval artifact, approval challenge, browser submission, or external side effect was used."
+  "authority_scope": "APPROVE_EXACT_PACKAGE_ONLY",
+  "external_submission_authorized": false,
+  "evidence_note": "Two real preparations using the pinned PaperPush transport at commit 3cc701d91bf78c046f008477baad40e7fa53ff4f were executed in distinct sandbox roots. The six canonical package components were identical and both stopped at HUMAN_REVIEW_REQUIRED. The human authority subsequently confirmed approval intent for the exact package hash, but no live approval challenge, MARXIV approval secret, cryptographic human-approval artifact, arXiv credential, browser submission, or external side effect has been used. Runtime APPROVED therefore remains fail-closed pending local cryptographic sealing."
 }
