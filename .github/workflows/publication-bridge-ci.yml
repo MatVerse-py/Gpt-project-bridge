@@ -75,11 +75,20 @@ jobs:
         run: |
           python - <<'PY'
           import json
+          import re
           from pathlib import Path
+
           p = json.loads(Path('examples/marxiv/matverse-2.0/paper1-preflight.json').read_text(encoding='utf-8'))
           tex = Path('papers/matverse-2.0/main.tex').read_text(encoding='utf-8')
+
+          def normalize_text(value: str) -> str:
+              value = value.replace(r'$\Omega$', 'Ω').replace(r'\Omega', 'Ω')
+              return ' '.join(value.split())
+
+          abstract_match = re.search(r'\\begin\{abstract\}(.*?)\\end\{abstract\}', tex, re.S)
+          assert abstract_match is not None
           assert p['title'] in tex
-          assert p['abstract'] in tex
+          assert normalize_text(p['abstract']) == normalize_text(abstract_match.group(1))
           assert p['publication_intent']['authors'][0]['name'].replace('ê', r'\^e') in tex or 'Mateus Alves Ar' in tex
           assert p['publication_intent']['authors'][0]['orcid'] in tex
           assert '\\begin{document}' in tex and '\\end{document}' in tex
