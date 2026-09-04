@@ -36,7 +36,7 @@ For the full governed lifecycle, use `app.marxiv_runtime_publisher` and see `MAR
 - author/browser review transport;
 - tamper verification.
 
-The MARXIV Runtime Publisher adds the higher-order authority model in which the human approves the exact immutable publication package before delegated final submission authority becomes active.
+The MARXIV Runtime Publisher adds the higher-order authority model in which the human reviews and approves the exact immutable publication package before delegated final-submission authority becomes active.
 
 ## Runtime credentials
 
