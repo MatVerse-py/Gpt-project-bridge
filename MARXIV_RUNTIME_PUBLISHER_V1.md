@@ -2,32 +2,56 @@
 
 ## Status
 
-`IMPLEMENTED / LIVE_ARXIV_FINALIZER_NOT_YET_PILOTED`
+`IMPLEMENTED / PAPER1_MANUSCRIPT_CANDIDATE / LIVE_ARXIV_FINALIZER_NOT_YET_PILOTED`
 
-## Canonical scientific boundary
+Canonical scientific boundary: see `MARXIV_CANON_V1.md`.
 
-This runtime is governed by [`MARXIV_CANON_V1.md`](./MARXIV_CANON_V1.md).
+This runtime couples MARXIV Scientific Objects to the governed MatVerse Publication Bridge. It is split into two planes:
 
-The canonical invariants are:
-
-```text
-MARXIV = Governed Lifecycle Runtime for Scientific Objects
-Publication != ScientificTruth
-Organizer != Authorizer != Publication Authority
-```
-
-The Runtime Publisher is an implemented governed external-effector subsystem. It is **not** evidence by itself that OCG, digital life, autopoiesis, consciousness or a new biological class has been demonstrated. Claims about measured publication speed, error-rate reduction, Monte Carlo reliability or operational cost remain inadmissible as factual results unless an experiment artifact is attached.
-
-This runtime couples MARXIV Scientific Objects to the governed MatVerse Publication Bridge. It is deliberately split into two planes:
-
-- **MARXIV plane** — scientific object, metadata organization, claims/evidence/lineage, sandbox, approval, state and reconciliation.
+- **MARXIV plane** — scientific object, metadata organization, claims/evidence/lineage, preflight, sandbox, approval, state and reconciliation.
 - **Publication transport plane** — venue-specific validation, authentication and submission mechanics.
 
 The venue never becomes the canonical source of the scientific object. arXiv receives a frozen publication projection of a MARXIV object.
 
+## Preflight before Scientific Object promotion
+
+A paper may exist in the corpus before it is ready to become a publication object. `app/marxiv_preflight.py` formalizes that boundary:
+
+```text
+paper-preflight.json
+      -> assess
+      -> HOLD_PREPARE | READY_FOR_PROMOTION
+      -> promote
+      -> marxiv.scientific-object.v1
+```
+
+The preflight distinguishes:
+
+```text
+manuscript absent
+!= manuscript candidate exists
+!= manuscript frozen for publication
+```
+
+Promotion requires explicit resolution of author identity, manuscript existence and freeze, arXiv category, cross-list decision, license and final abstract confirmation. A manuscript merely existing in Git is not publication authority.
+
+The first real preflight is recorded at:
+
+`examples/marxiv/matverse-2.0/paper1-preflight.json`
+
+Its manuscript candidate is:
+
+`papers/matverse-2.0/main.tex`
+
+Current Paper 1 state is `HOLD_PREPARE` at the human manuscript/venue-choice boundary.
+
 ## Authority model
 
 ```text
+Paper Preflight
+      |
+      | assess/promote only when complete
+      v
 Scientific Object
       |
       v
@@ -62,7 +86,7 @@ RECONCILED
 
 The agent has **no publication authority before approval**.
 
-Approval is not bound to a paper title or filename. It is bound to the exact package:
+Approval is bound to the exact package:
 
 ```text
 object_hash
@@ -74,7 +98,7 @@ object_hash
 = package_hash
 ```
 
-Any changed byte, author list, abstract, category, cross-list, license or venue metadata invalidates the approval and returns the workflow to human review.
+Any changed byte, author list, abstract, category, cross-list, license or venue metadata invalidates approval and returns the workflow to human review.
 
 The approval phrase is an explicit delegation to submit the reviewed package to the named destination under the publication metadata and license visible in `review-packet.json`. Before approving, the human must also review the venue's current submission terms/attestations that the runtime will encounter. A generic old approval is not authority to accept materially changed terms.
 
@@ -161,7 +185,7 @@ Pre-submit failure -> `HOLD_PRE_SUBMIT`.
 
 Uncertain state after final external click -> `HOLD_RECONCILIATION_REQUIRED` with **no automatic retry**.
 
-`SUBMITTED_TO_ARXIV` is not a claim that arXiv moderation/announcement has accepted the paper and never promotes the scientific truth-state of its claims automatically.
+`SUBMITTED_TO_ARXIV` is not a claim that arXiv moderation/announcement has accepted the paper and never promotes scientific claim state automatically.
 
 ## Reconcile external identity
 
@@ -183,17 +207,20 @@ The external identifier is written back into publisher state with an EvidenceOS 
 ## Security invariants
 
 1. `Generator != Authorizer`.
-2. Approval is package-bound and expires.
-3. Credentials do not enter persistent MARXIV state.
-4. Package mutation invalidates approval.
-5. External effects are blocked until approval verifies.
-6. Unknown post-click state is HOLD, never retry.
-7. External identity is reconciled only after an external effect exists.
-8. `.marxiv/` and approval artifacts are excluded from Git.
-9. Publication state never silently promotes epistemic claim state.
+2. `ManuscriptCandidate != FrozenManuscript`.
+3. Approval is package-bound and expires.
+4. Credentials do not enter persistent MARXIV state.
+5. Package mutation invalidates approval.
+6. External effects are blocked until approval verifies.
+7. Unknown post-click state is HOLD, never retry.
+8. External identity is reconciled only after an external effect exists.
+9. `.marxiv/` and approval artifacts are excluded from Git.
+10. `Publication != ScientificTruth`.
 
 ## Current evidence boundary
 
-Implemented and CI-testable: MARXIV object projection, deterministic sandbox/review packet, package hashing, human challenge/approval, mutation invalidation, authority gate, publication state machine, EvidenceOS receipts, no-auto-retry and identifier reconciliation.
+Implemented and CI-testable: paper preflight assessment/promotion, MARXIV object projection, deterministic sandbox/review packet, package hashing, human challenge/approval, mutation invalidation, authority gate, publication state machine, EvidenceOS receipts, no-auto-retry and identifier reconciliation.
+
+Paper 1 now has a tracked LaTeX manuscript candidate, but it has not yet been frozen by human authority as the submission manuscript. Venue category/cross-list/license decisions also remain human-controlled until explicitly confirmed.
 
 The finalizer follows the current arXiv workflow encoded by the pinned PaperPush adapter. A real author-authorized final submission through this MARXIV runtime has **not yet been executed as a live pilot**. Until then, live portal completion remains an operational validation target, not a claimed result.
