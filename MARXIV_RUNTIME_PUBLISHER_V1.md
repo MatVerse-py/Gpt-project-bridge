@@ -74,13 +74,7 @@ Example `scientific-object.json`:
   "object_id": "matverse-2.0",
   "version": "v1",
   "title": "MATVERSE 2.0: A Constitutional Architecture for Governed Informational Transformation in Federated Research Systems",
-  "authors": [
-    {
-      "name": "Author Name",
-      "orcid": null,
-      "affiliation": null
-    }
-  ],
+  "authors": [{"name": "Author Name", "orcid": null, "affiliation": null}],
   "abstract": "Full publication abstract goes here.",
   "manuscript_file": "./paper.zip",
   "keywords": ["AI governance", "reproducibility"],
@@ -107,150 +101,63 @@ Example `scientific-object.json`:
 
 MARXIV-only metadata such as ORCID, affiliation, claims, evidence and lineage remains in the Scientific Object/review packet even when a target venue does not accept those fields.
 
-## 1. Prepare in sandbox
+## Prepare in sandbox
 
 ```bash
-python -m app.marxiv_runtime_publisher prepare \
-  --object /absolute/path/scientific-object.json \
-  --sandbox-root .marxiv
+python -m app.marxiv_runtime_publisher prepare --object /absolute/path/scientific-object.json --sandbox-root .marxiv
 ```
 
-The sandbox is created as:
+The sandbox freezes the Scientific Object, venue manifest, review packet, transport files and package hashes. State becomes `HUMAN_REVIEW_REQUIRED`.
 
-```text
-.marxiv/<object_id>/<version>/
-├── scientific-object.snapshot.json
-├── arxiv-manifest.json
-├── review-packet.json
-├── publisher-state.json
-└── transport/<publication_id>/
-    ├── arxiv.sub
-    ├── values.json
-    ├── manifest.snapshot.json
-    └── publication-state.json
-```
-
-At this point the state is:
-
-```text
-HUMAN_REVIEW_REQUIRED
-```
-
-The agent may organize metadata and prepare the projection, but cannot publish.
-
-## 2. Request human approval
+## Request and grant human approval
 
 ```bash
-python -m app.marxiv_runtime_publisher request-approval \
-  --sandbox .marxiv/matverse-2.0/v1
-```
-
-This emits an expiring challenge with a random nonce and the exact confirmation phrase, for example:
-
-```text
-PUBLISH matverse-2.0-v1-arxiv 4f9a8b31d21c
-```
-
-The human reviews `review-packet.json`, the rendered/source manuscript, authors, abstract, categories, cross-lists, selected license and applicable venue submission terms before approving.
-
-## 3. Human approval
-
-Create a local approval signing secret. It is never committed:
-
-```bash
+python -m app.marxiv_runtime_publisher request-approval --sandbox .marxiv/matverse-2.0/v1
 export MARXIV_APPROVAL_SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+python -m app.marxiv_runtime_publisher approve --sandbox .marxiv/matverse-2.0/v1 --approver human-authority --confirm 'PUBLISH matverse-2.0-v1-arxiv 4f9a8b31d21c'
+python -m app.marxiv_runtime_publisher verify-approval --sandbox .marxiv/matverse-2.0/v1
 ```
 
-Approve exactly the prepared package:
+The approval is HMAC-bound to the exact package and an expiring random challenge.
 
-```bash
-python -m app.marxiv_runtime_publisher approve \
-  --sandbox .marxiv/matverse-2.0/v1 \
-  --approver human-authority \
-  --confirm 'PUBLISH matverse-2.0-v1-arxiv 4f9a8b31d21c'
-```
-
-The resulting `human-approval.json` is HMAC-bound to the package and the expiring challenge. It is a local runtime authorization artifact and is gitignored.
-
-Verify before publication:
-
-```bash
-python -m app.marxiv_runtime_publisher verify-approval \
-  --sandbox .marxiv/matverse-2.0/v1
-```
-
-## 4. Author-authorized arXiv credentials
-
-Credentials are runtime-only inputs:
+## Author-authorized credentials
 
 ```bash
 export ARXIV_EMAIL='author-account@example.org'
 export ARXIV_PASSWORD='use-the-real-password-only-in-your-local-environment'
 ```
 
-Do not put credentials in Scientific Objects, manifests, review packets, receipts, Git or chat messages.
+Credentials never enter Scientific Objects, manifests, receipts, Git or chat messages.
 
-## 5. Agent publication after human OK
-
-```bash
-python -m app.marxiv_runtime_publisher publish \
-  --sandbox .marxiv/matverse-2.0/v1
-```
-
-The runtime re-verifies the approval and every package hash **before authentication and before external effects**. If verification passes, delegated authority is active for that exact package and destination.
-
-The arXiv finalizer then executes the venue workflow using the current pinned PaperPush/Playwright transport and performs the final `Submit Article` action under the author's explicit delegated authorization.
-
-### State semantics
-
-```text
-HUMAN_REVIEW_REQUIRED
-  -> APPROVED
-  -> SUBMITTING
-  -> SUBMITTED_TO_ARXIV
-  -> RECONCILED
-```
-
-Failure before the final arXiv click:
-
-```text
-HOLD_PRE_SUBMIT
-```
-
-Uncertainty or transport failure after the final click:
-
-```text
-HOLD_RECONCILIATION_REQUIRED
-```
-
-The runtime **never automatically retries** from `HOLD_RECONCILIATION_REQUIRED`, because doing so could create a duplicate submission.
-
-`SUBMITTED_TO_ARXIV` means the submission action was performed and the portal confirmation heuristic was observed. It does **not** mean moderation/announcement/acceptance by arXiv.
-
-## 6. Reconcile external arXiv identity
-
-Once the real identifier is known:
+## Agent publication after human OK
 
 ```bash
-python -m app.marxiv_runtime_publisher reconcile \
-  --sandbox .marxiv/matverse-2.0/v1 \
-  --arxiv-id 2609.12345
+python -m app.marxiv_runtime_publisher publish --sandbox .marxiv/matverse-2.0/v1
 ```
 
-The identifier is written back into the MARXIV publisher state with a new EvidenceOS receipt:
+The runtime re-verifies approval and all hashes before external effects. If valid, delegated authority becomes active for that exact package/destination, and the finalizer performs the current arXiv submission flow including `Submit Article`.
+
+State flow:
 
 ```text
-MARXIV Scientific Object
-  -> publication projection
-  -> human approval
-  -> venue submission
-  -> external identifier
-  -> MARXIV lineage/state
+HUMAN_REVIEW_REQUIRED -> APPROVED -> SUBMITTING -> SUBMITTED_TO_ARXIV -> RECONCILED
 ```
+
+Pre-submit failure -> `HOLD_PRE_SUBMIT`.
+
+Uncertain state after final external click -> `HOLD_RECONCILIATION_REQUIRED` with **no automatic retry**.
+
+`SUBMITTED_TO_ARXIV` is not a claim that arXiv moderation/announcement has accepted the paper.
+
+## Reconcile external identity
+
+```bash
+python -m app.marxiv_runtime_publisher reconcile --sandbox .marxiv/matverse-2.0/v1 --arxiv-id 2609.12345
+```
+
+The external identifier is written back into publisher state with an EvidenceOS receipt.
 
 ## Receipts
-
-The runtime emits deterministic EvidenceOS receipts for:
 
 - `MARXIV_PUBLICATION_SANDBOX_PREPARED`
 - `MARXIV_HUMAN_PUBLICATION_APPROVAL`
@@ -259,31 +166,19 @@ The runtime emits deterministic EvidenceOS receipts for:
 - `MARXIV_PUBLICATION_HOLD`
 - `MARXIV_PUBLICATION_RECONCILED`
 
-No receipt claims that arXiv moderation accepted the paper unless that state is independently observed and reconciled.
-
 ## Security invariants
 
-1. `Generator != Authorizer`: the metadata-organizing agent cannot create its own valid human approval without the local approval secret.
+1. `Generator != Authorizer`.
 2. Approval is package-bound and expires.
 3. Credentials do not enter persistent MARXIV state.
-4. Any package mutation invalidates approval.
-5. External side effects are blocked until approval verifies.
-6. Unknown state after final external effect is `HOLD_RECONCILIATION_REQUIRED`, not retry.
-7. arXiv ID is reconciled only after a submission effect exists.
+4. Package mutation invalidates approval.
+5. External effects are blocked until approval verifies.
+6. Unknown post-click state is HOLD, never retry.
+7. External identity is reconciled only after an external effect exists.
 8. `.marxiv/` and approval artifacts are excluded from Git.
 
 ## Current evidence boundary
 
-Implemented and CI-testable now:
+Implemented and CI-testable: MARXIV object projection, deterministic sandbox/review packet, package hashing, human challenge/approval, mutation invalidation, authority gate, publication state machine, EvidenceOS receipts, no-auto-retry and identifier reconciliation.
 
-- MARXIV object -> arXiv projection;
-- deterministic sandbox and review packet;
-- package hashing;
-- human challenge/approval binding;
-- mutation invalidation;
-- authority gate before publish;
-- state machine and EvidenceOS receipts;
-- no-auto-retry after an uncertain final effect;
-- external identifier reconciliation.
-
-The finalizer follows the current arXiv workflow encoded by the pinned PaperPush arXiv adapter. A real author-authorized final submission through this MARXIV runtime has **not yet been executed as a live pilot**. Until that pilot succeeds, live portal completion remains an operational validation target, not a claimed result.
+The finalizer follows the current arXiv workflow encoded by the pinned PaperPush adapter. A real author-authorized final submission through this MARXIV runtime has **not yet been executed as a live pilot**. Until then, live portal completion remains an operational validation target, not a claimed result.
