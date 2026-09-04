@@ -51,25 +51,23 @@ jobs:
         run: python -m py_compile app/publication_bridge.py app/marxiv_runtime_publisher.py app/marxiv_preflight.py
       - name: Run publication tests
         run: pytest -q tests/test_publication_bridge.py tests/test_marxiv_runtime_publisher.py tests/test_marxiv_preflight.py
-      - name: Assess real Paper 1 preflight is fail-closed at human freeze boundary
+      - name: Assess frozen Paper 1 is ready for promotion
         shell: bash
         run: |
-          set +e
+          set -euo pipefail
           python -m app.marxiv_preflight assess --preflight examples/marxiv/matverse-2.0/paper1-preflight.json > /tmp/paper1-preflight.json
-          code=$?
-          set -e
-          test "$code" -eq 2
           python - <<'PY'
           import json
           from pathlib import Path
           data = json.load(open('/tmp/paper1-preflight.json', encoding='utf-8'))
-          assert data['status'] == 'HOLD_PREPARE'
+          assert data['status'] == 'READY_FOR_PROMOTION'
+          assert data['blockers'] == []
           assert data['manuscript_resolved_path'] is not None
           assert Path(data['manuscript_resolved_path']).is_file()
-          blockers = set(data['blockers'])
-          assert 'manuscript has not been explicitly frozen/confirmed for publication' in blockers
-          assert 'manuscript file is missing' not in blockers
           PY
+          python -m app.marxiv_preflight promote \
+            --preflight examples/marxiv/matverse-2.0/paper1-preflight.json \
+            --output /tmp/paper1-scientific-object.json > /tmp/paper1-promote-output.json
       - name: Manuscript/preflight identity consistency
         shell: bash
         run: |
@@ -91,12 +89,62 @@ jobs:
           assert normalize_text(p['abstract']) == normalize_text(abstract_match.group(1))
           assert p['publication_intent']['authors'][0]['name'].replace('ê', r'\^e') in tex or 'Mateus Alves Ar' in tex
           assert p['publication_intent']['authors'][0]['orcid'] in tex
+          assert p['publication_intent']['manuscript_confirmed'] is True
+          assert p['publication_intent']['primary_category'] == 'cs.SE'
+          assert p['publication_intent']['crosslist_categories'] == ['cs.AI']
+          assert p['publication_intent']['license'] == 'CC BY 4.0'
+          assert p['authority']['external_submission_authorized'] is False
           assert '\\begin{document}' in tex and '\\end{document}' in tex
           PY
       - name: Install pinned publication transport
         run: pip install -r requirements-publication.txt
       - name: Import pinned arXiv finalizer
         run: python -c "from paperpush.venues.arxiv.arxiv import ArxivVenue, license_url; assert ArxivVenue.slug == 'arxiv'; assert license_url('CC BY 4.0')"
+      - name: Governed Paper 1 dry-run to HUMAN_REVIEW_REQUIRED
+        shell: bash
+        env:
+          ARXIV_EMAIL: ''
+          ARXIV_PASSWORD: ''
+          MARXIV_APPROVAL_SECRET: ''
+        run: |
+          set -euo pipefail
+          rm -rf .marxiv
+          python -m app.marxiv_runtime_publisher prepare \
+            --object /tmp/paper1-scientific-object.json \
+            --sandbox-root .marxiv > /tmp/paper1-publisher-state.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          state = json.load(open('/tmp/paper1-publisher-state.json', encoding='utf-8'))
+          sandbox = Path('.marxiv/matverse-2.0/v1')
+          assert state['status'] == 'HUMAN_REVIEW_REQUIRED'
+          assert len(state['package_hash']) == 64
+          assert len(state['object_hash']) == 64
+          assert len(state['manifest_hash']) == 64
+          assert len(state['manuscript_sha256']) == 64
+          assert len(state['arxiv_subfile_sha256']) == 64
+          assert len(state['review_packet_hash']) == 64
+          assert (sandbox / 'scientific-object.snapshot.json').is_file()
+          assert (sandbox / 'arxiv-manifest.json').is_file()
+          assert (sandbox / 'review-packet.json').is_file()
+          assert (sandbox / 'publisher-state.json').is_file()
+          assert not (sandbox / 'approval-challenge.json').exists()
+          assert not (sandbox / 'human-approval.json').exists()
+          assert not (sandbox / 'submission-result.json').exists()
+          print(json.dumps({
+              'status': state['status'],
+              'publication_id': state['publication_id'],
+              'package_hash': state['package_hash'],
+              'object_hash': state['object_hash'],
+              'manifest_hash': state['manifest_hash'],
+              'manuscript_sha256': state['manuscript_sha256'],
+              'arxiv_subfile_sha256': state['arxiv_subfile_sha256'],
+              'review_packet_hash': state['review_packet_hash'],
+              'external_side_effect': False,
+              'approval_created': False
+          }, sort_keys=True))
+          PY
       - name: Secret-boundary static check
         shell: bash
         run: |
@@ -106,7 +154,7 @@ jobs:
             echo 'Credential-like assignment found in tracked runtime/test files.' >&2
             exit 1
           fi
-          if find . -type f \( -name 'human-approval.json' -o -name 'approval-challenge.json' -o -name 'publisher-state.json' \) -not -path './.git/*' | grep -q .; then
-            echo 'Runtime approval/sandbox artifact committed to repository.' >&2
+          if find . -type f \( -name 'human-approval.json' -o -name 'approval-challenge.json' \) -not -path './.git/*' | grep -q .; then
+            echo 'Approval artifact unexpectedly created or committed.' >&2
             exit 1
           fi
