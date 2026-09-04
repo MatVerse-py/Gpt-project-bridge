@@ -1,0 +1,187 @@
+name: MARXIV approval seal
+
+on:
+  workflow_dispatch:
+    inputs:
+      approval_intent:
+        description: 'Tracked approval-intent file bound to the exact package'
+        required: true
+        default: 'examples/marxiv/matverse-2.0/approval-intent.v1.json'
+        type: string
+      scientific_object:
+        description: 'Canonical Scientific Object to reconstruct before sealing'
+        required: true
+        default: 'examples/marxiv/matverse-2.0/scientific-object.v1.json'
+        type: string
+      approver_id:
+        description: 'Non-secret approver identifier recorded in the approval receipt'
+        required: true
+        default: 'author-human-authority'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  seal:
+    runs-on: ubuntu-latest
+    env:
+      MARXIV_APPROVAL_SECRET: ${{ secrets.MARXIV_APPROVAL_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install runtime dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install pinned publication transport
+        run: pip install -r requirements-publication.txt
+
+      - name: Fail closed if approval secret is unavailable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${MARXIV_APPROVAL_SECRET:-}" || {
+            echo 'MARXIV_APPROVAL_SECRET is not provisioned in GitHub Actions secrets.' >&2
+            exit 2
+          }
+          python - <<'PY'
+          import os
+          value = os.environ['MARXIV_APPROVAL_SECRET'].encode('utf-8')
+          if len(value) < 32:
+              raise SystemExit('MARXIV_APPROVAL_SECRET must contain at least 32 bytes')
+          PY
+
+      - name: Reconstruct exact package and validate approval intent
+        shell: bash
+        env:
+          APPROVAL_INTENT: ${{ inputs.approval_intent }}
+          SCIENTIFIC_OBJECT: ${{ inputs.scientific_object }}
+        run: |
+          set -euo pipefail
+          rm -rf .marxiv/approval-seal
+          python -m app.marxiv_runtime_publisher prepare \
+            --object "$SCIENTIFIC_OBJECT" \
+            --sandbox-root .marxiv/approval-seal > /tmp/prepared-state.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          intent = json.loads(Path(os.environ['APPROVAL_INTENT']).read_text(encoding='utf-8'))
+          state = json.loads(Path('/tmp/prepared-state.json').read_text(encoding='utf-8'))
+
+          assert intent['schema'] == 'marxiv.approval-intent.v1'
+          assert intent['human_confirmation'] == 'CONFIRMED'
+          assert intent['authority_scope'] == 'APPROVE_EXACT_PACKAGE_ONLY'
+          assert intent['external_submission_authorized'] is False
+          assert state['status'] == 'HUMAN_REVIEW_REQUIRED'
+          assert state['package_hash'] == intent['package_hash']
+          assert state['publication_id'] == intent['publication_id']
+          PY
+
+      - name: Create fresh challenge and seal exact package
+        shell: bash
+        env:
+          APPROVAL_INTENT: ${{ inputs.approval_intent }}
+          APPROVER_ID: ${{ inputs.approver_id }}
+        run: |
+          set -euo pipefail
+          SANDBOX=.marxiv/approval-seal/matverse-2.0/v1
+
+          python -m app.marxiv_runtime_publisher request-approval \
+            --sandbox "$SANDBOX" \
+            --ttl-seconds 7200 > /tmp/challenge.json
+
+          CONFIRMATION=$(python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('/tmp/challenge.json').read_text(encoding='utf-8'))
+          print(data['required_confirmation'])
+          PY
+          )
+
+          EXPECTED=$(python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          intent = json.loads(Path(os.environ['APPROVAL_INTENT']).read_text(encoding='utf-8'))
+          print(intent['required_runtime_confirmation'])
+          PY
+          )
+
+          test "$CONFIRMATION" = "$EXPECTED" || {
+            echo 'Fresh challenge does not match tracked package-bound approval intent.' >&2
+            exit 3
+          }
+
+          python -m app.marxiv_runtime_publisher approve \
+            --sandbox "$SANDBOX" \
+            --approver "$APPROVER_ID" \
+            --confirm "$CONFIRMATION" > /tmp/human-approval.json
+
+          python -m app.marxiv_runtime_publisher verify-approval \
+            --sandbox "$SANDBOX" > /tmp/approval-verification.json
+
+      - name: Assert no external publication effect occurred
+        shell: bash
+        run: |
+          set -euo pipefail
+          SANDBOX=.marxiv/approval-seal/matverse-2.0/v1
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('.marxiv/approval-seal/matverse-2.0/v1')
+          state = json.loads((root / 'publisher-state.json').read_text(encoding='utf-8'))
+          verification = json.loads(Path('/tmp/approval-verification.json').read_text(encoding='utf-8'))
+
+          assert state['status'] == 'APPROVED'
+          assert verification['ok'] is True
+          assert state['external_identifier'] is None
+          assert not (root / 'submission-result.json').exists()
+          PY
+
+      - name: Build non-secret approval evidence pack
+        shell: bash
+        env:
+          APPROVAL_INTENT: ${{ inputs.approval_intent }}
+        run: |
+          set -euo pipefail
+          SANDBOX=.marxiv/approval-seal/matverse-2.0/v1
+          mkdir -p /tmp/marxiv-approval-evidence
+          cp "$APPROVAL_INTENT" /tmp/marxiv-approval-evidence/approval-intent.json
+          cp "$SANDBOX/approval-challenge.json" /tmp/marxiv-approval-evidence/approval-challenge.json
+          cp "$SANDBOX/human-approval.json" /tmp/marxiv-approval-evidence/human-approval.json
+          cp "$SANDBOX/publisher-state.json" /tmp/marxiv-approval-evidence/publisher-state.json
+          cp /tmp/approval-verification.json /tmp/marxiv-approval-evidence/approval-verification.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('/tmp/marxiv-approval-evidence')
+          state = json.loads((root / 'publisher-state.json').read_text(encoding='utf-8'))
+          verification = json.loads((root / 'approval-verification.json').read_text(encoding='utf-8'))
+          summary = {
+              'schema': 'marxiv.approval-seal-evidence.v1',
+              'publication_id': state['publication_id'],
+              'package_hash': state['package_hash'],
+              'status': state['status'],
+              'approval_verified': verification['ok'],
+              'external_side_effect': False,
+              'external_identifier': state['external_identifier'],
+              'secret_persisted': False,
+          }
+          (root / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
+          PY
+
+      - name: Upload approval evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: marxiv-paper1-approval-seal
+          path: /tmp/marxiv-approval-evidence
+          if-no-files-found: error
+          retention-days: 30
