@@ -4,6 +4,7 @@ import pytest
 
 from app.deterministic_lab import (
     DeterministicFaultPlan,
+    FaultDirective,
     FaultInjectingExecutor,
     FaultKind,
     plan_fingerprint,
@@ -29,11 +30,7 @@ def test_fault_injecting_executor_is_replayable():
     plan = DeterministicFaultPlan(
         seed=3,
         cycles=3,
-        directives=(
-            # invocation index is intentionally the deterministic execution clock
-            # for executor-level faults.
-            __import__("app.deterministic_lab", fromlist=["FaultDirective"]).FaultDirective(2, FaultKind.EXECUTOR_ERROR),
-        ),
+        directives=(FaultDirective(2, FaultKind.EXECUTOR_ERROR),),
     )
 
     def delegate(proposal):
