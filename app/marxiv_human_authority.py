@@ -102,6 +102,8 @@ def _fingerprint(raw_public_key: bytes) -> str:
 def initialize_authority(*, authority_id: str, private_key_path: Path, public_registry_path: Path) -> HumanAuthority:
     private_key_path = private_key_path.expanduser().resolve()
     public_registry_path = public_registry_path.expanduser().resolve()
+    if private_key_path == public_registry_path:
+        raise HumanAuthorityError("private key and public authority registry must use different paths")
     if private_key_path.exists():
         raise HumanAuthorityError(f"refusing to overwrite existing private key: {private_key_path}")
     if public_registry_path.exists():
