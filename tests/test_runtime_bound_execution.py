@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from app.core import Decision
+from app.core import Decision, stable_hash
 from app.deterministic_lab import DeterministicFaultPlan, DeterministicTelemetry
 from app.organism_loop import GovernedOrganism
 from app.physiology import DurableEventJournal, ExecutionResult, PhysiologyEngine
@@ -72,6 +72,32 @@ def test_standalone_binding_validation_recomputes_hash() -> None:
     valid, reason = validate_execution_binding(forged)
     assert valid is False
     assert reason == "binding_hash_mismatch"
+
+
+def test_self_consistent_binding_with_extra_fields_is_rejected() -> None:
+    binding = _binding()
+    expanded = deepcopy(binding)
+    expanded["secret"] = "must-not-flow"
+    body = {key: value for key, value in expanded.items() if key != "binding_hash"}
+    expanded["binding_hash"] = stable_hash(body)
+
+    valid, reason = validate_execution_binding(expanded)
+
+    assert valid is False
+    assert reason == "unexpected_binding_fields"
+
+
+def test_self_consistent_nested_runtime_extension_is_rejected() -> None:
+    binding = _binding()
+    expanded = deepcopy(binding)
+    expanded["runtime"]["credential_hint"] = "must-not-flow"
+    body = {key: value for key, value in expanded.items() if key != "binding_hash"}
+    expanded["binding_hash"] = stable_hash(body)
+
+    valid, reason = validate_execution_binding(expanded)
+
+    assert valid is False
+    assert reason == "unexpected_runtime_identity_fields"
 
 
 def test_bound_executor_receives_exact_identity_after_omega_pass(tmp_path) -> None:
