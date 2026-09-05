@@ -1,0 +1,191 @@
+name: MARXIV Execution Delegation V1 CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/marxiv_execution_delegation.py'
+      - 'app/marxiv_human_authority.py'
+      - 'app/marxiv_runtime_publisher.py'
+      - 'app/publication_bridge.py'
+      - 'tests/test_marxiv_execution_delegation.py'
+      - 'tests/test_marxiv_human_authority.py'
+      - 'tests/test_marxiv_runtime_publisher.py'
+      - '.github/workflows/marxiv-execution-delegation-v1-ci.yml'
+      - 'MARXIV_EXECUTION_DELEGATION_V1.md'
+  push:
+    branches: [marxiv/execution-delegation-v1]
+    paths:
+      - 'app/marxiv_execution_delegation.py'
+      - 'app/marxiv_human_authority.py'
+      - 'app/marxiv_runtime_publisher.py'
+      - 'app/publication_bridge.py'
+      - 'tests/test_marxiv_execution_delegation.py'
+      - 'tests/test_marxiv_human_authority.py'
+      - 'tests/test_marxiv_runtime_publisher.py'
+      - '.github/workflows/marxiv-execution-delegation-v1-ci.yml'
+      - 'MARXIV_EXECUTION_DELEGATION_V1.md'
+
+permissions:
+  contents: read
+
+jobs:
+  execution-delegation-v1:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install runtime dependencies
+        run: pip install -r requirements.txt
+
+      - name: Compile delegation and human-authority modules
+        run: |
+          python -m py_compile app/marxiv_execution_delegation.py
+          python -m py_compile app/marxiv_human_authority.py
+
+      - name: Run delegation unit tests
+        run: pytest -q tests/test_marxiv_execution_delegation.py
+
+      - name: Install pinned publication transport
+        run: pip install -r requirements-publication.txt
+
+      - name: End-to-end Paper 1 approval to local execution context
+        shell: bash
+        env:
+          ARXIV_EMAIL: ''
+          ARXIV_PASSWORD: ''
+          MARXIV_APPROVAL_SECRET: ''
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/marxiv-delegation .marxiv/delegation-ci
+          mkdir -p /tmp/marxiv-delegation
+
+          python -m app.marxiv_runtime_publisher prepare \
+            --object examples/marxiv/matverse-2.0/scientific-object.v1.json \
+            --sandbox-root .marxiv/delegation-ci \
+            > /tmp/marxiv-delegation/prepared.json
+
+          sandbox=.marxiv/delegation-ci/matverse-2.0/v1
+          python -m app.marxiv_runtime_publisher request-approval \
+            --sandbox "$sandbox" \
+            --ttl-seconds 7200 \
+            > /tmp/marxiv-delegation/runtime-challenge.json
+          cp "$sandbox/approval-challenge.json" /tmp/marxiv-delegation/challenge.json
+
+          python -m app.marxiv_human_authority init \
+            --authority-id ci-ephemeral-human-authority \
+            --private-key /tmp/marxiv-delegation/private.pem \
+            --public-registry /tmp/marxiv-delegation/authority.json \
+            > /tmp/marxiv-delegation/init.json
+
+          python -m app.marxiv_human_authority describe \
+            --challenge /tmp/marxiv-delegation/challenge.json \
+            --output /tmp/marxiv-delegation/challenge-summary.json \
+            > /tmp/marxiv-delegation/describe.json
+
+          approval_confirmation=$(python - <<'PY'
+          import json
+          from pathlib import Path
+          print(json.loads(Path('/tmp/marxiv-delegation/challenge-summary.json').read_text())['required_human_confirmation'])
+          PY
+          )
+
+          python -m app.marxiv_human_authority sign \
+            --challenge /tmp/marxiv-delegation/challenge.json \
+            --private-key /tmp/marxiv-delegation/private.pem \
+            --authority-registry /tmp/marxiv-delegation/authority.json \
+            --output /tmp/marxiv-delegation/human-approval.v2.json \
+            --confirm "$approval_confirmation" \
+            > /tmp/marxiv-delegation/approval-sign.json
+
+          python -m app.marxiv_human_authority bundle \
+            --challenge /tmp/marxiv-delegation/challenge.json \
+            --approval /tmp/marxiv-delegation/human-approval.v2.json \
+            --authority-registry /tmp/marxiv-delegation/authority.json \
+            --output /tmp/marxiv-delegation/human-approval-evidence-pack.v2.json \
+            > /tmp/marxiv-delegation/approval-bundle.json
+
+          python -m app.marxiv_execution_delegation request \
+            --evidence-pack /tmp/marxiv-delegation/human-approval-evidence-pack.v2.json \
+            --delegatee marxiv-runtime-publisher \
+            --capability VERIFY_PACKAGE \
+            --capability PREPARE_RUNTIME_CONTEXT \
+            --capability BUILD_EXTERNAL_EFFECT_REQUEST \
+            --ttl-seconds 3600 \
+            --output /tmp/marxiv-delegation/execution-delegation-request.v1.json \
+            > /tmp/marxiv-delegation/delegation-request.json
+
+          python -m app.marxiv_execution_delegation describe \
+            --request /tmp/marxiv-delegation/execution-delegation-request.v1.json \
+            > /tmp/marxiv-delegation/delegation-summary.json
+
+          delegation_confirmation=$(python - <<'PY'
+          import json
+          from pathlib import Path
+          print(json.loads(Path('/tmp/marxiv-delegation/delegation-summary.json').read_text())['required_human_confirmation'])
+          PY
+          )
+
+          python -m app.marxiv_execution_delegation sign \
+            --request /tmp/marxiv-delegation/execution-delegation-request.v1.json \
+            --private-key /tmp/marxiv-delegation/private.pem \
+            --authority-registry /tmp/marxiv-delegation/authority.json \
+            --output /tmp/marxiv-delegation/execution-delegation.v1.json \
+            --confirm "$delegation_confirmation" \
+            > /tmp/marxiv-delegation/delegation-sign.json
+
+          python -m app.marxiv_execution_delegation verify \
+            --request /tmp/marxiv-delegation/execution-delegation-request.v1.json \
+            --delegation /tmp/marxiv-delegation/execution-delegation.v1.json \
+            --authority-registry /tmp/marxiv-delegation/authority.json \
+            --evidence-pack /tmp/marxiv-delegation/human-approval-evidence-pack.v2.json \
+            > /tmp/marxiv-delegation/delegation-verification.json
+
+          python -m app.marxiv_execution_delegation context \
+            --request /tmp/marxiv-delegation/execution-delegation-request.v1.json \
+            --delegation /tmp/marxiv-delegation/execution-delegation.v1.json \
+            --authority-registry /tmp/marxiv-delegation/authority.json \
+            --evidence-pack /tmp/marxiv-delegation/human-approval-evidence-pack.v2.json \
+            --output /tmp/marxiv-delegation/execution-context.v1.json \
+            > /tmp/marxiv-delegation/context.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          prepared = json.loads(Path('/tmp/marxiv-delegation/prepared.json').read_text())
+          verification = json.loads(Path('/tmp/marxiv-delegation/delegation-verification.json').read_text())
+          context = json.loads(Path('/tmp/marxiv-delegation/execution-context.v1.json').read_text())
+
+          assert prepared['package_hash'] == '4ef1c650ccf52054cb77adc5d1a1e8d5a19785bcdbe23a644470ee707e97b2aa'
+          assert verification['ok'] is True
+          assert verification['checks']['ed25519_signature_valid'] is True
+          assert verification['checks']['human_approval_evidence_valid'] is True
+          assert context['status'] == 'DELEGATED_LOCAL_EXECUTION'
+          assert context['external_effect_authorization_required'] is True
+          assert context['external_effect_authorized'] is False
+          assert context['arxiv_login_authorized'] is False
+          assert context['arxiv_submission_authorized'] is False
+          assert 'ARXIV_LOGIN' in context['prohibited_capabilities']
+          assert 'ARXIV_SUBMIT' in context['prohibited_capabilities']
+          assert not Path('.marxiv/delegation-ci/matverse-2.0/v1/submission-result.json').exists()
+          PY
+
+      - name: Assert private keys and external effects remain absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${ARXIV_EMAIL:-}"
+          test -z "${ARXIV_PASSWORD:-}"
+          if git ls-files | grep -Ei '(^|/)([^/]*private[^/]*\.(pem|key)|[^/]*ed25519[^/]*private[^/]*)$'; then
+            echo 'Private-key material must never be tracked.' >&2
+            exit 1
+          fi
+          if git grep -IlE -e '-----BEGIN (OPENSSH |RSA |EC )?PRIVATE KEY-----' -- .; then
+            echo 'Tracked file contains a private-key PEM header.' >&2
+            exit 1
+          fi
