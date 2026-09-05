@@ -19,6 +19,8 @@
   ],
   "binding_requirements": {
     "binding_hash_verified": true,
+    "canonical_shape_only": true,
+    "unknown_fields_rejected": true,
     "runtime_identity_exact": true,
     "required_model_digest_immutable": true,
     "executor_binding_hash_matches": true,
@@ -32,7 +34,8 @@
   },
   "privacy_boundary": {
     "runtime_bound_event_contains_raw_proposal": false,
-    "proposal_represented_by": "sha256"
+    "proposal_represented_by": "sha256",
+    "noncanonical_binding_metadata": "REJECT"
   },
   "replay_semantics": {
     "EXACT_MATCH": "record hash, binding, receipt inputs, receipt outputs, and receipt recomputation match",
