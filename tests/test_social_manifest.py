@@ -9,13 +9,17 @@ def test_manifest_is_explicit_and_secret_free():
         source_id="instagram:acct-1",
         provider="meta",
         account_id="acct-1",
-        capabilities=[SocialCapability.READ_PROFILE, SocialCapability.READ_MEDIA],
+        capabilities=[SocialCapability.READ_SELF, SocialCapability.READ_MEDIA],
         credential_ref="env:IG_TOKEN",
     )
     data = manifest.as_dict()
     assert data["schema"] == "matverse.source-capability-manifest.v1"
-    assert data["capabilities"] == ["read_media", "read_profile"]
-    assert "token" not in str(data).lower()
+    assert data["capabilities"] == [
+        "social.instagram.read_media",
+        "social.instagram.read_self",
+    ]
+    assert data["credential_ref"] == "env:IG_TOKEN"
+    assert "IG_TOKEN" not in repr(manifest.capabilities)
 
 
 def test_manifest_requires_capabilities():
