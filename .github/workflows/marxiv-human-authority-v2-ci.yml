@@ -148,7 +148,7 @@ jobs:
             echo 'Private-key material must never be tracked.' >&2
             exit 1
           fi
-          if git grep -IlE -- '-----BEGIN (OPENSSH |RSA |EC )?PRIVATE KEY-----' -- .; then
+          if git grep -IlE -e '-----BEGIN (OPENSSH |RSA |EC )?PRIVATE KEY-----' -- .; then
             echo 'Tracked file contains a private-key PEM header.' >&2
             exit 1
           fi
