@@ -11,6 +11,7 @@ on:
       - 'tests/test_marxiv_execution_delegation.py'
       - 'tests/test_marxiv_human_authority.py'
       - 'tests/test_marxiv_runtime_publisher.py'
+      - 'tests/test_publication_bridge.py'
       - '.github/workflows/marxiv-execution-delegation-v1-ci.yml'
       - 'MARXIV_EXECUTION_DELEGATION_V1.md'
   push:
@@ -23,6 +24,7 @@ on:
       - 'tests/test_marxiv_execution_delegation.py'
       - 'tests/test_marxiv_human_authority.py'
       - 'tests/test_marxiv_runtime_publisher.py'
+      - 'tests/test_publication_bridge.py'
       - '.github/workflows/marxiv-execution-delegation-v1-ci.yml'
       - 'MARXIV_EXECUTION_DELEGATION_V1.md'
 
@@ -42,13 +44,18 @@ jobs:
       - name: Install runtime dependencies
         run: pip install -r requirements.txt
 
-      - name: Compile delegation and human-authority modules
+      - name: Compile authority and publication boundary modules
         run: |
           python -m py_compile app/marxiv_execution_delegation.py
           python -m py_compile app/marxiv_human_authority.py
+          python -m py_compile app/publication_bridge.py
 
-      - name: Run delegation unit tests
-        run: pytest -q tests/test_marxiv_execution_delegation.py
+      - name: Run authority and external-effect boundary tests
+        run: |
+          pytest -q \
+            tests/test_marxiv_execution_delegation.py \
+            tests/test_marxiv_human_authority.py \
+            tests/test_publication_bridge.py
 
       - name: Install pinned publication transport
         run: pip install -r requirements-publication.txt
@@ -175,12 +182,29 @@ jobs:
           assert not Path('.marxiv/delegation-ci/matverse-2.0/v1/submission-result.json').exists()
           PY
 
+      - name: Prove arXiv login remains blocked even with credentials present
+        shell: bash
+        env:
+          ARXIV_EMAIL: 'ci-author@example.invalid'
+          ARXIV_PASSWORD: 'ci-nonsecret-fixture-value'
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from app.publication_bridge import PublicationBridgeError, authorize_login
+
+          try:
+              authorize_login(Path('/tmp'))
+          except PublicationBridgeError as exc:
+              assert 'external effect blocked' in str(exc)
+          else:
+              raise SystemExit('arXiv login unexpectedly crossed the external-effect gate')
+          PY
+
       - name: Assert private keys and external effects remain absent
         shell: bash
         run: |
           set -euo pipefail
-          test -z "${ARXIV_EMAIL:-}"
-          test -z "${ARXIV_PASSWORD:-}"
           if git ls-files | grep -Ei '(^|/)([^/]*private[^/]*\.(pem|key)|[^/]*ed25519[^/]*private[^/]*)$'; then
             echo 'Private-key material must never be tracked.' >&2
             exit 1
