@@ -30,6 +30,68 @@ def _validate_discovery_report(report: dict[str, Any]) -> tuple[bool, str]:
     return True, "ok"
 
 
+def validate_execution_binding(binding: dict[str, Any]) -> tuple[bool, str]:
+    """Validate a standalone execution binding before it can reach an executor.
+
+    A binding is observational identity, not authorization. This validator only
+    proves that the binding is internally consistent and sufficiently specific;
+    HDB/Ω remains the authority for the workload itself.
+    """
+
+    if binding.get("protocol_version") != PROTOCOL_VERSION:
+        return False, "unsupported_binding_protocol"
+    if binding.get("decision") != "PASS":
+        return False, "binding_not_pass"
+
+    supplied_hash = binding.get("binding_hash")
+    if not isinstance(supplied_hash, str) or not supplied_hash:
+        return False, "binding_hash_missing"
+    body = {key: value for key, value in binding.items() if key != "binding_hash"}
+    if stable_hash(body) != supplied_hash:
+        return False, "binding_hash_mismatch"
+
+    discovery_hash = binding.get("discovery_report_hash")
+    if not isinstance(discovery_hash, str) or len(discovery_hash) != 64:
+        return False, "discovery_report_hash_invalid"
+
+    runtime = binding.get("runtime")
+    if not isinstance(runtime, dict):
+        return False, "runtime_identity_missing"
+    runtime_id = runtime.get("runtime_id")
+    if not isinstance(runtime_id, str) or not runtime_id.strip():
+        return False, "runtime_identity_missing"
+
+    requirements = binding.get("requirements")
+    if not isinstance(requirements, dict):
+        return False, "binding_requirements_missing"
+    required_model = requirements.get("required_model")
+    model = binding.get("model")
+    if required_model is not None:
+        if not isinstance(required_model, str) or not required_model.strip():
+            return False, "required_model_invalid"
+        if not isinstance(model, dict) or model.get("name") != required_model:
+            return False, "required_model_identity_mismatch"
+        digest = model.get("digest")
+        if not isinstance(digest, str) or not digest.strip():
+            return False, "required_model_immutable_identity_missing"
+    elif model is not None:
+        if not isinstance(model, dict):
+            return False, "model_identity_invalid"
+        digest = model.get("digest")
+        if digest is not None and (not isinstance(digest, str) or not digest.strip()):
+            return False, "model_identity_invalid"
+
+    require_container = requirements.get("require_container")
+    if not isinstance(require_container, bool):
+        return False, "container_requirement_invalid"
+    if require_container:
+        container = binding.get("container")
+        if not isinstance(container, dict) or container.get("runtime_id") not in {"podman", "docker"}:
+            return False, "container_identity_missing"
+
+    return True, "ok"
+
+
 def build_execution_binding(
     report: dict[str, Any],
     *,
@@ -150,4 +212,13 @@ def build_execution_binding(
             "require_container": require_container,
         },
     }
-    return {**body, "binding_hash": stable_hash(body)}
+    binding = {**body, "binding_hash": stable_hash(body)}
+    valid, reason = validate_execution_binding(binding)
+    if not valid:
+        return {
+            "protocol_version": PROTOCOL_VERSION,
+            "decision": "HOLD",
+            "reason": f"constructed_binding_invalid:{reason}",
+            "discovery_report_hash": report.get("report_hash"),
+        }
+    return binding
