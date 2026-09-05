@@ -374,5 +374,7 @@ def world_real(principal: Principal = Depends(require_capability("world:read")))
 
 
 from .federation_trust_plane import router as federation_trust_plane_router
+from .openai_provider import router as openai_provider_router
 
 app.include_router(federation_trust_plane_router)
+app.include_router(openai_provider_router)
