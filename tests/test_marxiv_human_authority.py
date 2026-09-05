@@ -54,6 +54,19 @@ def _authority(tmp_path: Path):
     return private_key, registry, authority
 
 
+def test_initialize_authority_rejects_colliding_paths_without_writing(tmp_path: Path) -> None:
+    colliding_path = tmp_path / "authority-material.pem"
+
+    with pytest.raises(HumanAuthorityError, match="must use different paths"):
+        initialize_authority(
+            authority_id="author-human-authority",
+            private_key_path=colliding_path,
+            public_registry_path=colliding_path,
+        )
+
+    assert colliding_path.exists() is False
+
+
 def test_confirmation_binds_package_and_fresh_challenge_hash(tmp_path: Path) -> None:
     challenge_path = tmp_path / "challenge.json"
     _write(challenge_path, _challenge())
