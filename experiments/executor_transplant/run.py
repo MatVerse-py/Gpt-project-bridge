@@ -6,7 +6,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Callable, Mapping
 
 import httpx
 
@@ -24,6 +24,12 @@ DEFAULT_EVIDENCE = Path("evidence/executor-transplant-v1/EVIDENCE_PACK.json")
 EXPECTED_SEQUENCE = ("gpt-5.6-sol", "gpt-6-astra", "gpt-5.6-sol")
 
 TransportFactory = Callable[[str], httpx.BaseTransport | None]
+
+_SECRET_HOLD_CODES = {
+    "invalid_capability",
+    "capability_expired",
+    "capability_exhausted",
+}
 
 
 def canonical_json(value: object) -> bytes:
@@ -56,10 +62,7 @@ def parse_observable_output(text: str) -> dict[str, object]:
                 {item.strip().upper() for item in raw.split(",") if item.strip()}
             )
         elif key == "TRANSFER_HIDDEN_REASONING":
-            parsed["transfer_hidden_reasoning"] = raw.upper() in {
-                "YES",
-                "TRUE",
-            }
+            parsed["transfer_hidden_reasoning"] = raw.upper() in {"YES", "TRUE"}
     return parsed
 
 
@@ -96,9 +99,36 @@ TRANSFER_HIDDEN_REASONING=...
 """
 
 
+def _secret_plane(contract: Mapping[str, object]) -> Mapping[str, object]:
+    secret_plane = contract.get("secret_plane")
+    if not isinstance(secret_plane, Mapping):
+        raise ValueError("secret_plane configuration is required")
+    if secret_plane.get("mode") != "blind_proxy":
+        raise ValueError("secret_plane mode must be blind_proxy")
+    secret_ref = secret_plane.get("secret_ref")
+    if not isinstance(secret_ref, str) or not secret_ref.startswith("secret_ref://"):
+        raise ValueError("secret_plane secret_ref must use secret_ref://")
+    if secret_plane.get("provider_secret_in_executor") != "forbidden":
+        raise ValueError("provider secret must be forbidden in executor")
+    if secret_plane.get("capability_env") != "MATVERSE_OPENAI_CAPABILITY_TOKEN":
+        raise ValueError("unexpected capability environment binding")
+    if secret_plane.get("base_url_env") != "MATVERSE_OPENAI_BASE_URL":
+        raise ValueError("unexpected blind-proxy base URL binding")
+
+    ttl = secret_plane.get("ttl_seconds")
+    max_usage = secret_plane.get("max_usage")
+    if not isinstance(ttl, int) or not 1 <= ttl <= 3600:
+        raise ValueError("secret_plane ttl_seconds must be 1..3600")
+    if not isinstance(max_usage, int) or max_usage != 3:
+        raise ValueError("secret_plane max_usage must be exactly 3 for this experiment")
+    return secret_plane
+
+
 def _validate_experiment_contract(contract: Mapping[str, object]) -> None:
     if contract.get("protocol") != PROTOCOL:
         raise ValueError("unsupported executor-transplant protocol")
+    _secret_plane(contract)
+
     sequence_raw = contract.get("executor_sequence")
     if not isinstance(sequence_raw, list) or len(sequence_raw) != 3:
         raise ValueError("executor_sequence must contain exactly three entries")
@@ -131,21 +161,21 @@ def _load_source_contract(
     source_path = repository_root / path_raw
     if not source_path.is_file():
         raise ValueError(f"source contract not found: {path_raw}")
-    observed_hash = sha256_bytes(
-        canonical_json(json.loads(source_path.read_text(encoding="utf-8")))
-    )
+
+    raw = json.loads(source_path.read_text(encoding="utf-8"))
+    observed_hash = sha256_bytes(canonical_json(raw))
     if observed_hash != expected_hash:
         raise ValueError(
             f"source contract hash mismatch: expected {expected_hash}, got {observed_hash}"
         )
-    payload = json.loads(source_path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
+    if not isinstance(raw, dict):
         raise ValueError("source contract must be a JSON object")
-    return payload, observed_hash, source_path
+    return raw, observed_hash, source_path
 
 
 def _pricing_for_model(
-    experiment_contract: Mapping[str, object], model: str
+    experiment_contract: Mapping[str, object],
+    model: str,
 ) -> Mapping[str, object] | None:
     pricing = experiment_contract.get("pricing_snapshot_usd_per_million_tokens")
     if not isinstance(pricing, Mapping):
@@ -175,7 +205,8 @@ def _run_step(
     *,
     index: int,
     model: str,
-    api_key: str,
+    capability_token: str,
+    base_url: str,
     timeout_seconds: float,
     max_output_tokens: int,
     prompt: str,
@@ -192,10 +223,13 @@ def _run_step(
     transport = transport_factory(model) if transport_factory is not None else None
     runtime = OpenAIResponsesRuntime(
         OpenAIRuntimeConfig(
-            api_key=api_key,
+            # In blind-proxy mode this is NOT the OpenAI provider key. It is a
+            # TTL/scope/max-usage capability accepted only by the loopback proxy.
+            api_key=capability_token,
             model=model,
             timeout_seconds=timeout_seconds,
             max_output_tokens=max_output_tokens,
+            base_url=base_url,
         ),
         transport=transport,
     )
@@ -212,16 +246,22 @@ def _run_step(
             },
         )
     except OpenAIProviderError as exc:
+        secret_hold = exc.provider_code in _SECRET_HOLD_CODES
         return {
             "step": index,
             "requested_model": model,
-            "status": "HOLD_PROVIDER",
-            "reason": "provider request failed",
+            "status": "HOLD_SECRET" if secret_hold else "HOLD_PROVIDER",
+            "reason": (
+                "ephemeral secret-plane capability was rejected"
+                if secret_hold
+                else "provider request failed"
+            ),
             "provider_status_code": exc.status_code,
             "provider_code": exc.provider_code,
             "provider_request_id": exc.request_id,
             "elapsed_ms": round((time.perf_counter() - started) * 1000.0, 3),
             "raw_output_persisted": False,
+            "capability_persisted": False,
         }
 
     elapsed_ms = round((time.perf_counter() - started) * 1000.0, 3)
@@ -230,10 +270,13 @@ def _run_step(
             "step": index,
             "requested_model": model,
             "status": "HOLD_GOVERNANCE",
-            "reason": str(result.get("reason", "provider exposure was not admitted")),
+            "reason": str(
+                result.get("reason", "provider exposure was not admitted")
+            ),
             "request_hash": result.get("request_hash"),
             "elapsed_ms": elapsed_ms,
             "raw_output_persisted": False,
+            "capability_persisted": False,
         }
 
     output_text = result.get("output_text")
@@ -246,6 +289,7 @@ def _run_step(
             "reason": "provider response contained no observable output text",
             "elapsed_ms": elapsed_ms,
             "raw_output_persisted": False,
+            "capability_persisted": False,
         }
 
     parsed = parse_observable_output(output_text)
@@ -264,6 +308,7 @@ def _run_step(
             is expected_state["transfer_hidden_reasoning"]
         ),
         "requested_model_binding": returned_model == model,
+        "provider_secret_not_in_executor": True,
     }
     usage = result.get("usage") if isinstance(result.get("usage"), Mapping) else {}
     return {
@@ -284,9 +329,13 @@ def _run_step(
         "gate_fingerprint": gate_hash,
         "constitutional_contract_hash": constitutional_hash,
         "usage": dict(usage),
-        "estimated_cost_usd": _estimated_cost_usd(usage=usage, pricing=pricing),
+        "estimated_cost_usd": _estimated_cost_usd(
+            usage=usage,
+            pricing=pricing,
+        ),
         "elapsed_ms": elapsed_ms,
         "raw_output_persisted": False,
+        "capability_persisted": False,
     }
 
 
@@ -296,18 +345,30 @@ def _evidence_hash(payload: Mapping[str, object]) -> str:
     return sha256_bytes(canonical_json(without_hash))
 
 
+def _write_report(path: Path, report: dict[str, object]) -> dict[str, object]:
+    report["evidence_pack_hash"] = _evidence_hash(report)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(report, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return report
+
+
 def run_experiment(
     *,
     contract_path: Path = DEFAULT_CONTRACT,
     evidence_path: Path = DEFAULT_EVIDENCE,
     repository_root: Path = Path("."),
     api_key: str | None = None,
+    base_url: str | None = None,
     transport_factory: TransportFactory | None = None,
 ) -> dict[str, object]:
     experiment_contract = json.loads(contract_path.read_text(encoding="utf-8"))
     if not isinstance(experiment_contract, dict):
         raise ValueError("experiment contract must be a JSON object")
     _validate_experiment_contract(experiment_contract)
+    secret_plane = _secret_plane(experiment_contract)
 
     source_contract, source_contract_hash, source_path = _load_source_contract(
         experiment_contract,
@@ -346,11 +407,24 @@ def run_experiment(
     timeout_seconds = float(runtime_cfg["timeout_seconds"])
     max_output_tokens = int(runtime_cfg["max_output_tokens"])
 
-    resolved_key = (
-        api_key if api_key is not None else os.environ.get("OPENAI_API_KEY", "")
+    capability_env = str(secret_plane["capability_env"])
+    base_url_env = str(secret_plane["base_url_env"])
+    default_base_url = str(secret_plane["default_base_url"])
+
+    # Explicit `api_key` remains only as a test-injection compatibility name.
+    # In production the executor NEVER reads OPENAI_API_KEY. It receives only
+    # the blind proxy's ephemeral capability token.
+    capability_token = (
+        api_key if api_key is not None else os.environ.get(capability_env, "")
     ).strip()
-    if resolved_key and any(ch.isspace() for ch in resolved_key):
-        raise ValueError("OPENAI_API_KEY contains whitespace")
+    if capability_token and any(ch.isspace() for ch in capability_token):
+        raise ValueError("secret-plane capability contains whitespace")
+
+    resolved_base_url = (
+        base_url
+        if base_url is not None
+        else os.environ.get(base_url_env, default_base_url)
+    ).strip()
 
     base_report: dict[str, object] = {
         "protocol": PROTOCOL,
@@ -368,20 +442,39 @@ def run_experiment(
         "provider": "openai",
         "raw_output_persisted": False,
         "secret_persisted": False,
+        "capability_persisted": False,
+        "secret_plane": {
+            "mode": secret_plane["mode"],
+            "secret_ref": secret_plane["secret_ref"],
+            "ttl_seconds": secret_plane["ttl_seconds"],
+            "max_usage": secret_plane["max_usage"],
+            "provider_secret_in_executor": "forbidden",
+            "provider_secret_exposed_to_executor": False,
+            "capability_is_ephemeral": True,
+            "isolation_claim": "process_boundary_only",
+            "hsm_tee_claim": "HOLD_NOT_IMPLEMENTED",
+        },
         "claim_boundary": {
             "provider_independence": "HOLD_SAME_PROVIDER",
             "external_pass": "HOLD",
             "world_real_pass": "HOLD",
             "scientific_class_claim": "HOLD",
-            "scope": "observable portable-state relay under one frozen organism snapshot",
+            "secret_hardware_isolation": "HOLD_NOT_IMPLEMENTED",
+            "scope": (
+                "observable portable-state relay under one frozen organism "
+                "snapshot using a process-isolated blind-secret handler"
+            ),
         },
     }
 
-    if not resolved_key:
+    if not capability_token:
         report = {
             **base_report,
             "experiment_result": "HOLD",
-            "reason": "OPENAI_API_KEY is not configured in the execution runtime",
+            "reason": (
+                "secret_ref capability is unresolved; executor does not read "
+                "the provider secret"
+            ),
             "steps": [],
             "invariance": {
                 "all_steps_pass": False,
@@ -391,6 +484,7 @@ def run_experiment(
                 "same_constitutional_contract": False,
                 "same_prompt": False,
                 "sol_return_pass": False,
+                "provider_secret_not_in_executor": True,
             },
             "promotion": {
                 "executor_substitution_invariance": "HOLD_NOT_EXECUTED",
@@ -400,20 +494,15 @@ def run_experiment(
                 "scientific_class_claim": "HOLD",
             },
         }
-        report["evidence_pack_hash"] = _evidence_hash(report)
-        evidence_path.parent.mkdir(parents=True, exist_ok=True)
-        evidence_path.write_text(
-            json.dumps(report, indent=2, sort_keys=True),
-            encoding="utf-8",
-        )
-        return report
+        return _write_report(evidence_path, report)
 
     steps: list[dict[str, object]] = []
     for index, model in enumerate(EXPECTED_SEQUENCE, start=1):
         step = _run_step(
             index=index,
             model=model,
-            api_key=resolved_key,
+            capability_token=capability_token,
+            base_url=resolved_base_url,
             timeout_seconds=timeout_seconds,
             max_output_tokens=max_output_tokens,
             prompt=prompt,
@@ -466,6 +555,7 @@ def run_experiment(
         and steps[0].get("status") == "PASS"
         and steps[2].get("status") == "PASS"
     )
+    provider_secret_not_in_executor = True
     invariance = {
         "all_steps_pass": all_steps_pass,
         "same_source_contract": same_source_contract,
@@ -474,6 +564,7 @@ def run_experiment(
         "same_constitutional_contract": same_constitution,
         "same_prompt": same_prompt,
         "sol_return_pass": sol_return_pass,
+        "provider_secret_not_in_executor": provider_secret_not_in_executor,
     }
     invariant_pass = all(invariance.values())
 
@@ -482,6 +573,10 @@ def run_experiment(
         experiment_result = "PASS"
         promotion_status = "EXECUTOR_SUBSTITUTION_INVARIANCE_PASS"
         reason = "Sol -> Astra -> Sol preserved all declared hard invariants"
+    elif any(status == "HOLD_SECRET" for status in statuses):
+        experiment_result = "HOLD"
+        promotion_status = "HOLD_SECRET_CAPABILITY"
+        reason = "blind-secret capability did not complete the transplant sequence"
     elif any(status == "HOLD_PROVIDER" for status in statuses):
         experiment_result = "HOLD"
         promotion_status = "HOLD_PROVIDER_ACCESS"
@@ -509,13 +604,7 @@ def run_experiment(
             "scientific_class_claim": "HOLD",
         },
     }
-    report["evidence_pack_hash"] = _evidence_hash(report)
-    evidence_path.parent.mkdir(parents=True, exist_ok=True)
-    evidence_path.write_text(
-        json.dumps(report, indent=2, sort_keys=True),
-        encoding="utf-8",
-    )
-    return report
+    return _write_report(evidence_path, report)
 
 
 def main() -> int:
