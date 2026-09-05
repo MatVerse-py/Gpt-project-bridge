@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .core import stable_hash
+from .runtime_discovery import PROTOCOL_VERSION as DISCOVERY_PROTOCOL_VERSION
 
 PROTOCOL_VERSION = "matverse.runtime-binding.v1"
 
@@ -14,12 +15,36 @@ def _runtime(report: dict[str, Any], runtime_id: str) -> dict[str, Any] | None:
     return None
 
 
+def _validate_discovery_report(report: dict[str, Any]) -> tuple[bool, str]:
+    if report.get("protocol_version") != DISCOVERY_PROTOCOL_VERSION:
+        return False, "unsupported_discovery_protocol"
+
+    supplied_hash = report.get("report_hash")
+    if not isinstance(supplied_hash, str) or not supplied_hash:
+        return False, "discovery_report_hash_missing"
+
+    body = {key: value for key, value in report.items() if key != "report_hash"}
+    if stable_hash(body) != supplied_hash:
+        return False, "discovery_report_hash_mismatch"
+
+    return True, "ok"
+
+
 def build_execution_binding(
     report: dict[str, Any],
     *,
     required_model: str | None = None,
     require_container: bool = False,
 ) -> dict[str, Any]:
+    discovery_valid, discovery_reason = _validate_discovery_report(report)
+    if not discovery_valid:
+        return {
+            "protocol_version": PROTOCOL_VERSION,
+            "decision": "HOLD",
+            "reason": discovery_reason,
+            "discovery_report_hash": report.get("report_hash"),
+        }
+
     selector = report.get("selector")
     if not isinstance(selector, dict) or selector.get("decision") != "PASS":
         return {
@@ -55,9 +80,19 @@ def build_execution_binding(
             models = []
         for model in models:
             if isinstance(model, dict) and model.get("name") == required_model:
+                digest = model.get("digest")
+                if not isinstance(digest, str) or not digest.strip():
+                    return {
+                        "protocol_version": PROTOCOL_VERSION,
+                        "decision": "HOLD",
+                        "reason": "required_model_immutable_identity_missing",
+                        "runtime_id": runtime_id,
+                        "required_model": required_model,
+                        "discovery_report_hash": report.get("report_hash"),
+                    }
                 selected_model = {
                     "name": required_model,
-                    "digest": model.get("digest"),
+                    "digest": digest.strip(),
                     "size": model.get("size"),
                 }
                 break
