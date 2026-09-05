@@ -5,7 +5,9 @@ on:
     branches: [main]
     paths:
       - 'app/marxiv_human_authority.py'
+      - 'app/marxiv_runtime_publisher.py'
       - 'tests/test_marxiv_human_authority.py'
+      - 'tests/test_marxiv_runtime_publisher.py'
       - '.github/workflows/marxiv-human-authority-v2-ci.yml'
       - '.github/workflows/marxiv-human-approval-challenge-v2.yml'
       - '.github/workflows/marxiv-approval-seal.yml'
@@ -16,7 +18,9 @@ on:
     branches: [marxiv/human-challenge-ed25519-v2]
     paths:
       - 'app/marxiv_human_authority.py'
+      - 'app/marxiv_runtime_publisher.py'
       - 'tests/test_marxiv_human_authority.py'
+      - 'tests/test_marxiv_runtime_publisher.py'
       - '.github/workflows/marxiv-human-authority-v2-ci.yml'
       - '.github/workflows/marxiv-human-approval-challenge-v2.yml'
       - '.github/workflows/marxiv-approval-seal.yml'
@@ -136,11 +140,27 @@ jobs:
           assert not Path('.marxiv/v2-ci/matverse-2.0/v1/submission-result.json').exists()
           PY
 
-      - name: Assert private key never enters tracked evidence
+      - name: Assert tracked repository contains no private-key material
         shell: bash
         run: |
           set -euo pipefail
-          if git ls-files | grep -Ei '(private.*(pem|key)|ed25519.*private|human-approval\.v2\.json)$'; then
-            echo 'Private or runtime human-approval material must not be committed by CI.' >&2
+          if git ls-files | grep -Ei '(^|/)([^/]*private[^/]*\.(pem|key)|[^/]*ed25519[^/]*private[^/]*)$'; then
+            echo 'Private-key material must never be tracked.' >&2
             exit 1
           fi
+          if git grep -IlE -- '-----BEGIN (OPENSSH |RSA |EC )?PRIVATE KEY-----' -- .; then
+            echo 'Tracked file contains a private-key PEM header.' >&2
+            exit 1
+          fi
+
+      - name: Assert governed signed approval evidence is allowed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import re
+
+          allowed = 'evidence/marxiv/human-approval.v2.json'
+          private_name = re.compile(r'(^|/)([^/]*private[^/]*\.(pem|key)|[^/]*ed25519[^/]*private[^/]*)$', re.I)
+          assert private_name.search(allowed) is None
+          PY
