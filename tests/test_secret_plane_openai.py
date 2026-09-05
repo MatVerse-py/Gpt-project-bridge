@@ -80,7 +80,6 @@ def test_secret_plane_leases_openai_credential_without_persisting_it():
         runtime = OpenAIResponsesRuntime(config, transport=httpx.MockTransport(handler))
         return runtime.governed_invoke(
             input_text="Return exactly MATVERSE_SECRET_PLANE_PASS",
-            human={"classification": "PUBLIC"},
         )
 
     result = plane.execute_with_secret(lease, invoke)
