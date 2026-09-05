@@ -1,0 +1,99 @@
+{
+  "schema": "matverse.real-image-observations.v2",
+  "policy": {
+    "model_generated_overrides_visual_kind": true,
+    "ocr_is_not_structured_metadata": true,
+    "external_claims_require_independent_crosscheck": true,
+    "exact_sha_duplicate_is_one_probative_root": true,
+    "perceptual_similarity_is_review_signal_only": true
+  },
+  "observations": [
+    {
+      "source_file": "4aba2f46-72a2-4a8a-ada6-0c558f581823.png",
+      "kind": "SCREENSHOT",
+      "sha256": "5b998640e8593d4f12fc16a4d92a68491efd6e290958f9dfc0770d8fc28e8949",
+      "size_bytes": 201838,
+      "dimensions": [1352, 567],
+      "model_generated": false,
+      "independent_evidence": true,
+      "observed": ["URANO OSX", "MatVerse Organism Console v2.0", "MNB Explorer", "Q-Gate PASS", "Ledger PASS", "Replay PASS", "Witness PASS", "Cassandra LINKED", "ACOA ACTIVE"],
+      "interpretation": "UI state only; backend truth not independently established by pixels"
+    },
+    {
+      "source_file": "Screenshot 2026-06-13 20.32.28.png",
+      "kind": "SCREENSHOT",
+      "sha256": "cc6bbf0631f10cdb2fe60484c28ed60e6e666f13cfc7a3ab49c1aa1bfcf8d1c1",
+      "size_bytes": 88463,
+      "model_generated": false,
+      "independent_evidence": true,
+      "observed": ["URANO OSX", "NEXUSCORE SGI-MNB PIPELINE", "Q-GATE", "LEDGER / REPLAY", "MATBUCKETS", "LOGS & EVIDENCIAS"],
+      "interpretation": "captured interface state; numeric/status values remain visual observations until matched to runtime evidence"
+    },
+    {
+      "source_file": "409e021b-93f4-46c0-986e-172d89dcac2f.png",
+      "kind": "SCREENSHOT",
+      "sha256": "2e96c42f8762dc0d27cd941328278787b0ab1f39363435328f22e08b0a4a540d",
+      "size_bytes": 244339,
+      "dimensions": [1020, 517],
+      "model_generated": false,
+      "independent_evidence": true,
+      "observed": ["MATVERSE", "ENTRY SYSTEM V1.0", "Sistema de inteligência para operar sob incerteza", "CASSANDRA DISPONÍVEL", "DOMÍNIO ATIVO Informação"],
+      "interpretation": "visible product/interface state and terminology; does not independently prove service availability behind the UI"
+    },
+    {
+      "source_file": "cd6f2db3-7559-476e-8aea-d3aa9bf88c11.png",
+      "kind": "SCREENSHOT",
+      "sha256": "61a5fbbcb4890861f8de0dedd3f49f22744a3c8ebddbc3c6470595d07a215bd2",
+      "size_bytes": 31533,
+      "dimensions": [695, 303],
+      "model_generated": false,
+      "independent_evidence": true,
+      "observed": ["Meus plugins", "GitHub", "OpenAI", "MiniMax", "Hugging Face"],
+      "interpretation": "proves the plugin/options UI was rendered; does not prove account connection, authorization, or source content"
+    },
+    {
+      "source_file": "Screenshot 2026-06-20 01.53.39.png",
+      "kind": "SCREENSHOT",
+      "sha256": "427cbb2c3feb666f8a9c24919bcfb3ad76d55915b90749adb51bcfdd9f24c7da",
+      "size_bytes": 5436,
+      "dimensions": [323, 74],
+      "model_generated": false,
+      "independent_evidence": true,
+      "observed": ["Explorar métricas de impacto do Crossref", "Investir comunidades de pesquisa no Zenodo"],
+      "interpretation": "UI suggestion/context only; contains no Crossref or Zenodo evidence payload"
+    },
+    {
+      "source_file": "chart-1(2).png",
+      "kind": "GENERATED_IMAGE",
+      "sha256": "993462fffa849a9e6c1afb7d97c344c4fac83d818a7295c1f21f9cbffbbd38e9",
+      "size_bytes": 256870,
+      "dimensions": [1547, 2002],
+      "model_generated": true,
+      "independent_evidence": false,
+      "observed": ["Production Gate v0.3", "PASS_LOCAL_PRODUCTION__HOLD_EXTERNAL_WITNESS", "M_global=0.7505", "M_local=0.8388"],
+      "interpretation": "model-generated rendering of an artifact claim; must be cross-checked against the underlying report/runtime evidence before promotion"
+    },
+    {
+      "source_file": "chart-1(4).png",
+      "kind": "GENERATED_IMAGE",
+      "sha256": "d1ab7be0323c303ea03b5e7166c9ff132689758c7f4876f2c9579c9018214b6a",
+      "size_bytes": 111422,
+      "dimensions": [1600, 900],
+      "model_generated": true,
+      "independent_evidence": false,
+      "observed": ["Production Gate v0.3", "No independent replay, no public production claim", "PASS_LOCAL_PRODUCTION__HOLD_EXTERNAL_WITNESS"],
+      "interpretation": "model-generated visual statement; useful for lineage of what was asserted, not independent operational corroboration"
+    },
+    {
+      "source_file": "Implantação do SVCA Lab Genesis.png",
+      "kind": "GENERATED_IMAGE",
+      "sha256": "4e2ff13feb4e6118a35852f678fbff4d26ff156ed8beca1d473c77cd940c3d17",
+      "size_bytes": 1861821,
+      "dimensions": [1536, 1024],
+      "model_generated": true,
+      "independent_evidence": false,
+      "observed": ["Ω-SEED Genesis Artifact Deployed", "GitHub DEPLOYED", "Hugging Face DEPLOYED", "Sepolia Blockchain DEPLOYED", "Zenodo Archive DOI PREPARED"],
+      "interpretation": "synthetic/generated visual; claims require GitHub/HF/chain/Zenodo independent verification and cannot be promoted from the image itself"
+    }
+  ]
+}
