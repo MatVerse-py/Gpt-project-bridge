@@ -6,6 +6,16 @@
     "path": "experiments/cross_runtime/contract.json",
     "sha256": "67743cbe1f4d65983348401d2061e46dec22d57e232854ff263e1d646f600b26"
   },
+  "secret_plane": {
+    "mode": "blind_proxy",
+    "secret_ref": "secret_ref://openai/matverse/executor-transplant",
+    "capability_env": "MATVERSE_OPENAI_CAPABILITY_TOKEN",
+    "base_url_env": "MATVERSE_OPENAI_BASE_URL",
+    "default_base_url": "http://127.0.0.1:8787/v1",
+    "provider_secret_in_executor": "forbidden",
+    "ttl_seconds": 600,
+    "max_usage": 3
+  },
   "executor_sequence": [
     {
       "provider": "openai",
@@ -36,14 +46,16 @@
     "safety_gate",
     "claims",
     "transfer_hidden_reasoning",
-    "requested_model_binding"
+    "requested_model_binding",
+    "provider_secret_not_in_executor"
   ],
   "promotion": {
     "executor_substitution_invariance": "PASS only if all three fresh executions preserve all hard invariants under the same source contract and organism snapshot",
     "provider_independence": "HOLD because all three executions use the same OpenAI provider/account boundary",
     "external_pass": "HOLD",
     "world_real_pass": "HOLD",
-    "scientific_class_claim": "HOLD"
+    "scientific_class_claim": "HOLD",
+    "secret_hardware_isolation": "HOLD because blind_proxy is process isolation, not HSM/TEE"
   },
   "pricing_snapshot_usd_per_million_tokens": {
     "as_of": "2026-09-05",
