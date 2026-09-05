@@ -1,0 +1,251 @@
+name: Cross-substrate governed causal inheritance v1.1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "experiments/cross_substrate_causal_inheritance_v1_1/**"
+      - ".github/workflows/cross-substrate-gci-v1-1.yml"
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  PREREG_SHA256: "f0ac9e7fb5eb6f87c984e2a6ff359135475b60ef0d1e86ec9ac64df8fb4aa4d1"
+  STACK_COMMIT: "4f91c9223d587a56cc36d8496812e837e0bc0508"
+  PREREG: "experiments/cross_substrate_causal_inheritance_v1_1/prereg_v1_1.json"
+
+jobs:
+  origin:
+    name: v1.1 origin normalized relay (${{ matrix.sequence }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sequence: QWEN_TO_SMOL
+            model: Qwen/Qwen2.5-0.5B-Instruct
+          - sequence: SMOL_TO_QWEN
+            model: HuggingFaceTB/SmolLM2-360M-Instruct
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Verify frozen v1.1 preregistration
+        run: echo "${PREREG_SHA256}  ${PREREG}" | sha256sum -c -
+      - name: Materialize frozen portable-state contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path("experiments/cross_substrate_causal_inheritance_v1_1/prereg_v1_1.json").read_text())
+          Path("contract-v1.1.json").write_text(json.dumps(p["portable_state_contract"], indent=2, sort_keys=True) + "\n")
+          PY
+      - name: Install real-model runtime
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install 'transformers>=4.45,<5' 'safetensors>=0.4'
+      - name: Execute origin model using previously validated portable-state protocol
+        run: |
+          python experiments/cross_runtime/run_model.py \
+            --contract contract-v1.1.json \
+            --model "${{ matrix.model }}" \
+            --output "origin-v1.1-${{ matrix.sequence }}.json"
+      - name: Upload origin evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: origin-v1-1-${{ matrix.sequence }}
+          path: origin-v1.1-${{ matrix.sequence }}.json
+
+  governance:
+    name: v1.1 independent promotion (${{ matrix.sequence }})
+    needs: origin
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sequence: QWEN_TO_SMOL
+          - sequence: SMOL_TO_QWEN
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Verify frozen v1.1 preregistration
+        run: echo "${PREREG_SHA256}  ${PREREG}" | sha256sum -c -
+      - name: Download origin model evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: origin-v1-1-${{ matrix.sequence }}
+          path: evidence/origin
+      - name: Pin causal runtime
+        run: |
+          git clone -q https://github.com/MatVerse-py/matverse-stack-production.git causal-stack
+          git -C causal-stack checkout -q "${STACK_COMMIT}"
+          test "$(git -C causal-stack rev-parse HEAD)" = "${STACK_COMMIT}"
+          pip install 'pydantic>=2.0'
+      - name: Reject normalized origin candidate and independently promote causal governance
+        run: |
+          PYTHONPATH="experiments/cross_substrate_causal_inheritance_v1_1" \
+          python experiments/cross_substrate_causal_inheritance_v1_1/build_governance_pack_v1_1.py \
+            --origin-result "evidence/origin/origin-v1.1-${{ matrix.sequence }}.json" \
+            --prereg "${PREREG}" \
+            --stack-root causal-stack \
+            --sequence "${{ matrix.sequence }}" \
+            --output "governance-v1.1-${{ matrix.sequence }}.json"
+      - name: Upload governance pack before target job exists
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-v1-1-${{ matrix.sequence }}
+          path: governance-v1.1-${{ matrix.sequence }}.json
+
+  target:
+    name: v1.1 target after promotion, context-flushed (${{ matrix.sequence }})
+    needs: governance
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sequence: QWEN_TO_SMOL
+            model: HuggingFaceTB/SmolLM2-360M-Instruct
+          - sequence: SMOL_TO_QWEN
+            model: Qwen/Qwen2.5-0.5B-Instruct
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Verify frozen v1.1 preregistration
+        run: echo "${PREREG_SHA256}  ${PREREG}" | sha256sum -c -
+      - name: Assert target job has no downloaded origin or governance evidence
+        run: |
+          test ! -d evidence
+          test ! -e governance-v1.1-${{ matrix.sequence }}.json
+      - name: Materialize only the frozen portable-state contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path("experiments/cross_substrate_causal_inheritance_v1_1/prereg_v1_1.json").read_text())
+          Path("contract-v1.1.json").write_text(json.dumps(p["portable_state_contract"], indent=2, sort_keys=True) + "\n")
+          PY
+      - name: Install real-model runtime
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install 'transformers>=4.45,<5' 'safetensors>=0.4'
+      - name: Execute different target model after governance promotion without receiving governance
+        run: |
+          python experiments/cross_runtime/run_model.py \
+            --contract contract-v1.1.json \
+            --model "${{ matrix.model }}" \
+            --output "target-v1.1-${{ matrix.sequence }}.json"
+      - name: Upload target evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: target-v1-1-${{ matrix.sequence }}
+          path: target-v1.1-${{ matrix.sequence }}.json
+
+  evaluate:
+    name: v1.1 apply external governance after model replacement (${{ matrix.sequence }})
+    needs: [target, governance]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sequence: QWEN_TO_SMOL
+          - sequence: SMOL_TO_QWEN
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Verify frozen v1.1 preregistration
+        run: echo "${PREREG_SHA256}  ${PREREG}" | sha256sum -c -
+      - name: Download target runtime evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: target-v1-1-${{ matrix.sequence }}
+          path: evidence/target
+      - name: Download previously promoted governance pack
+        uses: actions/download-artifact@v4
+        with:
+          name: governance-v1-1-${{ matrix.sequence }}
+          path: evidence/governance
+      - name: Pin causal runtime
+        run: |
+          git clone -q https://github.com/MatVerse-py/matverse-stack-production.git causal-stack
+          git -C causal-stack checkout -q "${STACK_COMMIT}"
+          test "$(git -C causal-stack rev-parse HEAD)" = "${STACK_COMMIT}"
+          pip install 'pydantic>=2.0' 'requests>=2.32'
+      - name: Evaluate identical normalized target mutation across frozen arms
+        run: |
+          PYTHONPATH="experiments/cross_substrate_causal_inheritance_v1_1" \
+          python experiments/cross_substrate_causal_inheritance_v1_1/evaluate_target_v1_1.py \
+            --target-result "evidence/target/target-v1.1-${{ matrix.sequence }}.json" \
+            --governance-pack "evidence/governance/governance-v1.1-${{ matrix.sequence }}.json" \
+            --prereg "${PREREG}" \
+            --stack-root causal-stack \
+            --sequence "${{ matrix.sequence }}" \
+            --output "eval-v1.1-${{ matrix.sequence }}.json"
+      - name: Upload sequence report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-v1-1-${{ matrix.sequence }}
+          path: eval-v1.1-${{ matrix.sequence }}.json
+      - name: Enforce sequence result fail-closed
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d = json.loads(Path("eval-v1.1-${{ matrix.sequence }}.json").read_text())
+          assert d["primary_result"] == "PASS", d
+          PY
+
+  compare:
+    name: v1.1 adjudicate two-direction evidence
+    needs: evaluate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Download both sequence reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: eval-v1-1-*
+          path: evidence/evals
+          merge-multiple: true
+      - name: Freeze v1.1 evidence pack
+        run: |
+          python experiments/cross_substrate_causal_inheritance_v1_1/compare_sequences_v1_1.py \
+            --pattern "evidence/evals/eval-v1.1-*.json" \
+            --output cross-substrate-gci-v1.1-evidence-pack.json
+          sha256sum cross-substrate-gci-v1.1-evidence-pack.json
+      - name: Upload final v1.1 evidence pack
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-substrate-gci-v1-1-evidence
+          path: cross-substrate-gci-v1.1-evidence-pack.json
+      - name: Enforce bounded promotion gate
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d = json.loads(Path("cross-substrate-gci-v1.1-evidence-pack.json").read_text())
+          assert d["primary_result"] == "PASS", d
+          assert d["promotion"]["PATENTABILITY"] == "HOLD"
+          assert d["promotion"]["INDEPENDENT_PROVIDER_REPRODUCTION"] == "HOLD"
+          assert d["promotion"]["MODEL_INDEPENDENT_SEMANTIC_DISCOVERY"] == "HOLD"
+          PY
