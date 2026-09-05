@@ -14,7 +14,7 @@ on:
         default: 'examples/marxiv/matverse-2.0/approval-intent.v1.json'
         type: string
       ttl_seconds:
-        description: 'Fresh challenge validity window in seconds'
+        description: 'Fresh challenge validity window in seconds (300..86400)'
         required: true
         default: '7200'
         type: string
@@ -37,6 +37,24 @@ jobs:
 
       - name: Install pinned publication transport
         run: pip install -r requirements-publication.txt
+
+      - name: Validate challenge TTL
+        shell: bash
+        env:
+          TTL_SECONDS: ${{ inputs.ttl_seconds }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+
+          raw = os.environ['TTL_SECONDS'].strip()
+          try:
+              ttl = int(raw)
+          except ValueError as exc:
+              raise SystemExit('ttl_seconds must be an integer') from exc
+          if not 300 <= ttl <= 86400:
+              raise SystemExit('ttl_seconds must be between 300 and 86400 seconds')
+          PY
 
       - name: Reconstruct exact package without credentials
         shell: bash
@@ -76,7 +94,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          state_path=/tmp/marxiv-human-challenge-v2/prepared-state.json
           sandbox=$(python - <<'PY'
           import json
           from pathlib import Path
