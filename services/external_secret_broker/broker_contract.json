@@ -1,0 +1,50 @@
+{
+  "alg": "RS256",
+  "allowed_events": [
+    "workflow_dispatch"
+  ],
+  "allowed_repository": "MatVerse-py/Gpt-project-bridge",
+  "allowed_repository_owner": "MatVerse-py",
+  "audience": "matverse-secret-broker",
+  "capability": "openai.responses.create",
+  "claim_boundary": {
+    "HSM_KMS_Vault_backend": "HOLD until independently verified",
+    "executor_transplant": "independent; no promotion from this service",
+    "external_deployment": "HOLD until a reachable deployment is observed",
+    "provider_secret_backend": "HOLD until external secret provisioning is observed",
+    "service_implementation": "may PASS after CI"
+  },
+  "default_allowed_refs": [
+    "refs/heads/main"
+  ],
+  "issuer": "https://token.actions.githubusercontent.com",
+  "jwks_uri": "https://token.actions.githubusercontent.com/.well-known/jwks",
+  "protocol": "matverse.external-secret-broker.v1",
+  "provider": {
+    "endpoint": "https://api.openai.com/v1/responses",
+    "models": [
+      "gpt-5.6-sol",
+      "gpt-6-astra"
+    ],
+    "name": "openai"
+  },
+  "request_invariants": {
+    "max_body_bytes": 1000000,
+    "previous_response_id": "forbidden",
+    "request_hash_binding": "sha256(secret_ref || 0x00 || capability || 0x00 || raw_body)",
+    "store": false
+  },
+  "secret_backend": {
+    "env_secret_default": "forbidden",
+    "env_secret_transitional_opt_in": "MATVERSE_ALLOW_ENV_SECRET=true",
+    "preferred": "mounted_secret_file",
+    "target_backends": [
+      "Vault Agent",
+      "Kubernetes CSI Secret Store",
+      "external KMS/Vault broker"
+    ]
+  },
+  "secret_ref": "secret_ref://openai/matverse/executor-transplant",
+  "service": "MatVerse External Secret Broker",
+  "workflow_ref_prefix": "MatVerse-py/Gpt-project-bridge/.github/workflows/secret-plane-oidc-broker-v1.yml@"
+}
