@@ -7,16 +7,16 @@ from pydantic import BaseModel, Field
 
 from .auth import Principal, require_capability
 from .evidence import evidence_receipt
-from .openai_runtime import (
-    OPENAI_RUNTIME_PROTOCOL,
-    OpenAIConfigurationError,
-    OpenAIProviderError,
-    OpenAIResponsesRuntime,
-    runtime_status_from_env,
-)
+from .openai_runtime import OPENAI_RUNTIME_PROTOCOL, OpenAIConfigurationError, OpenAIProviderError
+from .openai_secret_plane import OpenAISecretPlaneBroker, secret_plane_status_from_env
+from .secret_plane import KeyAuthority, SecretPlaneError
 from .storage import append_event
 
 router = APIRouter(prefix="/providers/openai", tags=["providers", "openai"])
+
+# Process-local authority for short-lived disclosure leases. It is intentionally
+# not persisted, exported or reused as provider credential material.
+_OPENAI_PROCESS_LEASE_KEY = KeyAuthority.generate()
 
 
 class OpenAIHumanData(BaseModel):
@@ -39,7 +39,7 @@ class OpenAIResponseRequest(BaseModel):
 def openai_status(
     principal: Principal = Depends(require_capability("provider:openai:read")),
 ) -> dict[str, Any]:
-    return {**runtime_status_from_env(), "read_by": principal.principal_id}
+    return {**secret_plane_status_from_env(), "read_by": principal.principal_id}
 
 
 @router.post("/responses")
@@ -48,12 +48,13 @@ def openai_response(
     principal: Principal = Depends(require_capability("provider:openai:invoke")),
 ) -> dict[str, Any]:
     try:
-        runtime = OpenAIResponsesRuntime.from_env()
+        broker = OpenAISecretPlaneBroker.from_env(lease_signing_key=_OPENAI_PROCESS_LEASE_KEY)
     except OpenAIConfigurationError as exc:
         event = {
             "event_type": "OPENAI_PROVIDER_CONFIGURATION_HOLD",
             "principal_id": principal.principal_id,
             "protocol": OPENAI_RUNTIME_PROTOCOL,
+            "credential_mode": "secret_plane",
             "reason": str(exc),
         }
         receipt = append_event(event, "HOLD")
@@ -64,7 +65,8 @@ def openai_response(
 
     human = req.human.model_dump() if req.human is not None else None
     try:
-        result = runtime.governed_invoke(
+        result = broker.governed_invoke(
+            actor=principal.principal_id,
             input_text=req.input,
             instructions=req.instructions,
             metadata=req.metadata,
@@ -78,6 +80,7 @@ def openai_response(
             "principal_id": principal.principal_id,
             "protocol": OPENAI_RUNTIME_PROTOCOL,
             "provider": "openai",
+            "credential_mode": "secret_plane",
             "status_code": exc.status_code,
             "provider_request_id": exc.request_id,
             "provider_code": exc.provider_code,
@@ -94,11 +97,32 @@ def openai_response(
                 "receipt": ledger_receipt,
             },
         ) from exc
+    except (SecretPlaneError, OpenAIConfigurationError) as exc:
+        event = {
+            "event_type": "OPENAI_SECRET_PLANE_HOLD",
+            "principal_id": principal.principal_id,
+            "protocol": OPENAI_RUNTIME_PROTOCOL,
+            "provider": "openai",
+            "credential_mode": "secret_plane",
+            "error_type": type(exc).__name__,
+        }
+        ledger_receipt = append_event(event, "HOLD")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "decision": "HOLD",
+                "reason": "secret plane could not authorize or disclose the provider credential",
+                "receipt": ledger_receipt,
+            },
+        ) from exc
 
     auditable_input = {
         "protocol": OPENAI_RUNTIME_PROTOCOL,
         "principal_id": principal.principal_id,
         "provider": "openai",
+        "credential_mode": "secret_plane",
+        "secret_id": result.get("secret_id"),
+        "secret_version": result.get("secret_version"),
         "model": result.get("model"),
         "request_hash": result.get("request_hash"),
         "human_boundary_declared": human is not None,
@@ -110,6 +134,7 @@ def openai_response(
                 "event_type": "OPENAI_PROVIDER_EXPOSURE_REJECTED",
                 **auditable_input,
                 "gate": {"decision": result["decision"], "reason": result["reason"]},
+                "secret_disclosed": result.get("secret_disclosed", False),
             },
             result["decision"],
         )
@@ -121,6 +146,7 @@ def openai_response(
         "response_hash": result.get("response_hash"),
         "usage": result.get("usage", {}),
         "provider_request_id": result.get("provider_request_id"),
+        "lease_id": result.get("lease_id"),
     }
     ev = evidence_receipt("OPENAI_RESPONSE", auditable_input, auditable_output)
     ledger_receipt = append_event(
