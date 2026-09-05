@@ -52,13 +52,20 @@ def _success_transport(expected_model: str, *, returned_model: str | None = None
     return httpx.MockTransport(handler)
 
 
-def test_missing_secret_produces_explicit_hold(tmp_path: Path) -> None:
+def test_missing_capability_produces_hold_and_ignores_provider_key(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     output = tmp_path / "evidence.json"
+    provider_secret = "sk-provider-secret-must-not-reach-executor"
+    monkeypatch.setenv("OPENAI_API_KEY", provider_secret)
+    monkeypatch.delenv("MATVERSE_OPENAI_CAPABILITY_TOKEN", raising=False)
+
     report = run_experiment(
         contract_path=CONTRACT,
         evidence_path=output,
         repository_root=ROOT,
-        api_key="",
+        api_key=None,
     )
 
     assert report["experiment_result"] == "HOLD"
@@ -66,16 +73,22 @@ def test_missing_secret_produces_explicit_hold(tmp_path: Path) -> None:
     assert report["promotion"]["external_pass"] == "HOLD"
     assert report["steps"] == []
     assert report["secret_persisted"] is False
+    assert report["capability_persisted"] is False
     assert report["raw_output_persisted"] is False
+    assert report["secret_plane"]["provider_secret_exposed_to_executor"] is False
     assert len(report["evidence_pack_hash"]) == 64
 
     persisted = output.read_text(encoding="utf-8")
-    assert "OPENAI_API_KEY" in persisted
-    assert "test-secret-key-material" not in persisted
+    assert "secret_ref://openai/matverse/executor-transplant" in persisted
+    assert provider_secret not in persisted
+    assert "OPENAI_API_KEY" not in persisted
 
 
-def test_mocked_sol_astra_sol_preserves_invariants(tmp_path: Path) -> None:
+def test_mocked_sol_astra_sol_preserves_invariants_without_persisting_capability(
+    tmp_path: Path,
+) -> None:
     output = tmp_path / "evidence.json"
+    capability = "capability-" + ("a" * 40)
 
     def factory(model: str):
         return _success_transport(model)
@@ -84,7 +97,8 @@ def test_mocked_sol_astra_sol_preserves_invariants(tmp_path: Path) -> None:
         contract_path=CONTRACT,
         evidence_path=output,
         repository_root=ROOT,
-        api_key="test-secret-key-material",
+        api_key=capability,
+        base_url="http://127.0.0.1:8787/v1",
         transport_factory=factory,
     )
 
@@ -103,6 +117,7 @@ def test_mocked_sol_astra_sol_preserves_invariants(tmp_path: Path) -> None:
     ]
     assert all(step["status"] == "PASS" for step in report["steps"])
     assert all(step["raw_output_persisted"] is False for step in report["steps"])
+    assert all(step["capability_persisted"] is False for step in report["steps"])
     assert report["invariance"] == {
         "all_steps_pass": True,
         "same_source_contract": True,
@@ -111,10 +126,12 @@ def test_mocked_sol_astra_sol_preserves_invariants(tmp_path: Path) -> None:
         "same_constitutional_contract": True,
         "same_prompt": True,
         "sol_return_pass": True,
+        "provider_secret_not_in_executor": True,
     }
     assert report["steps"][0]["parsed_state"] == report["steps"][2]["parsed_state"]
     assert report["steps"][0]["estimated_cost_usd"] == pytest.approx(0.0008)
     assert report["steps"][1]["estimated_cost_usd"] == pytest.approx(0.002)
+    assert capability not in output.read_text(encoding="utf-8")
 
 
 def test_astra_access_hold_does_not_promote(tmp_path: Path) -> None:
@@ -140,7 +157,7 @@ def test_astra_access_hold_does_not_promote(tmp_path: Path) -> None:
         contract_path=CONTRACT,
         evidence_path=output,
         repository_root=ROOT,
-        api_key="test-secret-key-material",
+        api_key="capability-" + ("b" * 40),
         transport_factory=factory,
     )
 
@@ -151,6 +168,41 @@ def test_astra_access_hold_does_not_promote(tmp_path: Path) -> None:
     assert report["steps"][0]["status"] == "PASS"
     assert report["steps"][1]["status"] == "HOLD_PROVIDER"
     assert report["steps"][1]["provider_code"] == "model_not_available"
+
+
+def test_expired_secret_capability_has_distinct_hold(tmp_path: Path) -> None:
+    output = tmp_path / "evidence.json"
+
+    def factory(model: str):
+        if model == "gpt-6-astra":
+            def handler(_: httpx.Request) -> httpx.Response:
+                return httpx.Response(
+                    401,
+                    json={
+                        "error": {
+                            "code": "capability_expired",
+                            "message": "request not authorized by MatVerse secret plane",
+                        }
+                    },
+                )
+            return httpx.MockTransport(handler)
+        return _success_transport(model)
+
+    report = run_experiment(
+        contract_path=CONTRACT,
+        evidence_path=output,
+        repository_root=ROOT,
+        api_key="capability-" + ("c" * 40),
+        transport_factory=factory,
+    )
+
+    assert report["experiment_result"] == "HOLD"
+    assert (
+        report["promotion"]["executor_substitution_invariance"]
+        == "HOLD_SECRET_CAPABILITY"
+    )
+    assert report["steps"][1]["status"] == "HOLD_SECRET"
+    assert report["steps"][1]["provider_code"] == "capability_expired"
 
 
 def test_returned_model_mismatch_fails_binding(tmp_path: Path) -> None:
@@ -165,7 +217,7 @@ def test_returned_model_mismatch_fails_binding(tmp_path: Path) -> None:
         contract_path=CONTRACT,
         evidence_path=output,
         repository_root=ROOT,
-        api_key="test-secret-key-material",
+        api_key="capability-" + ("d" * 40),
         transport_factory=factory,
     )
 
