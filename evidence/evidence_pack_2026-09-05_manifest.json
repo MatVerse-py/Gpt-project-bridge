@@ -1,0 +1,79 @@
+{
+  "convergence": {
+    "capsule/verify.py": {
+      "action": "DO_NOT_DUPLICATE",
+      "canonical": [
+        "app/reproduction_capsule.py",
+        "app/evidence.py"
+      ]
+    },
+    "drift_engine.py": {
+      "action": "PROMOTE",
+      "reason": "no canonical equivalent found on main; instrument is non-overlapping",
+      "target": "app/drift_engine.py"
+    },
+    "field_runtime.py": {
+      "action": "DO_NOT_DUPLICATE",
+      "canonical": [
+        "app/core.py",
+        "app/organism_loop.py",
+        "app/physiology.py",
+        "app/storage.py"
+      ]
+    },
+    "integrated_cycle.py": {
+      "action": "DO_NOT_DUPLICATE",
+      "canonical": [
+        "app/physiology.py",
+        "app/organism_loop.py",
+        "app/evidence.py"
+      ]
+    },
+    "openai_audit_snapshot": {
+      "action": "SUPERSEDED",
+      "canonical": [
+        "app/openai_runtime.py",
+        "app/openai_provider.py"
+      ],
+      "superseded_by": "PR #38 merged 2026-09-05"
+    },
+    "runtime_audit.py": {
+      "action": "DO_NOT_DUPLICATE",
+      "canonical": [
+        "app/deterministic_lab.py",
+        "app/physiology.py",
+        "app/evidence.py"
+      ]
+    }
+  },
+  "live_provider_execution": "HOLD_NO_SECRET_IN_CI",
+  "observed_results": {
+    "drift_adjudicate_median_us": 14.339,
+    "drift_chernoff_median_us": 539.219,
+    "field_negative_final_state": "ROLLED_BACK",
+    "field_negative_receipt_digest": "37d744e8c5c2ceba9099fe9477b49a92324f93f4d7e2ee973ec2792e40f18c3a",
+    "runtime_deterministic_median_us": 86.732,
+    "runtime_receipt_digest": "83e4aa8fb4714c215ae9f7e64d91f6388ef27b6868c0fe78c18fa52bc09c3997",
+    "runtime_receipt_final_state": "COMMITTED",
+    "runtime_replay_median_us": 75.132
+  },
+  "schema": "matverse.evidence-pack-convergence.v1",
+  "source": {
+    "filename": "Desenvolvimento_de_Testes_e_Benchmarking_2_FIXED.zip",
+    "local_clean_extract_pytest": "62 passed in 0.15s",
+    "sha256": "589dda3c5431175036019ae56f0a08f97d4bfa47a23307c1b6f0894d3162101b",
+    "validation_scope": "LOCAL_ISOLATED_NO_NETWORK_NO_SECRETS"
+  },
+  "source_artifacts_sha256": {
+    "Auditoria local da integração OpenAI no MatVerse.md": "246153b7edab7f41570f2d4e11ebb76605545b0858e51548541a54b44124c4d2",
+    "benchmark_results.csv": "88158c0834f0228d89b06ea2abd27bc9b478fef1875b48aa20ef58a312b7c4b8",
+    "benchmark_runtime_results.csv": "450334fd8e1f732f36870bc49c2683dfb8f4a9685fb3647047f09917f06cc0cf",
+    "capsule/verify.py": "614f43d386e0a8ea275ea554675c73396f3db3a4d19cbd1c2afdac6f509b1574",
+    "drift_engine.py": "69fab09672325971909c06fbf1e1590239e10ae406232419d0263ce95f9f1785",
+    "field-receipt.json": "a9076c59679af4fbf9918e3045a5122944420aa940e9a861233d0b88d6f85eb4",
+    "field_runtime.py": "4e7e8a2b48977b36685661f71d2299236e764778c63d7f2010a7b7e9ba3a127c",
+    "integrated_cycle.py": "6987d6db86a84ae4462d01f3258ef7d884c03d2ce39a241839f5c516f7ad3274",
+    "receipt.json": "03c50b8dcc9eb29d906c66f14d85c8e071a86210a6cfdfef68b6da4a49e7596e",
+    "runtime_audit.py": "3598cbce9091f2c34a90275708ff0fc7d056ffeed2335bacd26ee12d3202b093"
+  }
+}
