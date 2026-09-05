@@ -1,0 +1,35 @@
+{
+  "schema": "marxiv.manuscript-freeze.v1",
+  "object_id": "matverse-2.0",
+  "scientific_object_version": "v1",
+  "manuscript_version": "v0.1",
+  "manuscript_path": "papers/matverse-2.0/main.tex",
+  "source_commit": "e4c38eba93c8948cf68a4124179003720c76bfd8",
+  "status": "FROZEN_FOR_GOVERNED_DRY_RUN",
+  "editorial_selection": {
+    "author": "Mateus Alves Arêas",
+    "orcid": "0009-0008-2973-4047",
+    "affiliation": null,
+    "primary_archive": "cs",
+    "primary_category": "cs.SE",
+    "crosslist_archives": ["cs"],
+    "crosslist_categories": ["cs.AI"],
+    "license": "CC BY 4.0",
+    "abstract": "current manuscript abstract"
+  },
+  "authority": {
+    "scope": "FREEZE_AND_DRY_RUN_ONLY",
+    "external_submission_authorized": false,
+    "approval_challenge_authorized": false,
+    "arxiv_login_authorized": false,
+    "final_submit_authorized": false,
+    "source": "explicit interactive user confirmation immediately following the exact freeze configuration"
+  },
+  "invariants": [
+    "ManuscriptCandidate != FrozenManuscript",
+    "FrozenManuscript != ApprovedPublicationPackage",
+    "Prepared != Approved",
+    "Publication != ScientificTruth"
+  ],
+  "mutation_rule": "Any content or publication-metadata mutation after this freeze requires a new freeze decision before promotion or preparation."
+}

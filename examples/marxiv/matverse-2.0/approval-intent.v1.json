@@ -1,0 +1,21 @@
+{
+  "schema": "marxiv.approval-intent.v1",
+  "object_id": "matverse-2.0",
+  "version": "v1",
+  "publication_id": "matverse-2.0-v1-arxiv",
+  "package_hash": "4ef1c650ccf52054cb77adc5d1a1e8d5a19785bcdbe23a644470ee707e97b2aa",
+  "decision": "APPROVE_PACKAGE_INTENT",
+  "authority_scope": "APPROVE_EXACT_PACKAGE_ONLY",
+  "human_confirmation": "CONFIRMED",
+  "confirmation_context": "Explicit affirmative confirmation immediately after the exact package hash and the HUMAN_REVIEW_REQUIRED -> APPROVED transition were presented in the project session.",
+  "recorded_at": "2026-09-04T02:33:00Z",
+  "runtime_approval_state": "HOLD_LOCAL_CRYPTOGRAPHIC_SEAL",
+  "approval_challenge_created": false,
+  "human_approval_artifact_created": false,
+  "marxiv_approval_secret_present": false,
+  "required_runtime_confirmation": "PUBLISH matverse-2.0-v1-arxiv 4ef1c650ccf5",
+  "external_submission_authorized": false,
+  "arxiv_login_authorized": false,
+  "browser_submit_authorized": false,
+  "note": "This record captures human package-bound approval intent but is not the marxiv.human-approval.v1 cryptographic artifact. Runtime APPROVED remains fail-closed until request-approval creates a live challenge and the local runtime seals the exact package using MARXIV_APPROVAL_SECRET."
+}

@@ -123,7 +123,7 @@ export class MatVerseContainer extends Container {
   defaultPort = 8000;
   sleepAfter = "10m";
   enableInternet = false;
-  pingEndpoint = "localhost/health";
+  pingEndpoint = "/health";
   envVars = {
     MATVERSE_INSTITUTIONAL_STATE_URL: `http://${INTERNAL_STATE_HOST}`,
     MATVERSE_PRINCIPALS_JSON: String(bindings.MATVERSE_PRINCIPALS_JSON ?? ""),

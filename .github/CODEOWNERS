@@ -1,0 +1,7 @@
+# MARXIV / publication authority critical paths
+/.github/CODEOWNERS @MatVerse-py
+/.github/workflows/marxiv-* @MatVerse-py
+/app/marxiv_* @MatVerse-py
+/examples/marxiv/** @MatVerse-py
+/papers/matverse-2.0/** @MatVerse-py
+/evidence/marxiv/** @MatVerse-py

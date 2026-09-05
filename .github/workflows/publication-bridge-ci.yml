@@ -1,0 +1,217 @@
+name: Publication Bridge CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/publication_bridge.py'
+      - 'app/marxiv_runtime_publisher.py'
+      - 'app/marxiv_preflight.py'
+      - 'app/marxiv_approval_seal.py'
+      - 'tests/test_publication_bridge.py'
+      - 'tests/test_marxiv_runtime_publisher.py'
+      - 'tests/test_marxiv_preflight.py'
+      - 'requirements-publication.txt'
+      - 'PUBLICATION_BRIDGE_V1.md'
+      - 'MARXIV_RUNTIME_PUBLISHER_V1.md'
+      - 'MARXIV_CANON_V1.md'
+      - 'MARXIV_PAPER1_DRY_RUN.md'
+      - 'examples/marxiv/**'
+      - 'papers/matverse-2.0/**'
+      - '.gitignore'
+      - '.github/workflows/publication-bridge-ci.yml'
+      - '.github/workflows/marxiv-approval-seal.yml'
+  push:
+    branches: [publication-bridge/v1]
+    paths:
+      - 'app/publication_bridge.py'
+      - 'app/marxiv_runtime_publisher.py'
+      - 'app/marxiv_preflight.py'
+      - 'app/marxiv_approval_seal.py'
+      - 'tests/test_publication_bridge.py'
+      - 'tests/test_marxiv_runtime_publisher.py'
+      - 'tests/test_marxiv_preflight.py'
+      - 'requirements-publication.txt'
+      - 'PUBLICATION_BRIDGE_V1.md'
+      - 'MARXIV_RUNTIME_PUBLISHER_V1.md'
+      - 'MARXIV_CANON_V1.md'
+      - 'MARXIV_PAPER1_DRY_RUN.md'
+      - 'examples/marxiv/**'
+      - 'papers/matverse-2.0/**'
+      - '.gitignore'
+      - '.github/workflows/publication-bridge-ci.yml'
+      - '.github/workflows/marxiv-approval-seal.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Compile publisher modules
+        run: python -m py_compile app/publication_bridge.py app/marxiv_runtime_publisher.py app/marxiv_preflight.py app/marxiv_approval_seal.py
+      - name: Run publication tests
+        run: pytest -q tests/test_publication_bridge.py tests/test_marxiv_runtime_publisher.py tests/test_marxiv_preflight.py
+      - name: Assess and promote frozen Paper 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m app.marxiv_preflight assess --preflight examples/marxiv/matverse-2.0/paper1-preflight.json > /tmp/paper1-preflight.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.load(open('/tmp/paper1-preflight.json', encoding='utf-8'))
+          assert data['status'] == 'READY_FOR_PROMOTION'
+          assert data['blockers'] == []
+          assert data['manuscript_resolved_path'] is not None
+          assert Path(data['manuscript_resolved_path']).is_file()
+          PY
+          python -m app.marxiv_preflight promote \
+            --preflight examples/marxiv/matverse-2.0/paper1-preflight.json \
+            --output examples/marxiv/matverse-2.0/scientific-object.generated.json > /tmp/paper1-promote-output.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          generated = json.loads(Path('examples/marxiv/matverse-2.0/scientific-object.generated.json').read_text(encoding='utf-8'))
+          canonical = json.loads(Path('examples/marxiv/matverse-2.0/scientific-object.v1.json').read_text(encoding='utf-8'))
+          assert generated == canonical
+          assert generated['manuscript_file'] == '../../../papers/matverse-2.0/main.tex'
+          PY
+      - name: Manuscript/preflight identity consistency
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          p = json.loads(Path('examples/marxiv/matverse-2.0/paper1-preflight.json').read_text(encoding='utf-8'))
+          tex = Path('papers/matverse-2.0/main.tex').read_text(encoding='utf-8')
+
+          def normalize_text(value: str) -> str:
+              value = value.replace(r'$\Omega$', 'Ω').replace(r'\Omega', 'Ω')
+              return ' '.join(value.split())
+
+          abstract_match = re.search(r'\\begin\{abstract\}(.*?)\\end\{abstract\}', tex, re.S)
+          assert abstract_match is not None
+          assert p['title'] in tex
+          assert normalize_text(p['abstract']) == normalize_text(abstract_match.group(1))
+          assert p['publication_intent']['authors'][0]['name'].replace('ê', r'\^e') in tex or 'Mateus Alves Ar' in tex
+          assert p['publication_intent']['authors'][0]['orcid'] in tex
+          assert p['publication_intent']['manuscript_confirmed'] is True
+          assert p['publication_intent']['primary_category'] == 'cs.SE'
+          assert p['publication_intent']['crosslist_categories'] == ['cs.AI']
+          assert p['publication_intent']['license'] == 'CC BY 4.0'
+          assert p['authority']['external_submission_authorized'] is False
+          assert '\\begin{document}' in tex and '\\end{document}' in tex
+          PY
+      - name: Install pinned publication transport
+        run: pip install -r requirements-publication.txt
+      - name: Import pinned arXiv finalizer
+        run: python -c "from paperpush.venues.arxiv.arxiv import ArxivVenue, license_url; assert ArxivVenue.slug == 'arxiv'; assert license_url('CC BY 4.0')"
+      - name: Governed Paper 1 dry-run is portable and stops at HUMAN_REVIEW_REQUIRED
+        shell: bash
+        env:
+          ARXIV_EMAIL: ''
+          ARXIV_PASSWORD: ''
+          MARXIV_APPROVAL_SECRET: ''
+        run: |
+          set -euo pipefail
+          rm -rf .marxiv
+          python -m app.marxiv_runtime_publisher prepare \
+            --object examples/marxiv/matverse-2.0/scientific-object.generated.json \
+            --sandbox-root .marxiv/run-a > /tmp/paper1-state-a.json
+          python -m app.marxiv_runtime_publisher prepare \
+            --object examples/marxiv/matverse-2.0/scientific-object.generated.json \
+            --sandbox-root .marxiv/run-b > /tmp/paper1-state-b.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          a = json.load(open('/tmp/paper1-state-a.json', encoding='utf-8'))
+          b = json.load(open('/tmp/paper1-state-b.json', encoding='utf-8'))
+          stable_fields = [
+              'object_hash',
+              'manifest_hash',
+              'manuscript_sha256',
+              'arxiv_subfile_sha256',
+              'review_packet_hash',
+              'package_hash',
+          ]
+          for key in stable_fields:
+              assert a[key] == b[key], (key, a[key], b[key])
+          assert a['status'] == b['status'] == 'HUMAN_REVIEW_REQUIRED'
+          assert a['publication_id'] == b['publication_id'] == 'matverse-2.0-v1-arxiv'
+          for root in (Path('.marxiv/run-a/matverse-2.0/v1'), Path('.marxiv/run-b/matverse-2.0/v1')):
+              assert (root / 'scientific-object.snapshot.json').is_file()
+              assert (root / 'arxiv-manifest.json').is_file()
+              assert (root / 'review-packet.json').is_file()
+              assert (root / 'publisher-state.json').is_file()
+              assert (root / 'manuscript' / 'main.tex').is_file()
+              assert not (root / 'approval-challenge.json').exists()
+              assert not (root / 'human-approval.json').exists()
+              assert not (root / 'submission-result.json').exists()
+          print(json.dumps({
+              'status': a['status'],
+              'publication_id': a['publication_id'],
+              'portable_package_identity': True,
+              'package_hash': a['package_hash'],
+              'object_hash': a['object_hash'],
+              'manifest_hash': a['manifest_hash'],
+              'manuscript_sha256': a['manuscript_sha256'],
+              'arxiv_subfile_sha256': a['arxiv_subfile_sha256'],
+              'review_packet_hash': a['review_packet_hash'],
+              'external_side_effect': False,
+              'approval_created': False
+          }, sort_keys=True))
+          PY
+      - name: Simulate package-bound approval seal without submission
+        shell: bash
+        env:
+          ARXIV_EMAIL: ''
+          ARXIV_PASSWORD: ''
+          MARXIV_APPROVAL_SECRET: 'ci-ephemeral-approval-secret-not-production-2026'
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/marxiv-approval-seal /tmp/marxiv-approval-evidence
+          python -m app.marxiv_approval_seal \
+            --intent examples/marxiv/matverse-2.0/approval-intent.v1.json \
+            --object examples/marxiv/matverse-2.0/scientific-object.generated.json \
+            --sandbox-root /tmp/marxiv-approval-seal \
+            --approver ci-ephemeral-test \
+            --evidence-dir /tmp/marxiv-approval-evidence \
+            --ttl-seconds 7200 > /tmp/marxiv-approval-summary.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          summary = json.loads(Path('/tmp/marxiv-approval-summary.json').read_text(encoding='utf-8'))
+          assert summary['status'] == 'APPROVED'
+          assert summary['approval_verified'] is True
+          assert summary['package_hash'] == '4ef1c650ccf52054cb77adc5d1a1e8d5a19785bcdbe23a644470ee707e97b2aa'
+          assert summary['external_side_effect'] is False
+          assert summary['external_identifier'] is None
+          assert summary['secret_persisted'] is False
+          assert summary['submission_authorized'] is False
+
+          root = Path('/tmp/marxiv-approval-seal/matverse-2.0/v1')
+          assert (root / 'approval-challenge.json').is_file()
+          assert (root / 'human-approval.json').is_file()
+          assert not (root / 'submission-result.json').exists()
+          PY
+      - name: Secret-boundary static check
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RIn --exclude-dir=.git --exclude='PUBLICATION_BRIDGE_V1.md' --exclude='MARXIV_RUNTIME_PUBLISHER_V1.md' \
+            -E '(ARXIV_PASSWORD[[:space:]]*=.+|PAPERPUSH_PASSWORD[[:space:]]*=.+|MARXIV_APPROVAL_SECRET[[:space:]]*=.+)' .; then
+            echo 'Credential-like assignment found in tracked runtime/test files.' >&2
+            exit 1
+          fi
+          if find . -type f \( -name 'human-approval.json' -o -name 'approval-challenge.json' \) -not -path './.git/*' | grep -q .; then
+            echo 'Approval artifact unexpectedly created or committed.' >&2
+            exit 1
+          fi

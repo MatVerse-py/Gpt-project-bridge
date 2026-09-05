@@ -1,0 +1,32 @@
+name: MARXIV approval seal (legacy HMAC disabled)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  blocked:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Legacy seal is intentionally disabled
+        shell: bash
+        run: |
+          cat >&2 <<'EOF'
+          BLOCKED: the legacy MARXIV HMAC approval workflow is intentionally disabled.
+
+          Reason:
+          - it could create the fresh challenge and derive the confirmation phrase in the same automated run;
+          - HMAC possession proves runtime-secret possession, not a non-repudiable human-authority signature.
+
+          Use the V2 flow instead:
+          1. Run "MARXIV human approval challenge v2".
+          2. Inspect the fresh challenge and exact APPROVE_PACKAGE confirmation phrase.
+          3. Sign the challenge locally with the human authority Ed25519 private key.
+          4. Verify the signed approval against the registered public authority.
+          5. Persist the verified evidence pack through a reviewed commit/PR.
+
+          This workflow performs no arXiv login, submission, or external publication action.
+          EOF
+          exit 2

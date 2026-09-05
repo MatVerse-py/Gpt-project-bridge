@@ -1,0 +1,149 @@
+name: MARXIV human approval challenge v2
+
+on:
+  workflow_dispatch:
+    inputs:
+      scientific_object:
+        description: 'Canonical Scientific Object to reconstruct before challenge issuance'
+        required: true
+        default: 'examples/marxiv/matverse-2.0/scientific-object.v1.json'
+        type: string
+      approval_intent:
+        description: 'Tracked package-bound approval intent used only as a package identity constraint'
+        required: true
+        default: 'examples/marxiv/matverse-2.0/approval-intent.v1.json'
+        type: string
+      ttl_seconds:
+        description: 'Fresh challenge validity window in seconds (300..86400)'
+        required: true
+        default: '7200'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  challenge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install runtime dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install pinned publication transport
+        run: pip install -r requirements-publication.txt
+
+      - name: Validate challenge TTL
+        shell: bash
+        env:
+          TTL_SECONDS: ${{ inputs.ttl_seconds }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+
+          raw = os.environ['TTL_SECONDS'].strip()
+          try:
+              ttl = int(raw)
+          except ValueError as exc:
+              raise SystemExit('ttl_seconds must be an integer') from exc
+          if not 300 <= ttl <= 86400:
+              raise SystemExit('ttl_seconds must be between 300 and 86400 seconds')
+          PY
+
+      - name: Reconstruct exact package without credentials
+        shell: bash
+        env:
+          ARXIV_EMAIL: ''
+          ARXIV_PASSWORD: ''
+          MARXIV_APPROVAL_SECRET: ''
+        run: |
+          set -euo pipefail
+          rm -rf .marxiv/human-challenge-v2 /tmp/marxiv-human-challenge-v2
+          mkdir -p /tmp/marxiv-human-challenge-v2
+          python -m app.marxiv_runtime_publisher prepare \
+            --object "${{ inputs.scientific_object }}" \
+            --sandbox-root .marxiv/human-challenge-v2 \
+            > /tmp/marxiv-human-challenge-v2/prepared-state.json
+
+      - name: Validate package identity against tracked intent
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          state = json.loads(Path('/tmp/marxiv-human-challenge-v2/prepared-state.json').read_text(encoding='utf-8'))
+          intent = json.loads(Path('${{ inputs.approval_intent }}').read_text(encoding='utf-8'))
+          assert state['status'] == 'HUMAN_REVIEW_REQUIRED'
+          assert state['package_hash'] == intent['package_hash']
+          assert state['publication_id'] == intent['publication_id']
+          assert intent['authority_scope'] == 'APPROVE_EXACT_PACKAGE_ONLY'
+          assert intent['external_submission_authorized'] is False
+          assert intent['arxiv_login_authorized'] is False
+          assert intent['browser_submit_authorized'] is False
+          PY
+
+      - name: Issue fresh challenge
+        shell: bash
+        run: |
+          set -euo pipefail
+          sandbox=$(python - <<'PY'
+          import json
+          from pathlib import Path
+          s = json.loads(Path('/tmp/marxiv-human-challenge-v2/prepared-state.json').read_text(encoding='utf-8'))
+          print(f".marxiv/human-challenge-v2/{s['object_id']}/{s['version']}")
+          PY
+          )
+          python -m app.marxiv_runtime_publisher request-approval \
+            --sandbox "$sandbox" \
+            --ttl-seconds "${{ inputs.ttl_seconds }}" \
+            > /tmp/marxiv-human-challenge-v2/runtime-challenge-output.json
+          cp "$sandbox/approval-challenge.json" /tmp/marxiv-human-challenge-v2/approval-challenge.json
+          cp "$sandbox/publisher-state.json" /tmp/marxiv-human-challenge-v2/publisher-state.json
+          cp "$sandbox/review-packet.json" /tmp/marxiv-human-challenge-v2/review-packet.json
+
+      - name: Derive human-visible V2 confirmation from fresh challenge
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m app.marxiv_human_authority describe \
+            --challenge /tmp/marxiv-human-challenge-v2/approval-challenge.json \
+            --output /tmp/marxiv-human-challenge-v2/challenge-summary.v2.json \
+            > /tmp/marxiv-human-challenge-v2/challenge-summary.stdout.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          summary = json.loads(Path('/tmp/marxiv-human-challenge-v2/challenge-summary.v2.json').read_text(encoding='utf-8'))
+          state = json.loads(Path('/tmp/marxiv-human-challenge-v2/prepared-state.json').read_text(encoding='utf-8'))
+          assert summary['publication_id'] == state['publication_id']
+          assert summary['package_hash'] == state['package_hash']
+          assert summary['required_human_confirmation'].startswith('APPROVE_PACKAGE ')
+          assert summary['required_human_confirmation'].endswith(summary['challenge_hash'][:12])
+          assert summary['external_submission_authorized'] is False
+          PY
+
+      - name: Assert no external side effect
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find .marxiv/human-challenge-v2 -name submission-result.json | grep -q .; then
+            echo 'Unexpected submission-result.json during challenge-only ceremony.' >&2
+            exit 1
+          fi
+          test -z "${ARXIV_EMAIL:-}"
+          test -z "${ARXIV_PASSWORD:-}"
+
+      - name: Upload fresh challenge evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: marxiv-paper1-human-challenge-v2
+          path: /tmp/marxiv-human-challenge-v2
+          if-no-files-found: error
+          retention-days: 30

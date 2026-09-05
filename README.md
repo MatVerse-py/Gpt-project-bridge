@@ -1,3 +1,13 @@
-# GPT Project Bridge
+# MatVerse Governed Bridge
 
-Repository initialized. The complete full-stack implementation is being proposed through a reviewable branch and pull request.
+Core bridge, federation, evidence and publication runtimes.
+
+## MARXIV Runtime Publisher
+
+Governed scientific publication flow:
+
+```text
+Scientific Object -> metadata projection -> sandbox -> human approval -> delegated agent publish -> external reconciliation
+```
+
+See `MARXIV_RUNTIME_PUBLISHER_V1.md` and `app/marxiv_runtime_publisher.py`.
