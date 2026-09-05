@@ -96,6 +96,11 @@ class _NoRedirectHandler(HTTPRedirectHandler):
         raise HTTPError(req.full_url, code, "runtime discovery redirect denied", headers, fp)
 
 
+def _is_http_url(url: str) -> bool:
+    parsed = urlparse(url)
+    return parsed.scheme.lower() in {"http", "https"} and parsed.hostname is not None
+
+
 def _is_loopback_url(url: str) -> bool:
     parsed = urlparse(url)
     host = parsed.hostname
@@ -147,6 +152,8 @@ def _probe_tcp(host: str, port: int, timeout: float) -> bool:
 
 
 def _safe_json_get(url: str, config: DiscoveryConfig, getter: JsonGet) -> tuple[dict[str, Any] | None, str]:
+    if not _is_http_url(url):
+        return None, "unsupported_url_scheme"
     if not config.allow_remote_endpoints and not _is_loopback_url(url):
         return None, "remote_probe_denied"
     try:
