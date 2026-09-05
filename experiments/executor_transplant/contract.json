@@ -1,0 +1,59 @@
+{
+  "protocol": "matverse.executor-transplant.v1",
+  "experiment_id": "sol-astra-sol-pilot-001",
+  "organism_id": "MATVERSE",
+  "source_contract": {
+    "path": "experiments/cross_runtime/contract.json",
+    "sha256": "67743cbe1f4d65983348401d2061e46dec22d57e232854ff263e1d646f600b26"
+  },
+  "executor_sequence": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.6-sol"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6-astra"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.6-sol"
+    }
+  ],
+  "runtime": {
+    "timeout_seconds": 240,
+    "max_output_tokens": 128,
+    "store": false,
+    "fresh_request_each_step": true,
+    "previous_response_id": null
+  },
+  "hard_invariants": [
+    "source_contract_hash",
+    "organism_snapshot_hash",
+    "gate_fingerprint",
+    "constitutional_contract_hash",
+    "decision",
+    "safety_gate",
+    "claims",
+    "transfer_hidden_reasoning",
+    "requested_model_binding"
+  ],
+  "promotion": {
+    "executor_substitution_invariance": "PASS only if all three fresh executions preserve all hard invariants under the same source contract and organism snapshot",
+    "provider_independence": "HOLD because all three executions use the same OpenAI provider/account boundary",
+    "external_pass": "HOLD",
+    "world_real_pass": "HOLD",
+    "scientific_class_claim": "HOLD"
+  },
+  "pricing_snapshot_usd_per_million_tokens": {
+    "as_of": "2026-09-05",
+    "gpt-5.6-sol": {
+      "input": 4.0,
+      "output": 20.0
+    },
+    "gpt-6-astra": {
+      "input": 10.0,
+      "output": 50.0
+    }
+  }
+}

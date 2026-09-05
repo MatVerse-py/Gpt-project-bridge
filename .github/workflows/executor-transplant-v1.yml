@@ -1,0 +1,98 @@
+name: Executor transplant Sol-Astra-Sol v1
+
+on:
+  pull_request:
+    paths:
+      - "app/core.py"
+      - "app/openai_runtime.py"
+      - "app/organism_loop.py"
+      - "experiments/cross_runtime/contract.json"
+      - "experiments/executor_transplant/**"
+      - "tests/test_executor_transplant.py"
+      - ".github/workflows/executor-transplant-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime
+        run: pip install -r requirements.txt
+
+      - name: Verify frozen organism substrate
+        run: |
+          git diff --exit-code \
+            b421a7132f13eab7c73f46e7ed5a802c4db6b657 \
+            -- app/core.py app/organism_loop.py experiments/cross_runtime/contract.json
+
+      - name: Compile
+        run: python -m compileall -q app experiments/executor_transplant
+
+      - name: Run offline transplant and provider regressions
+        run: |
+          pytest -q \
+            tests/test_openai_runtime.py \
+            tests/test_executor_transplant.py
+
+  live-transplant:
+    needs: offline-contract
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime
+        run: pip install -r requirements.txt
+
+      - name: Execute governed Sol-Astra-Sol transplant
+        run: |
+          python -m experiments.executor_transplant.run \
+            --contract experiments/executor_transplant/contract.json \
+            --output evidence/executor-transplant-v1/EVIDENCE_PACK.json
+
+      - name: Enforce promotion boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("evidence/executor-transplant-v1/EVIDENCE_PACK.json")
+          evidence = json.loads(p.read_text(encoding="utf-8"))
+          status = evidence["promotion"]["executor_substitution_invariance"]
+          allowed = {
+              "EXECUTOR_SUBSTITUTION_INVARIANCE_PASS",
+              "HOLD_NOT_EXECUTED",
+              "HOLD_PROVIDER_ACCESS",
+          }
+          print(json.dumps({
+              "experiment_result": evidence["experiment_result"],
+              "promotion": status,
+              "evidence_pack_hash": evidence["evidence_pack_hash"],
+          }, sort_keys=True))
+          if status not in allowed:
+              raise SystemExit(
+                  f"unexpected transplant result requiring review: {status}"
+              )
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: executor-transplant-v1-evidence
+          path: evidence/executor-transplant-v1/EVIDENCE_PACK.json
+          if-no-files-found: error
