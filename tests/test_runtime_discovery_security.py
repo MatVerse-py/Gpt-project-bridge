@@ -11,6 +11,7 @@ from app.runtime_discovery import (
     DiscoveryConfig,
     RuntimeState,
     _NoRedirectHandler,
+    _safe_json_get,
     discover_runtime_capabilities,
 )
 
@@ -89,6 +90,24 @@ def test_redirect_handler_fails_closed() -> None:
 
     assert exc_info.value.code == 302
     assert "redirect denied" in str(exc_info.value)
+
+
+def test_non_http_scheme_is_rejected_without_probe() -> None:
+    calls: list[str] = []
+
+    def getter(url: str, timeout: float) -> dict[str, Any]:
+        calls.append(url)
+        return {"marker": "must-not-be-read"}
+
+    payload, reason = _safe_json_get(
+        "file://localhost/tmp/matverse-runtime-probe.json",
+        DiscoveryConfig(allow_remote_endpoints=True),
+        getter,
+    )
+
+    assert payload is None
+    assert reason == "unsupported_url_scheme"
+    assert calls == []
 
 
 def test_arbitrary_json_does_not_prove_ollama_readiness() -> None:
