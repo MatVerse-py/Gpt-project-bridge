@@ -1,94 +1,32 @@
-name: MARXIV approval seal
+name: MARXIV approval seal (legacy HMAC disabled)
 
 on:
   workflow_dispatch:
-    inputs:
-      approval_intent:
-        description: 'Tracked approval-intent file bound to the exact package'
-        required: true
-        default: 'examples/marxiv/matverse-2.0/approval-intent.v1.json'
-        type: string
-      scientific_object:
-        description: 'Canonical Scientific Object to reconstruct before sealing'
-        required: true
-        default: 'examples/marxiv/matverse-2.0/scientific-object.v1.json'
-        type: string
-      approver_id:
-        description: 'Non-secret approver identifier recorded in the approval receipt'
-        required: true
-        default: 'author-human-authority'
-        type: string
 
 permissions:
   contents: read
 
 jobs:
-  seal:
+  blocked:
     runs-on: ubuntu-latest
-    env:
-      MARXIV_APPROVAL_SECRET: ${{ secrets.MARXIV_APPROVAL_SECRET }}
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install runtime dependencies
-        run: pip install -r requirements.txt
-
-      - name: Install pinned publication transport
-        run: pip install -r requirements-publication.txt
-
-      - name: Fail closed if approval secret is unavailable
+      - name: Legacy seal is intentionally disabled
         shell: bash
         run: |
-          set -euo pipefail
-          test -n "${MARXIV_APPROVAL_SECRET:-}" || {
-            echo 'MARXIV_APPROVAL_SECRET is not provisioned in GitHub Actions secrets.' >&2
-            exit 2
-          }
-          python - <<'PY'
-          import os
-          value = os.environ['MARXIV_APPROVAL_SECRET'].encode('utf-8')
-          if len(value) < 32:
-              raise SystemExit('MARXIV_APPROVAL_SECRET must contain at least 32 bytes')
-          PY
+          cat >&2 <<'EOF'
+          BLOCKED: the legacy MARXIV HMAC approval workflow is intentionally disabled.
 
-      - name: Seal exact package without external publication
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf .marxiv/approval-seal /tmp/marxiv-approval-evidence
-          python -m app.marxiv_approval_seal \
-            --intent "${{ inputs.approval_intent }}" \
-            --object "${{ inputs.scientific_object }}" \
-            --sandbox-root .marxiv/approval-seal \
-            --approver "${{ inputs.approver_id }}" \
-            --evidence-dir /tmp/marxiv-approval-evidence \
-            --ttl-seconds 7200
+          Reason:
+          - it could create the fresh challenge and derive the confirmation phrase in the same automated run;
+          - HMAC possession proves runtime-secret possession, not a non-repudiable human-authority signature.
 
-      - name: Assert approval-only evidence boundary
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
+          Use the V2 flow instead:
+          1. Run "MARXIV human approval challenge v2".
+          2. Inspect the fresh challenge and exact APPROVE_PACKAGE confirmation phrase.
+          3. Sign the challenge locally with the human authority Ed25519 private key.
+          4. Verify the signed approval against the registered public authority.
+          5. Persist the verified evidence pack through a reviewed commit/PR.
 
-          summary = json.loads(Path('/tmp/marxiv-approval-evidence/summary.json').read_text(encoding='utf-8'))
-          assert summary['status'] == 'APPROVED'
-          assert summary['approval_verified'] is True
-          assert summary['external_side_effect'] is False
-          assert summary['external_identifier'] is None
-          assert summary['secret_persisted'] is False
-          assert summary['submission_authorized'] is False
-          PY
-
-      - name: Upload approval evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: marxiv-paper1-approval-seal
-          path: /tmp/marxiv-approval-evidence
-          if-no-files-found: error
-          retention-days: 30
+          This workflow performs no arXiv login, submission, or external publication action.
+          EOF
+          exit 2
