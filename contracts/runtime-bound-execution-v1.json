@@ -22,7 +22,13 @@
     "runtime_identity_exact": true,
     "required_model_digest_immutable": true,
     "executor_binding_hash_matches": true,
-    "executor_identity_matches": true
+    "executor_identity_matches": true,
+    "binding_origin_attested": false
+  },
+  "trust_boundary": {
+    "hashes_provide": "INTEGRITY_AND_LINKAGE",
+    "hashes_do_not_provide": "ORIGIN_AUTHENTICATION",
+    "serialized_untrusted_binding": "HOLD_UNLESS_INDEPENDENT_HOST_OR_ISSUER_ATTESTATION_EXISTS"
   },
   "privacy_boundary": {
     "runtime_bound_event_contains_raw_proposal": false,
@@ -34,5 +40,5 @@
     "HOLD": "record lacks required material or uses an unsupported schema",
     "provider_reexecution_proven": false
   },
-  "promotion_boundary": "Provider/runtime attestation and live Ollama/llama.cpp adapter execution remain outside v1."
+  "promotion_boundary": "Signed host/issuer binding attestation plus live Ollama/llama.cpp adapter execution remain outside v1."
 }
