@@ -1,6 +1,6 @@
 # MARXIV Human Authority V2
 
-Status: `IMPLEMENTATION_CANDIDATE / CI_REQUIRED / PRODUCTION_KEY_UNBOUND`
+Status: `IMPLEMENTATION_PASS_IN_DECLARED_CI_SCOPE / PRODUCTION_KEY_UNBOUND / RUNTIME_PUBLICATION_DELEGATION_HOLD`
 
 ## Purpose
 
@@ -75,6 +75,12 @@ The production private key MUST NOT be placed in:
 - CI artifacts.
 
 The generated private key is written with filesystem mode `0600`. A hardware-backed or encrypted-key implementation is a future hardening step.
+
+## CI evidence
+
+On branch head `4eb439d978a233d8aa5a3d3d38165d874e9eb307`, `MARXIV Human Authority V2 CI` run `33937015110` completed successfully. The job exercised compilation, V2 authority tests, the pinned publication transport, an end-to-end fresh Paper 1 challenge, an ephemeral Ed25519 signature, verification, EvidencePack generation, and the assertion that no private key entered tracked evidence.
+
+This is implementation evidence in the declared GitHub Actions scope. It is not the production author's key binding and is not external publication evidence.
 
 ## Local authority initialization
 
@@ -181,7 +187,16 @@ VerifiedHumanApprovalV2 != ExternalSubmissionAuthority
 VerifiedHumanApprovalV2 != ScientificTruth
 ```
 
-A later integration may make a verified V2 approval a precondition for the runtime `APPROVED` state. That integration must preserve a separate explicit gate for arXiv login/submission.
+The current V1 Runtime Publisher still has a legacy HMAC-based `APPROVED` transition for compatibility. The production GitHub workflow for that transition is disabled by this change. V2 intentionally does not reuse that state transition until an explicit publication-delegation gate is designed and tested.
+
+Therefore:
+
+```text
+VerifiedHumanApprovalV2 -> HUMAN_PACKAGE_APPROVAL_EVIDENCE
+HUMAN_PACKAGE_APPROVAL_EVIDENCE != RuntimePublishAuthority
+```
+
+A later integration may make a verified V2 approval a necessary precondition for publication delegation, but external arXiv login/submission must remain a separate explicit authority transition.
 
 ## Repository governance boundary
 
