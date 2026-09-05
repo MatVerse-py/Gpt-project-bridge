@@ -10,9 +10,13 @@
     "execute_discovered_binaries": false,
     "follow_http_redirects": false,
     "use_environment_proxies": false,
+    "allowed_probe_schemes": ["http", "https"],
     "trusted_upstreams_only": true,
     "runtime_identity": ["runtime_id", "version", "executable", "endpoint"],
-    "model_identity": ["name", "digest", "size"]
+    "model_identity": ["name", "digest", "size"],
+    "binding_requires_valid_discovery_protocol": true,
+    "binding_recomputes_discovery_report_hash": true,
+    "required_model_binding_requires_nonempty_digest": true
   },
   "trusted_upstreams": {
     "ollama": "https://github.com/ollama/ollama",
