@@ -1,0 +1,146 @@
+name: MARXIV Human Authority V2 CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/marxiv_human_authority.py'
+      - 'tests/test_marxiv_human_authority.py'
+      - '.github/workflows/marxiv-human-authority-v2-ci.yml'
+      - '.github/workflows/marxiv-human-approval-challenge-v2.yml'
+      - '.github/workflows/marxiv-approval-seal.yml'
+      - 'MARXIV_HUMAN_AUTHORITY_V2.md'
+      - '.github/CODEOWNERS'
+      - 'evidence/marxiv/**'
+  push:
+    branches: [marxiv/human-challenge-ed25519-v2]
+    paths:
+      - 'app/marxiv_human_authority.py'
+      - 'tests/test_marxiv_human_authority.py'
+      - '.github/workflows/marxiv-human-authority-v2-ci.yml'
+      - '.github/workflows/marxiv-human-approval-challenge-v2.yml'
+      - '.github/workflows/marxiv-approval-seal.yml'
+      - 'MARXIV_HUMAN_AUTHORITY_V2.md'
+      - '.github/CODEOWNERS'
+      - 'evidence/marxiv/**'
+
+permissions:
+  contents: read
+
+jobs:
+  test-human-authority-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install runtime dependencies
+        run: pip install -r requirements.txt
+
+      - name: Compile V2 authority module
+        run: python -m py_compile app/marxiv_human_authority.py
+
+      - name: Run V2 authority tests
+        run: pytest -q tests/test_marxiv_human_authority.py
+
+      - name: Install pinned publication transport
+        run: pip install -r requirements-publication.txt
+
+      - name: End-to-end fresh challenge + ephemeral Ed25519 signature
+        shell: bash
+        env:
+          ARXIV_EMAIL: ''
+          ARXIV_PASSWORD: ''
+          MARXIV_APPROVAL_SECRET: ''
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/marxiv-v2 .marxiv/v2-ci
+          mkdir -p /tmp/marxiv-v2
+
+          python -m app.marxiv_runtime_publisher prepare \
+            --object examples/marxiv/matverse-2.0/scientific-object.v1.json \
+            --sandbox-root .marxiv/v2-ci \
+            > /tmp/marxiv-v2/prepared.json
+
+          sandbox=.marxiv/v2-ci/matverse-2.0/v1
+          python -m app.marxiv_runtime_publisher request-approval \
+            --sandbox "$sandbox" \
+            --ttl-seconds 7200 \
+            > /tmp/marxiv-v2/runtime-challenge.json
+          cp "$sandbox/approval-challenge.json" /tmp/marxiv-v2/challenge.json
+
+          python -m app.marxiv_human_authority init \
+            --authority-id ci-ephemeral-human-authority \
+            --private-key /tmp/marxiv-v2/private.pem \
+            --public-registry /tmp/marxiv-v2/authority.json \
+            > /tmp/marxiv-v2/init.json
+
+          python -m app.marxiv_human_authority describe \
+            --challenge /tmp/marxiv-v2/challenge.json \
+            --output /tmp/marxiv-v2/challenge-summary.json \
+            > /tmp/marxiv-v2/describe.json
+
+          confirmation=$(python - <<'PY'
+          import json
+          from pathlib import Path
+          print(json.loads(Path('/tmp/marxiv-v2/challenge-summary.json').read_text())['required_human_confirmation'])
+          PY
+          )
+
+          python -m app.marxiv_human_authority sign \
+            --challenge /tmp/marxiv-v2/challenge.json \
+            --private-key /tmp/marxiv-v2/private.pem \
+            --authority-registry /tmp/marxiv-v2/authority.json \
+            --output /tmp/marxiv-v2/human-approval.v2.json \
+            --confirm "$confirmation" \
+            > /tmp/marxiv-v2/sign.json
+
+          python -m app.marxiv_human_authority verify \
+            --challenge /tmp/marxiv-v2/challenge.json \
+            --approval /tmp/marxiv-v2/human-approval.v2.json \
+            --authority-registry /tmp/marxiv-v2/authority.json \
+            > /tmp/marxiv-v2/verification.json
+
+          python -m app.marxiv_human_authority bundle \
+            --challenge /tmp/marxiv-v2/challenge.json \
+            --approval /tmp/marxiv-v2/human-approval.v2.json \
+            --authority-registry /tmp/marxiv-v2/authority.json \
+            --output /tmp/marxiv-v2/evidence-pack.v2.json \
+            > /tmp/marxiv-v2/bundle.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          prepared = json.loads(Path('/tmp/marxiv-v2/prepared.json').read_text())
+          summary = json.loads(Path('/tmp/marxiv-v2/challenge-summary.json').read_text())
+          verification = json.loads(Path('/tmp/marxiv-v2/verification.json').read_text())
+          pack = json.loads(Path('/tmp/marxiv-v2/evidence-pack.v2.json').read_text())
+
+          assert prepared['status'] == 'HUMAN_REVIEW_REQUIRED'
+          assert prepared['package_hash'] == '4ef1c650ccf52054cb77adc5d1a1e8d5a19785bcdbe23a644470ee707e97b2aa'
+          assert summary['package_hash'] == prepared['package_hash']
+          assert summary['required_human_confirmation'].startswith('APPROVE_PACKAGE ')
+          assert summary['required_human_confirmation'].endswith(summary['challenge_hash'][:12])
+          assert verification['ok'] is True
+          assert verification['checks']['ed25519_signature_valid'] is True
+          assert verification['checks']['challenge_nonce_match'] is True
+          assert verification['external_submission_authorized'] is False
+          assert pack['approval_verified'] is True
+          assert pack['evidence_pack_hash']
+          assert pack['external_side_effect'] is False
+          assert pack['submission_authorized'] is False
+          assert not Path('.marxiv/v2-ci/matverse-2.0/v1/submission-result.json').exists()
+          PY
+
+      - name: Assert private key never enters tracked evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -Ei '(private.*(pem|key)|ed25519.*private|human-approval\.v2\.json)$'; then
+            echo 'Private or runtime human-approval material must not be committed by CI.' >&2
+            exit 1
+          fi
