@@ -17,11 +17,13 @@ on:
         type: boolean
       model_a:
         description: 'Explicit OpenAI model id for arm A'
-        required: false
+        required: true
+        default: 'gpt-5.6-sol'
         type: string
       model_b:
         description: 'Explicit OpenAI model id for arm B'
-        required: false
+        required: true
+        default: 'gpt-6-astra'
         type: string
 
 permissions:
@@ -61,6 +63,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+      - name: Fail-closed live preflight
+        shell: bash
+        run: |
+          test -n "$OPENAI_API_KEY" || { echo 'OPENAI_API_KEY secret is not configured'; exit 2; }
+          test -n "$MATVERSE_EXECUTOR_A_MODEL" || { echo 'model_a is empty'; exit 2; }
+          test -n "$MATVERSE_EXECUTOR_B_MODEL" || { echo 'model_b is empty'; exit 2; }
+          test "$MATVERSE_EXECUTOR_A_MODEL" != "$MATVERSE_EXECUTOR_B_MODEL" || { echo 'executor models must differ'; exit 2; }
       - name: Run live paired substitution
         run: PYTHONPATH=. python experiments/executor_substitution_v1.py --output executor-substitution-v1-report.json
       - name: Upload minimized experiment report
