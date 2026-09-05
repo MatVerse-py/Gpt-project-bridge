@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 from dataclasses import dataclass, field
 from typing import Mapping
@@ -117,20 +116,25 @@ class GitHubOIDCSecretBroker:
         self.config = config
         self._transport = transport
 
+    def _client(self) -> httpx.Client:
+        return httpx.Client(
+            timeout=self.config.timeout_seconds,
+            follow_redirects=False,
+            transport=self._transport,
+        )
+
     def acquire_oidc_token(self) -> str:
         url = _with_audience(self.config.oidc_request_url, self.config.audience)
         try:
-            response = httpx.get(
-                url,
-                headers={
-                    "Authorization": f"Bearer {self.config.oidc_request_token}",
-                    "Accept": "application/json",
-                    "User-Agent": "MatVerse-Secret-Broker-Client/1.0",
-                },
-                timeout=self.config.timeout_seconds,
-                follow_redirects=False,
-                transport=self._transport,
-            )
+            with self._client() as client:
+                response = client.get(
+                    url,
+                    headers={
+                        "Authorization": f"Bearer {self.config.oidc_request_token}",
+                        "Accept": "application/json",
+                        "User-Agent": "MatVerse-Secret-Broker-Client/1.0",
+                    },
+                )
         except httpx.HTTPError as exc:
             raise SecretBrokerError("GitHub OIDC token request failed") from exc
 
@@ -162,20 +166,18 @@ class GitHubOIDCSecretBroker:
         oidc_token = self.acquire_oidc_token()
         request_hash = _request_hash(body, secret_ref, capability)
         try:
-            return httpx.post(
-                f"{self.config.broker_base_url}/v1/responses",
-                content=body,
-                headers={
-                    "Authorization": f"Bearer {oidc_token}",
-                    "Content-Type": "application/json",
-                    "User-Agent": "MatVerse-Secret-Broker-Client/1.0",
-                    "X-MatVerse-Secret-Ref": secret_ref,
-                    "X-MatVerse-Capability": capability,
-                    "X-MatVerse-Request-Hash": request_hash,
-                },
-                timeout=self.config.timeout_seconds,
-                follow_redirects=False,
-                transport=self._transport,
-            )
+            with self._client() as client:
+                return client.post(
+                    f"{self.config.broker_base_url}/v1/responses",
+                    content=body,
+                    headers={
+                        "Authorization": f"Bearer {oidc_token}",
+                        "Content-Type": "application/json",
+                        "User-Agent": "MatVerse-Secret-Broker-Client/1.0",
+                        "X-MatVerse-Secret-Ref": secret_ref,
+                        "X-MatVerse-Capability": capability,
+                        "X-MatVerse-Request-Hash": request_hash,
+                    },
+                )
         except httpx.HTTPError as exc:
             raise SecretBrokerError("OIDC secret broker request failed") from exc
