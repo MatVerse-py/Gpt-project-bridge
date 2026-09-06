@@ -11,6 +11,12 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator
 
 from .db import Database
+from .fractions import (
+    DEFAULT_FRACTION_SIZE,
+    FRACTION_PROTOCOL,
+    build_fraction_plan,
+    fraction_index_for_ordinal,
+)
 
 CONVERSATION_FILE = re.compile(r"(^|/)(conversations(?:[-_ ]?\d+)?\.json)$", re.IGNORECASE)
 
@@ -195,14 +201,23 @@ def load_owner_map(path: Path | None) -> dict[str, OwnerProject]:
     return result
 
 
-def ingest_export(db: Database, export_zip: Path, owner_map_path: Path | None = None) -> dict[str, Any]:
+def ingest_export(
+    db: Database,
+    export_zip: Path,
+    owner_map_path: Path | None = None,
+    fraction_size: int = DEFAULT_FRACTION_SIZE,
+) -> dict[str, Any]:
     if not export_zip.is_file() or not zipfile.is_zipfile(export_zip):
         raise ValueError(f"Invalid export ZIP: {export_zip}")
+    if fraction_size <= 0:
+        raise ValueError("fraction_size must be greater than zero")
+
     owner_map = load_owner_map(owner_map_path)
     started = utc_now()
     source_hash = sha256_file(export_zip)
     imported = assigned = unassigned = 0
     source_files: list[str] = []
+    fraction_members: list[dict[str, Any]] = []
 
     with zipfile.ZipFile(export_zip) as archive:
         names = [name for name in archive.namelist() if CONVERSATION_FILE.search(name)]
@@ -246,6 +261,8 @@ def ingest_export(db: Database, export_zip: Path, owner_map_path: Path | None = 
                 canonical = json.dumps(conversation, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
                 source_conversation_hash = sha256_bytes(canonical)
                 document_id = f"chat:{conversation_id}"
+                corpus_ordinal = imported + 1
+                fraction_index = fraction_index_for_ordinal(corpus_ordinal, fraction_size)
 
                 db.upsert_project(project.project_id, project.project_name, basis)
                 db.upsert_document({
@@ -265,13 +282,35 @@ def ingest_export(db: Database, export_zip: Path, owner_map_path: Path | None = 
                         "source_export": export_zip.name,
                         "source_file": source_name,
                         "source_hash": source_conversation_hash,
+                        "fraction_protocol": FRACTION_PROTOCOL,
+                        "fraction_size": fraction_size,
+                        "fraction_index": fraction_index,
+                        "corpus_ordinal": corpus_ordinal,
                     },
+                })
+                fraction_members.append({
+                    "ordinal": corpus_ordinal,
+                    "document_id": document_id,
+                    "conversation_id": conversation_id,
+                    "source_hash": source_conversation_hash,
                 })
                 imported += 1
                 if project.project_id == "unassigned":
                     unassigned += 1
                 else:
                     assigned += 1
+
+    fraction_plan = build_fraction_plan(fraction_members, fraction_size=fraction_size)
+    compact_fractions = [
+        {
+            "fraction_index": fraction.fraction_index,
+            "start_ordinal": fraction.start_ordinal,
+            "end_ordinal": fraction.end_ordinal,
+            "member_count": fraction.member_count,
+            "manifest_hash": fraction.manifest_hash,
+        }
+        for fraction in fraction_plan.fractions
+    ]
 
     completed = utc_now()
     run = {
@@ -283,7 +322,15 @@ def ingest_export(db: Database, export_zip: Path, owner_map_path: Path | None = 
         "unassigned_documents": unassigned,
         "started_at": started,
         "completed_at": completed,
-        "metadata": {"conversation_files": source_files, "owner_map": str(owner_map_path) if owner_map_path else None},
+        "metadata": {
+            "conversation_files": source_files,
+            "owner_map": str(owner_map_path) if owner_map_path else None,
+            "fraction_protocol": fraction_plan.protocol,
+            "fraction_size": fraction_plan.fraction_size,
+            "fraction_count": fraction_plan.fraction_count,
+            "fraction_merge_root": fraction_plan.merge_root,
+            "fractions": compact_fractions,
+        },
     }
     db.record_ingestion(run)
     return run
