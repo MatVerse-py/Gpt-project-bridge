@@ -1,0 +1,28 @@
+{
+  "schema": "matverse.bridge-acquisition-manifest.v1",
+  "fail_fast": false,
+  "requests": [
+    {
+      "provider": "crossref",
+      "identifier": "10.22541/au.176463806.67728089/v1"
+    },
+    {
+      "provider": "zenodo",
+      "identifier": "10.5281/zenodo.19112302"
+    },
+    {
+      "provider": "orcid",
+      "identifier": "0009-0008-2973-4047"
+    },
+    {
+      "provider": "github",
+      "identifier": "MatVerse-py/urano-os",
+      "ref": "master"
+    },
+    {
+      "provider": "huggingface",
+      "identifier": "MatverseHub/matverse-superdataset",
+      "resource_type": "dataset"
+    }
+  ]
+}

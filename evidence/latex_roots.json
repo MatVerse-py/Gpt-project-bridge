@@ -1,0 +1,28 @@
+{
+  "schema": "matverse.latex-roots.v1",
+  "status": "HOLD_NO_DECLARED_CANONICAL_ROOTS",
+  "roots": [],
+  "root_contract": {
+    "required": [
+      "id",
+      "entry_tex",
+      "source_root",
+      "deposited_pdf"
+    ],
+    "optional": [
+      "expected_closure_sha256",
+      "repo",
+      "commit_sha",
+      "release_tag",
+      "doi",
+      "arxiv_id",
+      "build_environment"
+    ]
+  },
+  "notes": [
+    "Do not invent entry_tex -> deposited_pdf pairs.",
+    "Add a root only after both artifacts and their intended relation are identified.",
+    "Closure diagnostics run before any expensive TeX -> PDF derivation verification.",
+    "An empty roots array is a HOLD state, not a PASS claim."
+  ]
+}

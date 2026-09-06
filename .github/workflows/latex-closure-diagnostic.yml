@@ -1,0 +1,27 @@
+name: LaTeX closure diagnostic v1
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  latex-closure-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - name: Validate closure implementation and TeX evidence policy
+        run: pytest -q tests/test_tex_evidence_policy.py
+      - name: Diagnose declared canonical LaTeX roots
+        run: python scripts/check_latex_roots.py --allow-empty --output evidence/latex_closure_diagnostic.json
+      - name: Surface current HOLD/PASS state
+        run: cat evidence/latex_closure_diagnostic.json

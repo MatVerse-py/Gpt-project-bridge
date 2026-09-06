@@ -1,0 +1,75 @@
+{
+  "schema": "matverse.visual-duplicate-roots.v1",
+  "rules": {
+    "exact_sha256": "collapse_to_one_probative_root",
+    "perceptual_similarity": "review_signal_only_do_not_collapse",
+    "same_size_only": "insufficient_for_duplicate_claim",
+    "unavailable_backing_file": "hold_no_hash_claim"
+  },
+  "exact_roots": [
+    {
+      "sha256": "79de617945f94141922e3bbdc6ae064276264c508f89b479e8757ce26da84508",
+      "files": [
+        "ChatGPT Image 11 de jun. de 2026, 04_52_37.png",
+        "ChatGPT Image 11 de jun. de 2026, 04_52_37(1).png",
+        "ChatGPT Image 11 de jun. de 2026, 04_52_37(2).png"
+      ],
+      "probative_roots": 1,
+      "note": "exact byte duplicates; generated provenance remains non-independent"
+    },
+    {
+      "sha256": "cc6bbf0631f10cdb2fe60484c28ed60e6e666f13cfc7a3ab49c1aa1bfcf8d1c1",
+      "files": [
+        "Screenshot 2026-06-13 20.32.28.png",
+        "Screenshot 2026-06-13 20.32.28(1).png"
+      ],
+      "probative_roots": 1
+    },
+    {
+      "sha256": "234bef952827a3af304ef53207c7efeea4c2115b4121d3750b0508dd3addcae6",
+      "files": [
+        "Screenshot 2026-06-13 20.33.39.png",
+        "Screenshot 2026-06-13 20.33.39(1).png"
+      ],
+      "probative_roots": 1
+    },
+    {
+      "sha256": "fdeb919b83555ae167f57dc9104ca3680e514c2e3e305344d721055b62d3ce31",
+      "files": [
+        "informacao_coerencia_inteligibilidade_triade.png",
+        "informacao_coerencia_inteligibilidade_triade(1).png",
+        "informacao_coerencia_inteligibilidade_triade(2).png"
+      ],
+      "probative_roots": 1
+    }
+  ],
+  "near_duplicate_candidates": [
+    {
+      "files": [
+        "3e87b422-a889-4921-b58b-83d8f87c2fbf.png",
+        "Screenshot 2026-06-16 20.30.51.png"
+      ],
+      "sha256": [
+        "4430733aeeb4a9d1c753afbae144557f5a975fd482d4494a52289ff75103a04c",
+        "487b8f069ec38f261f3e329db43200a8c77c19951c8ff99ae0984b0d4a09aef6"
+      ],
+      "dimensions": [[1366, 724], [1366, 724]],
+      "average_hash_16_hamming_distance": 0,
+      "probative_roots": 2,
+      "decision": "DO_NOT_COLLAPSE_WITHOUT_VERIFIED_DERIVATION",
+      "note": "visually equivalent captures with different bytes; similarity is not evidentiary identity"
+    }
+  ],
+  "unresolved_same_size_candidates": [
+    {
+      "files": ["6dd14027-f6d8-4eb4-bc16-2d6c21273c58.png", "fc0112fc-10a8-4d4e-8475-5a612e8343d4.png"],
+      "size_bytes": 149228,
+      "state": "HOLD_BACKING_FILE_UNAVAILABLE"
+    },
+    {
+      "files": ["1c76f4e1-4ee8-4c7e-9160-c86e0a922428.png", "86769cd8-d6aa-44eb-9127-e96d1b703757.png"],
+      "size_bytes": 59424,
+      "state": "HOLD_BACKING_FILE_UNAVAILABLE"
+    }
+  ]
+}
