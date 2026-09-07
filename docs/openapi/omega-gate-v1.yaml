@@ -1,13 +1,15 @@
 openapi: 3.1.0
 info:
   title: MatVerse Ω-Gate API
-  version: 1.1.0
+  version: 1.1.1
   description: >-
     Canonical Ω-Gate interfaces. /v1/admit is the generic stateless invariant
-    evaluator. Q-Gate is not a second organ: publication uses the
-    Ω-GATE::CanPublish projection with explicit Body-A proposer, Body-D
-    adjudicator and Body-X executor separation. HOLD is fail-closed and expires
-    to BLOCK. ADMIT never means external execution.
+    evaluator. A bare authorization_ref is never authority: the server must
+    resolve it to a trusted active record bound to principal, requested_action
+    and target_state_hash before ADMIT. Q-Gate is not a second organ:
+    publication uses the Ω-GATE::CanPublish projection with explicit Body-A
+    proposer, Body-D adjudicator and Body-X executor separation. HOLD is
+    fail-closed and expires to BLOCK. ADMIT never means external execution.
 paths:
   /v1/admit:
     post:
@@ -200,13 +202,42 @@ components:
           default: false
         authorization_ref:
           type: [string, 'null']
+          description: >-
+            Opaque reference only. If authorization is required, the server MUST
+            resolve this reference to a trusted active AuthorizationRecord bound
+            to principal, requested_action and target_state_hash. A non-empty
+            string by itself cannot authorize ADMIT.
+
+    AuthorizationRecord:
+      type: object
+      additionalProperties: false
+      required:
+        [authorization_ref, principal, requested_action, target_state_hash,
+         evidence_ref, active]
+      properties:
+        authorization_ref:
+          type: string
+          minLength: 1
+        principal:
+          type: string
+          minLength: 1
+        requested_action:
+          type: string
+          minLength: 1
+        target_state_hash:
+          $ref: '#/components/schemas/Sha256'
+        evidence_ref:
+          type: string
+          minLength: 1
+        active:
+          type: boolean
 
     AdmissionDecision:
       type: object
       additionalProperties: false
       required:
         [schema, decision_id, proposal_id, status, reasons,
-         evaluated_invariants, receipt]
+         evaluated_invariants, resolved_authorization, receipt]
       properties:
         schema:
           const: matverse.omega-gate.v1
@@ -221,6 +252,10 @@ components:
         evaluated_invariants:
           type: array
           items: {type: string}
+        resolved_authorization:
+          oneOf:
+            - $ref: '#/components/schemas/AuthorizationRecord'
+            - type: 'null'
         receipt:
           type: object
           additionalProperties: true
