@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from app.corpus_fractions import build_fraction_plan
 from app.evidence import sha256_text
 
@@ -39,3 +41,8 @@ def test_fraction_merge_root_changes_when_member_source_changes():
     assert baseline.merge_root != changed.merge_root
     assert baseline.fractions[0].manifest_hash == changed.fractions[0].manifest_hash
     assert baseline.fractions[1].manifest_hash != changed.fractions[1].manifest_hash
+
+
+def test_empty_fraction_plan_is_rejected():
+    with pytest.raises(ValueError, match="at least one member"):
+        build_fraction_plan([], fraction_size=14)
