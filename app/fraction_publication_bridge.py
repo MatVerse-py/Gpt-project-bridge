@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
 from .corpus_fractions import FRACTION_PROTOCOL, FractionManifest, FractionPlan
-from .evidence import canonical_json, evidence_receipt, sha256_text
+from .evidence import canonical_json, evidence_receipt
 
 SCHEMA = "matverse.fraction-publication.v1"
 
@@ -46,12 +46,7 @@ class FractionPublicationEnvelope:
     receipt: dict[str, Any]
 
     def public_manifest(self) -> dict[str, Any]:
-        """Return the publication-safe structural manifest.
-
-        Conversation/document identifiers and raw member content are deliberately
-        absent. The structural root proves membership ordering in the source
-        fraction plan; it does not authorize disclosure of the underlying corpus.
-        """
+        """Return a publication-safe structural manifest with no source member IDs."""
 
         return {
             "schema": self.schema,
@@ -86,9 +81,9 @@ class ZenodoDraftPlan:
 class FractionPublicationBridge:
     """Governed structural bridge from corpus fractions to publication staging.
 
-    The bridge never performs a network write. It prepares a privacy-safe Zenodo
-    draft plan that must subsequently pass the existing publication/LLM bridge
-    authorization boundary before an executor can call Zenodo.
+    This module produces plans only. It never performs a Zenodo network write.
+    Any executor must still cross the existing independent publication
+    authorization and provider-secret boundaries.
     """
 
     def __init__(self, plan: FractionPlan, *, corpus_id: str) -> None:
@@ -161,6 +156,43 @@ class FractionPublicationBridge:
             receipt=receipt,
         )
 
+    def _validate_envelope(self, envelope: FractionPublicationEnvelope) -> None:
+        if envelope.schema != SCHEMA:
+            raise FractionPublicationError(f"unsupported publication envelope schema: {envelope.schema}")
+        if envelope.corpus_id != self.corpus_id:
+            raise FractionPublicationError("envelope corpus_id does not belong to this bridge")
+        if envelope.source_protocol != self.plan.protocol:
+            raise FractionPublicationError("envelope source protocol does not match this fraction plan")
+        if envelope.merge_root != self.plan.merge_root:
+            raise FractionPublicationError("envelope merge_root does not match this fraction plan")
+        fraction = self._fraction(envelope.fraction_index)
+        expected = (
+            fraction.start_ordinal,
+            fraction.end_ordinal,
+            fraction.member_count,
+            self.plan.fraction_size,
+            self.plan.total_items,
+            self.plan.fraction_count,
+            fraction.manifest_hash,
+        )
+        actual = (
+            envelope.start_ordinal,
+            envelope.end_ordinal,
+            envelope.member_count,
+            envelope.fraction_size,
+            envelope.total_items,
+            envelope.fraction_count,
+            envelope.manifest_hash,
+        )
+        if actual != expected:
+            raise FractionPublicationError("envelope structural fields do not match the canonical fraction plan")
+        if envelope.disclosure_mode is DisclosureMode.METADATA_ONLY and envelope.bundle_sha256 is not None:
+            raise FractionPublicationError("METADATA_ONLY envelope must not contain bundle_sha256")
+        if envelope.disclosure_mode in {DisclosureMode.REDACTED_BUNDLE, DisclosureMode.PUBLIC_BUNDLE}:
+            if envelope.bundle_sha256 is None:
+                raise FractionPublicationError("bundle disclosure envelope is missing bundle_sha256")
+            _require_sha256(envelope.bundle_sha256, field="bundle_sha256")
+
     def prepare_zenodo_draft(
         self,
         envelope: FractionPublicationEnvelope,
@@ -168,8 +200,13 @@ class FractionPublicationBridge:
         title_prefix: str = "MatVerse Corpus Fraction",
         creators: tuple[str, ...] = (),
     ) -> ZenodoDraftPlan:
-        if envelope.corpus_id != self.corpus_id or envelope.merge_root != self.plan.merge_root:
-            raise FractionPublicationError("envelope does not belong to this fraction plan")
+        self._validate_envelope(envelope)
+        cleaned_creators = tuple(item.strip() for item in creators if item.strip())
+        if not cleaned_creators:
+            raise FractionPublicationError("Zenodo staging requires at least one explicit creator")
+        if not title_prefix.strip():
+            raise FractionPublicationError("title_prefix is required")
+
         public_manifest = envelope.public_manifest()
         manifest_text = canonical_json(public_manifest)
         manifest_name = f"{self.corpus_id}-F{envelope.fraction_index:03d}-manifest.json"
@@ -185,9 +222,9 @@ class FractionPublicationBridge:
             )
 
         metadata = {
-            "title": f"{title_prefix}: {self.corpus_id} F{envelope.fraction_index}",
+            "title": f"{title_prefix.strip()}: {self.corpus_id} F{envelope.fraction_index}",
             "resource_type": "dataset",
-            "creators": list(creators),
+            "creators": list(cleaned_creators),
             "description": (
                 "Governed structural publication envelope for one corpus fraction. "
                 "The fraction manifest hash and corpus merge root commit to structural "
