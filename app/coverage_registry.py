@@ -5,7 +5,7 @@ import json
 import secrets
 import sqlite3
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -106,6 +106,7 @@ class SweepResult:
     changed_items: int
     missing_items: int
     zero_streak: int
+    complete_scope: bool
     status: str
 
     @property
@@ -117,9 +118,8 @@ class CoverageRegistry:
     """Durable inventory for exhaustive No-Left-Behind sweeps.
 
     Identity is stable across content revisions: `(partition_id, source_uri,
-    artifact_type)`. Content revisions are tracked separately. A sweep may be
-    declared discovery-saturated only after two consecutive complete sweeps over
-    the same scope produce neither new nor missing items.
+    artifact_type)`. Content revisions are tracked separately. Only complete
+    sweeps may contribute to discovery saturation.
     """
 
     def __init__(self, db_path: str | Path = "coverage_registry.db") -> None:
@@ -187,10 +187,15 @@ class CoverageRegistry:
                   new_items INTEGER NOT NULL,
                   changed_items INTEGER NOT NULL,
                   missing_items INTEGER NOT NULL,
+                  complete_scope INTEGER NOT NULL DEFAULT 1,
                   status TEXT NOT NULL
                 );
                 """
             )
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(sweep_runs)").fetchall()}
+            if "complete_scope" not in columns:
+                conn.execute("ALTER TABLE sweep_runs ADD COLUMN complete_scope INTEGER NOT NULL DEFAULT 1")
+            conn.commit()
 
     @staticmethod
     def item_id(partition_id: str, source_uri: str, artifact_type: str) -> str:
@@ -257,15 +262,35 @@ class CoverageRegistry:
                 ),
             )
         else:
-            restore_state = CoverageState.DISCOVERED.value if str(current["state"]) == CoverageState.ORPHAN.value else str(current["state"])
-            conn.execute(
-                """
-                UPDATE coverage_items
-                   SET state = ?, content_hash = ?, metadata_json = ?, updated_at = ?, last_seen_run = ?
-                 WHERE item_id = ?
-                """,
-                (restore_state, content_hash, metadata_json, observed_at, run_id, item_id),
-            )
+            must_readjudicate = changed or str(current["state"]) == CoverageState.ORPHAN.value
+            if must_readjudicate:
+                conn.execute(
+                    """
+                    UPDATE coverage_items
+                       SET state = ?, content_hash = ?, metadata_json = ?,
+                           semantic_status = ?, evidence_status = ?, updated_at = ?, last_seen_run = ?
+                     WHERE item_id = ?
+                    """,
+                    (
+                        CoverageState.DISCOVERED.value,
+                        content_hash,
+                        metadata_json,
+                        "UNRESOLVED",
+                        "UNVERIFIED",
+                        observed_at,
+                        run_id,
+                        item_id,
+                    ),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE coverage_items
+                       SET content_hash = ?, metadata_json = ?, updated_at = ?, last_seen_run = ?
+                     WHERE item_id = ?
+                    """,
+                    (content_hash, metadata_json, observed_at, run_id, item_id),
+                )
 
         conn.execute(
             """
@@ -292,6 +317,7 @@ class CoverageRegistry:
         observed = 0
         new_items = 0
         changed_items = 0
+        seen_item_ids: set[str] = set()
 
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
@@ -300,6 +326,10 @@ class CoverageRegistry:
                     raise CoverageError(
                         f"observation partition {observation.partition_id!r} is outside declared sweep scope"
                     )
+                stable_id = self.item_id(observation.partition_id, observation.source_uri, observation.artifact_type)
+                if stable_id in seen_item_ids:
+                    raise CoverageError(f"duplicate coverage identity in one sweep: {stable_id}")
+                seen_item_ids.add(stable_id)
                 observed += 1
                 _, created, changed = self._register_observation(
                     conn,
@@ -315,7 +345,7 @@ class CoverageRegistry:
                 placeholders = ",".join("?" for _ in scope)
                 rows = conn.execute(
                     f"""
-                    SELECT item_id, state FROM coverage_items
+                    SELECT item_id FROM coverage_items
                     WHERE partition_id IN ({placeholders})
                       AND (last_seen_run IS NULL OR last_seen_run != ?)
                       AND state != ?
@@ -330,12 +360,13 @@ class CoverageRegistry:
                     )
 
             ended_at = time.time_ns()
+            initial_status = "PROGRESSING" if complete_scope else "PARTIAL_SCOPE"
             conn.execute(
                 """
                 INSERT INTO sweep_runs(
                   run_id, scope_hash, scope_json, started_at, ended_at,
-                  observed_items, new_items, changed_items, missing_items, status
-                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  observed_items, new_items, changed_items, missing_items, complete_scope, status
+                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run_id,
@@ -347,11 +378,12 @@ class CoverageRegistry:
                     new_items,
                     changed_items,
                     missing_items,
-                    "PROGRESSING",
+                    int(complete_scope),
+                    initial_status,
                 ),
             )
-            zero_streak = self._zero_streak(conn, scope_hash)
-            status = "DISCOVERY_SATURATED" if zero_streak >= 2 else "PROGRESSING"
+            zero_streak = self._zero_streak(conn, scope_hash) if complete_scope else 0
+            status = "DISCOVERY_SATURATED" if zero_streak >= 2 else initial_status
             conn.execute("UPDATE sweep_runs SET status = ? WHERE run_id = ?", (status, run_id))
             conn.commit()
 
@@ -364,6 +396,7 @@ class CoverageRegistry:
             changed_items=changed_items,
             missing_items=missing_items,
             zero_streak=zero_streak,
+            complete_scope=complete_scope,
             status=status,
         )
 
@@ -372,7 +405,7 @@ class CoverageRegistry:
         rows = conn.execute(
             """
             SELECT new_items, missing_items FROM sweep_runs
-            WHERE scope_hash = ?
+            WHERE scope_hash = ? AND complete_scope = 1
             ORDER BY ended_at DESC
             """,
             (scope_hash,),
@@ -486,22 +519,42 @@ class CoverageRegistry:
         placeholders = ",".join("?" for _ in scope)
         with self._connect() as conn:
             rows = conn.execute(
-                f"SELECT state, membership_status FROM coverage_items WHERE partition_id IN ({placeholders})",
+                f"""
+                SELECT state, membership_status, lineage_status, semantic_status
+                FROM coverage_items
+                WHERE partition_id IN ({placeholders})
+                """,
                 tuple(scope),
             ).fetchall()
             counts: dict[str, int] = {}
             orphan_count = 0
             unresolved_membership = 0
+            unresolved_lineage = 0
+            unresolved_semantic = 0
+            unresolved_state = 0
             for row in rows:
                 state = str(row["state"])
+                membership = str(row["membership_status"])
                 counts[state] = counts.get(state, 0) + 1
                 orphan_count += int(state == CoverageState.ORPHAN.value)
+                unresolved_state += int(state == CoverageState.UNRESOLVED.value)
                 unresolved_membership += int(
-                    str(row["membership_status"]) in {MembershipStatus.UNKNOWN.value, MembershipStatus.HOLD.value}
+                    membership in {MembershipStatus.UNKNOWN.value, MembershipStatus.HOLD.value}
                 )
+                if membership == MembershipStatus.MEMBER.value:
+                    unresolved_lineage += int(str(row["lineage_status"]) == LineageStatus.UNKNOWN.value)
+                    unresolved_semantic += int(
+                        str(row["semantic_status"]).upper() in {"UNRESOLVED", "UNKNOWN", "HOLD"}
+                    )
             zero_streak = self._zero_streak(conn, scope_hash)
             discovery_saturated = zero_streak >= 2
-            complete = discovery_saturated and orphan_count == 0 and unresolved_membership == 0
+            adjudication_complete = (
+                orphan_count == 0
+                and unresolved_state == 0
+                and unresolved_membership == 0
+                and unresolved_lineage == 0
+                and unresolved_semantic == 0
+            )
             return {
                 "schema": SCHEMA,
                 "scope": scope,
@@ -509,8 +562,12 @@ class CoverageRegistry:
                 "total_items": len(rows),
                 "states": counts,
                 "orphan_count": orphan_count,
+                "unresolved_state_count": unresolved_state,
                 "unresolved_membership_count": unresolved_membership,
+                "unresolved_lineage_count": unresolved_lineage,
+                "unresolved_semantic_count": unresolved_semantic,
                 "zero_streak": zero_streak,
                 "discovery_saturated": discovery_saturated,
-                "coverage_complete": complete,
+                "adjudication_complete": adjudication_complete,
+                "coverage_complete": discovery_saturated and adjudication_complete,
             }
