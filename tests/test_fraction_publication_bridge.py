@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from app.corpus_fractions import build_fraction_plan
@@ -64,3 +66,20 @@ def test_zenodo_plan_is_staging_only_and_requires_authorization():
     assert len(draft.generated_files) == 1
     assert "merge_root" in next(iter(draft.generated_files.values()))
     assert draft.receipt["schema"] == "matverse.evidence-receipt.v1"
+
+
+def test_forged_structural_envelope_is_rejected_before_staging():
+    bridge = FractionPublicationBridge(make_plan(), corpus_id="patente")
+    envelope = bridge.build_envelope(1)
+    forged = replace(envelope, manifest_hash=sha256_text("forged-manifest"))
+
+    with pytest.raises(FractionPublicationError, match="structural fields"):
+        bridge.prepare_zenodo_draft(forged, creators=("MatVerse",))
+
+
+def test_zenodo_staging_requires_explicit_creator():
+    bridge = FractionPublicationBridge(make_plan(), corpus_id="patente")
+    envelope = bridge.build_envelope(1)
+
+    with pytest.raises(FractionPublicationError, match="explicit creator"):
+        bridge.prepare_zenodo_draft(envelope)
