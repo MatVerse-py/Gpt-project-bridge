@@ -4,126 +4,181 @@ Protocol: `matverse.no-left-behind.v1`
 
 ## Purpose
 
-No-Left-Behind is a coverage protocol, not a claim of omniscience. It proves what
-was enumerated inside a declared, accessible partition scope and preserves every
-known object as integrated, superseded, unresolved or orphaned rather than
-silently dropping it.
+No-Left-Behind is a bounded coverage protocol, not a claim of omniscience. It
+tracks what was enumerated inside a declared accessible scope, what changed, what
+is missing, what remains outside the registered source set, and what still lacks
+adjudication.
 
 ```text
-registered partitions
+registered partitions + registered sources
         ↓
 complete sweep
         ↓
 CoverageRegistry
         ↓
-new / changed / missing / orphan detection
+Δobjects + Δsources + missing + R_ext
         ↓
-classification + membership + lineage + relation adjudication
+classification + relation + membership + lineage + adjudication
         ↓
-repeat complete sweep
+repeat over the same scope hash
         ↓
-two consecutive zero-new / zero-missing sweeps
+two consecutive clean complete sweeps
         ↓
 DISCOVERY_SATURATED
 ```
 
+A clean sweep requires all four conditions:
+
+```text
+Δobjects = 0
+missing  = 0
+Δsources = 0
+R_ext    = ∅
+```
+
+Therefore saturation means the known accessible universe is stable **and closed
+under currently observed source references**. It does not assert that inaccessible
+or unregistered environments contain nothing else.
+
 `DISCOVERY_SATURATED` is deliberately weaker than `COVERAGE_COMPLETE`.
 
-Coverage closure additionally requires:
+## Orthogonal state axes
 
-1. no ORPHAN item in the scope;
-2. no membership item left `UNKNOWN` or `HOLD`;
-3. the same scope hash for the saturation sweeps.
+Coverage does not use one overloaded enum. Lifecycle, verdict and presence are
+separate:
 
-The protocol does not assert that inaccessible or unregistered partitions contain
-nothing else.
+```text
+Lifecycle = DISCOVERED | INDEXED | CLASSIFIED | RELATED | ADJUDICATED
+Verdict   = PENDING | CANONICAL | SUPERSEDED | UNRESOLVED | ARCHIVED
+Presence  = PRESENT | MISSING
+```
+
+Membership, lineage, semantic state, implementation state and evidence state are
+also independent fields.
+
+`orphan` is **derived**, not stored. An item is orphaned when it has no
+non-refuted relation to another `CANONICAL` item in the governed relation graph.
+
+Illegal closure examples:
+
+```text
+CANONICAL ∧ orphan
+UNRESOLVED ∧ orphan ∧ no hashed justification
+SUPERSEDED ∧ no successor
+PENDING residual
+MISSING without governed resolution
+```
+
+This prevents the prior ambiguity where `ORPHAN` and `CANONICAL` competed inside
+the same lifecycle enum.
 
 ## Stable identity and revisions
 
-A coverage item is identified by:
+A coverage object is identified by:
 
 ```text
 partition_id + source_uri + artifact_type
 ```
 
-Content hashes are version observations, not object identity. Updating a file does
-not create a fake second file; it creates a new recorded content version of the
-same coverage item.
+Content hashes are version observations, not identity. When content changes, the
+same object returns to `DISCOVERED/PENDING`, semantic state becomes `UNRESOLVED`,
+and prior evidence is not silently inherited.
 
 ## Relation Integrity
 
-A relation may not become registered merely because two endpoints exist or appear
-semantically similar. `CoverageRegistry.record_relation` requires an independent
-`evidence_ref`.
+A relation requires its own evidence reference:
 
 ```text
 Exist(A) ∧ Exist(B)  ≠  Evidence(Relation(A,B))
 ```
 
-## Canonical states
-
-- `DISCOVERED`
-- `INDEXED`
-- `CLASSIFIED`
-- `RELATED`
-- `ADJUDICATED`
-- `SUPERSEDED`
-- `CANONICAL`
-- `UNRESOLVED`
-- `ORPHAN`
-
-Membership is tracked separately (`UNKNOWN`, `HOLD`, `MEMBER`, `NON_MEMBER`,
-`UNASSIGNED`) so semantic similarity never silently becomes project membership.
+`record_relation` rejects missing `evidence_ref`.
 
 ## Relationship to corpus fractions
 
-No-Left-Behind precedes canonical fractioning:
+Coverage precedes fractioning:
 
 ```text
 Coverage sweep
 → membership adjudication
 → canonical ordering
 → matverse.corpus-fractions.v1
-→ fraction manifests
-→ merge_root
+→ private deterministic structural plan
+→ matverse.corpus-commitments.v1
+→ public salted commitment roots
 ```
 
-The fraction protocol is structural and semantic-free. A `merge_root` commits to
-an ordered set of fraction manifest hashes; it is not a truth claim and is not a
-publication authorization.
+The deterministic `merge_root` of `matverse.corpus-fractions.v1` is an internal
+structural identifier. It must not be treated as a hiding commitment for private
+or low-entropy content.
+
+## Hiding public commitments
+
+Protocol: `matverse.corpus-commitments.v1`
+
+Public fraction integrity uses salted, domain-separated SHA-256 commitments:
+
+```text
+leaf = H(0x00 || salt_128 || canonical(member))
+node = H(0x01 || left || right)
+root = H(0x02 || commitment_protocol || source_protocol || n || k || count || fraction_roots...)
+```
+
+The 128-bit salts and membership openings remain private staging material. The
+public root is binding to the staged state while resisting dictionary confirmation
+of low-entropy source objects. Revealing an opening is a separate disclosure act
+and requires authorization.
 
 ## Governed Zenodo staging
 
 Protocol: `matverse.fraction-publication.v1`
 
-Three disclosure modes exist:
+Disclosure modes:
 
 - `METADATA_ONLY` (default)
 - `REDACTED_BUNDLE`
 - `PUBLIC_BUNDLE`
 
-`METADATA_ONLY` emits only a privacy-safe structural envelope: corpus id, fraction
-number/bounds/counts, fraction manifest hash and merge root. Document IDs,
-conversation IDs and raw content are not placed in the public envelope.
-
-Bundle modes require an explicit SHA-256 of the externally prepared bundle. The
-fraction publication bridge never performs a network write. It produces a
-`zenodo.create_draft` plan with `requires_authorization=true`. Execution must pass
-through the existing governed publication boundary and Secret Plane/provider
-controls.
+The public envelope exposes salted commitment roots, not deterministic source
+manifest hashes, source IDs, salts, raw chats or the private structural merge root.
 
 ```text
-FractionPlan
+private FractionPlan
    ↓
-publication envelope
+salted CommitmentWork
    ↓
-disclosure governance
+privacy-safe publication envelope
    ↓
-Zenodo draft PLAN
+MARXIV.Prepared
    ↓
-independent external authorization
+Ω-GATE::CanPublish
    ↓
-provider executor
+Body-D independent adjudication
+   ↓
+MARXIV.Approved
+   ↓
+Body-X external executor + provider receipt
+   ↓
+MARXIV.Submitted
+```
+
+`ADMIT` never performs a network write. Only the external execution layer may
+produce `Submitted`, and it must use a principal distinct from proposer and
+adjudicator.
+
+## Q-Gate terminology
+
+`Q-Gate` is not a second constitutional organ. When retained as a historical or UI
+label it resolves to:
+
+```text
+Q-Gate ≡ Ω-GATE::CanPublish
+```
+
+The canonical Ω sequence remains:
+
+```text
+CanExist → CanExecute → CanPersist → CanPublish
 ```
 
 ## Boundary
@@ -131,10 +186,12 @@ provider executor
 The following implications are invalid:
 
 ```text
-merge_root exists      ⇒ corpus may be disclosed        [false]
-LLM recommends publish ⇒ publication is authorized      [false]
-Zenodo draft exists    ⇒ claim is scientifically valid  [false]
-coverage saturated     ⇒ universe is exhaustively known [false]
+structural hash exists       ⇒ source content is hidden       [false]
+commitment root exists       ⇒ disclosure is authorized       [false]
+LLM recommends publication   ⇒ publication is authorized      [false]
+MARXIV.Prepared              ⇒ MARXIV.Approved                [false]
+MARXIV.Approved              ⇒ external state changed         [false]
+coverage saturated           ⇒ all possible information known [false]
 ```
 
-The protocols prove bounded structural facts only.
+The protocols prove bounded structural and governance facts only.
