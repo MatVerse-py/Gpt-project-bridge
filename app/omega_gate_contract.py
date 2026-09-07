@@ -33,6 +33,8 @@ class InvariantCheck:
     def __post_init__(self) -> None:
         if not self.invariant_id.strip():
             raise ValueError("invariant_id is required")
+        if self.passed is not None and not isinstance(self.passed, bool):
+            raise TypeError("passed must be bool or None")
         if not self.evidence_ref.strip():
             raise ValueError("every invariant check requires evidence_ref")
 
@@ -94,8 +96,9 @@ class OmegaGateContract:
             if failed:
                 status = GateDecision.BLOCK
                 reasons.extend(f"INVARIANT_FAILED:{item}" for item in failed)
-            elif unresolved:
-                status = GateDecision.HOLD
+            if unresolved:
+                if status is not GateDecision.BLOCK:
+                    status = GateDecision.HOLD
                 reasons.extend(f"INVARIANT_UNRESOLVED:{item}" for item in unresolved)
 
         if request.requires_authorization and not request.authorization_ref:
