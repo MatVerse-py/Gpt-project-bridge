@@ -114,6 +114,9 @@ def build_fraction_plan(
             )
         )
 
+    if not normalized:
+        raise ValueError("fraction plan requires at least one member")
+
     manifests: list[FractionManifest] = []
     for offset in range(0, len(normalized), fraction_size):
         chunk = tuple(normalized[offset : offset + fraction_size])
