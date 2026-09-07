@@ -26,8 +26,9 @@ def make_plan():
     return build_fraction_plan(members, fraction_size=14)
 
 
-def test_metadata_only_envelope_does_not_expose_member_ids():
-    bridge = FractionPublicationBridge(make_plan(), corpus_id="patente")
+def test_metadata_only_envelope_exposes_hiding_commitments_not_structural_hashes():
+    plan = make_plan()
+    bridge = FractionPublicationBridge(plan, corpus_id="patente")
     envelope = bridge.build_envelope(1)
     public_manifest = envelope.public_manifest()
 
@@ -35,7 +36,21 @@ def test_metadata_only_envelope_does_not_expose_member_ids():
     assert envelope.disclosure_mode is DisclosureMode.METADATA_ONLY
     assert "conv-private" not in serialized
     assert "document_id" not in serialized
-    assert public_manifest["manifest_hash"] == make_plan().fractions[0].manifest_hash
+    assert "conversation_id" not in serialized
+    assert "source_hash" not in serialized
+    assert "manifest_hash" not in public_manifest
+    assert "merge_root" not in public_manifest
+    assert len(public_manifest["fraction_commitment_root"]) == 64
+    assert len(public_manifest["corpus_commitment_root"]) == 64
+    assert public_manifest["corpus_commitment_root"] != plan.merge_root
+
+
+def test_same_private_plan_yields_different_public_roots_by_default():
+    plan = make_plan()
+    a = FractionPublicationBridge(plan, corpus_id="patente")
+    b = FractionPublicationBridge(plan, corpus_id="patente")
+
+    assert a.commitment_work.public.root != b.commitment_work.public.root
 
 
 def test_content_bundle_requires_explicit_disclosure_mode_and_hash():
@@ -55,25 +70,32 @@ def test_content_bundle_requires_explicit_disclosure_mode_and_hash():
     assert envelope.bundle_sha256 == sha256_text("redacted-bundle")
 
 
-def test_zenodo_plan_is_staging_only_and_requires_authorization():
+def test_zenodo_plan_is_prepared_staging_only_and_requires_authorization():
     bridge = FractionPublicationBridge(make_plan(), corpus_id="patente")
     envelope = bridge.build_envelope(2)
     draft = bridge.prepare_zenodo_draft(envelope, creators=("MatVerse",))
 
     assert draft.action == "zenodo.create_draft"
     assert draft.requires_authorization is True
+    assert draft.marxiv_stage == "Prepared"
     assert draft.external_files == ()
     assert len(draft.generated_files) == 1
-    assert "merge_root" in next(iter(draft.generated_files.values()))
+    manifest = next(iter(draft.generated_files.values()))
+    assert "corpus_commitment_root" in manifest
+    assert "merge_root" not in manifest
+    assert "conversation_id" not in manifest
     assert draft.receipt["schema"] == "matverse.evidence-receipt.v1"
 
 
-def test_forged_structural_envelope_is_rejected_before_staging():
+def test_forged_commitment_envelope_is_rejected_before_staging():
     bridge = FractionPublicationBridge(make_plan(), corpus_id="patente")
     envelope = bridge.build_envelope(1)
-    forged = replace(envelope, manifest_hash=sha256_text("forged-manifest"))
+    forged = replace(
+        envelope,
+        fraction_commitment_root=sha256_text("forged-commitment"),
+    )
 
-    with pytest.raises(FractionPublicationError, match="structural fields"):
+    with pytest.raises(FractionPublicationError, match="commitment fields"):
         bridge.prepare_zenodo_draft(forged, creators=("MatVerse",))
 
 
