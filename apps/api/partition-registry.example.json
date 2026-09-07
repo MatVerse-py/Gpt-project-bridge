@@ -1,0 +1,32 @@
+{
+  "protocol": "matverse.owner-access-fabric.v1",
+  "partitions": [
+    {
+      "partition_id": "drive",
+      "title": "Owner Drive MCP",
+      "adapter": "mcp_http",
+      "endpoint": "https://drive-mcp.example.com/mcp",
+      "capabilities": ["search", "fetch"],
+      "authorization_mode": "bridge_authorized",
+      "credential_env": "OWNER_DRIVE_MCP_TOKEN",
+      "search_tool": "search",
+      "fetch_tool": "fetch",
+      "sensitivity": "user_private",
+      "enabled": false
+    },
+    {
+      "partition_id": "mail",
+      "title": "Owner Mail MCP",
+      "adapter": "mcp_http",
+      "endpoint": "https://mail-mcp.example.com/mcp",
+      "capabilities": ["search", "fetch"],
+      "authorization_mode": "principal_scopes",
+      "required_scopes": ["mail.read"],
+      "credential_env": "OWNER_MAIL_MCP_TOKEN",
+      "search_tool": "search",
+      "fetch_tool": "fetch",
+      "sensitivity": "user_private",
+      "enabled": false
+    }
+  ]
+}

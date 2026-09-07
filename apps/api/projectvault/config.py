@@ -43,6 +43,9 @@ class Settings:
     max_indexable_file_bytes: int = 20 * 1024 * 1024
     min_free_bytes: int = 1024 * 1024 * 1024
     staging_path: Path | None = None
+    partition_registry_path: Path | None = None
+    partition_timeout_seconds: int = 10
+    max_federated_partitions: int = 32
 
     @property
     def staging_dir(self) -> Path:
@@ -51,6 +54,7 @@ class Settings:
     @classmethod
     def from_env(cls) -> "Settings":
         database_path = Path(os.getenv("PROJECTVAULT_DB", "data/projectvault.db")).resolve()
+        partition_registry_raw = os.getenv("PROJECTVAULT_PARTITION_REGISTRY", "").strip()
         settings = cls(
             database_path=database_path,
             host=os.getenv("PROJECTVAULT_HOST", "127.0.0.1"),
@@ -81,6 +85,13 @@ class Settings:
                 "PROJECTVAULT_MIN_FREE_BYTES", 1024 * 1024 * 1024, maximum=64 * 1024 * 1024 * 1024
             ),
             staging_path=Path(os.getenv("PROJECTVAULT_STAGING_DIR", str(database_path.parent / "staging"))),
+            partition_registry_path=Path(partition_registry_raw).resolve() if partition_registry_raw else None,
+            partition_timeout_seconds=_positive_int(
+                "PROJECTVAULT_PARTITION_TIMEOUT_SECONDS", 10, maximum=120
+            ),
+            max_federated_partitions=_positive_int(
+                "PROJECTVAULT_MAX_FEDERATED_PARTITIONS", 32, maximum=256
+            ),
         )
         settings.validate()
         return settings
@@ -112,3 +123,5 @@ class Settings:
             raise ValueError("PROJECTVAULT_MAX_INDEXABLE_FILE_BYTES cannot exceed PROJECTVAULT_MAX_ARCHIVE_MEMBER_BYTES")
         if self.staging_dir.exists() and not self.staging_dir.is_dir():
             raise ValueError("PROJECTVAULT_STAGING_DIR must be a directory")
+        if self.partition_registry_path is not None and not self.partition_registry_path.is_file():
+            raise ValueError("PROJECTVAULT_PARTITION_REGISTRY must point to an existing JSON file")
