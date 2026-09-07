@@ -4,7 +4,13 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from .corpus_fractions import FRACTION_PROTOCOL, FractionManifest, FractionPlan
+from .corpus_commitments import (
+    COMMITMENT_PROTOCOL,
+    CommitmentWork,
+    FractionCommitment,
+    build_commitment_work,
+)
+from .corpus_fractions import FRACTION_PROTOCOL, FractionPlan
 from .evidence import canonical_json, evidence_receipt
 
 SCHEMA = "matverse.fraction-publication.v1"
@@ -32,6 +38,7 @@ class FractionPublicationEnvelope:
     schema: str
     corpus_id: str
     source_protocol: str
+    commitment_protocol: str
     fraction_index: int
     start_ordinal: int
     end_ordinal: int
@@ -39,19 +46,26 @@ class FractionPublicationEnvelope:
     fraction_size: int
     total_items: int
     fraction_count: int
-    manifest_hash: str
-    merge_root: str
+    fraction_commitment_root: str
+    corpus_commitment_root: str
     disclosure_mode: DisclosureMode
     bundle_sha256: str | None
     receipt: dict[str, Any]
 
     def public_manifest(self) -> dict[str, Any]:
-        """Return a publication-safe structural manifest with no source member IDs."""
+        """Publication-safe manifest.
+
+        Deterministic structural hashes over low-entropy source identifiers are
+        deliberately omitted. Public integrity is represented by salted,
+        domain-separated commitments whose salts remain private until an
+        authorized opening is disclosed.
+        """
 
         return {
             "schema": self.schema,
             "corpus_id": self.corpus_id,
             "source_protocol": self.source_protocol,
+            "commitment_protocol": self.commitment_protocol,
             "fraction_index": self.fraction_index,
             "start_ordinal": self.start_ordinal,
             "end_ordinal": self.end_ordinal,
@@ -59,8 +73,8 @@ class FractionPublicationEnvelope:
             "fraction_size": self.fraction_size,
             "total_items": self.total_items,
             "fraction_count": self.fraction_count,
-            "manifest_hash": self.manifest_hash,
-            "merge_root": self.merge_root,
+            "fraction_commitment_root": self.fraction_commitment_root,
+            "corpus_commitment_root": self.corpus_commitment_root,
             "disclosure_mode": self.disclosure_mode.value,
             "bundle_sha256": self.bundle_sha256,
         }
@@ -72,6 +86,7 @@ class ZenodoDraftPlan:
     action: str
     target: str
     requires_authorization: bool
+    marxiv_stage: str
     metadata: dict[str, Any]
     generated_files: dict[str, str]
     external_files: tuple[dict[str, str], ...]
@@ -81,22 +96,39 @@ class ZenodoDraftPlan:
 class FractionPublicationBridge:
     """Governed structural bridge from corpus fractions to publication staging.
 
-    This module produces plans only. It never performs a Zenodo network write.
-    Any executor must still cross the existing independent publication
-    authorization and provider-secret boundaries.
+    The structural FractionPlan remains private/deterministic. A separate salted
+    commitment layer is generated for public integrity proofs. This module never
+    performs a Zenodo network write; it prepares MARXIV.Prepared artifacts only.
     """
 
-    def __init__(self, plan: FractionPlan, *, corpus_id: str) -> None:
+    def __init__(
+        self,
+        plan: FractionPlan,
+        *,
+        corpus_id: str,
+        commitment_work: CommitmentWork | None = None,
+    ) -> None:
         if plan.protocol != FRACTION_PROTOCOL:
             raise FractionPublicationError(f"unsupported fraction protocol: {plan.protocol}")
         if not corpus_id.strip():
             raise ValueError("corpus_id is required")
-        _require_sha256(plan.merge_root, field="merge_root")
+        _require_sha256(plan.merge_root, field="private structural merge_root")
         self.plan = plan
         self.corpus_id = corpus_id.strip()
+        self.commitment_work = commitment_work or build_commitment_work(plan)
+        public = self.commitment_work.public
+        if public.source_protocol != plan.protocol:
+            raise FractionPublicationError("commitment source protocol does not match fraction plan")
+        if (
+            public.total_items != plan.total_items
+            or public.fraction_size != plan.fraction_size
+            or public.fraction_count != plan.fraction_count
+        ):
+            raise FractionPublicationError("commitment geometry does not match fraction plan")
+        _require_sha256(public.root, field="corpus_commitment_root")
 
-    def _fraction(self, fraction_index: int) -> FractionManifest:
-        for fraction in self.plan.fractions:
+    def _commitment_fraction(self, fraction_index: int) -> FractionCommitment:
+        for fraction in self.commitment_work.public.fractions:
             if fraction.fraction_index == fraction_index:
                 return fraction
         raise FractionPublicationError(f"unknown fraction_index: {fraction_index}")
@@ -108,8 +140,7 @@ class FractionPublicationBridge:
         disclosure_mode: DisclosureMode = DisclosureMode.METADATA_ONLY,
         bundle_sha256: str | None = None,
     ) -> FractionPublicationEnvelope:
-        fraction = self._fraction(fraction_index)
-        _require_sha256(fraction.manifest_hash, field="manifest_hash")
+        commitment_fraction = self._commitment_fraction(fraction_index)
         if disclosure_mode is DisclosureMode.METADATA_ONLY and bundle_sha256 is not None:
             raise FractionPublicationError("METADATA_ONLY must not attach a content bundle")
         if disclosure_mode in {DisclosureMode.REDACTED_BUNDLE, DisclosureMode.PUBLIC_BUNDLE}:
@@ -121,36 +152,41 @@ class FractionPublicationBridge:
             "schema": SCHEMA,
             "corpus_id": self.corpus_id,
             "source_protocol": self.plan.protocol,
-            "fraction_index": fraction.fraction_index,
-            "start_ordinal": fraction.start_ordinal,
-            "end_ordinal": fraction.end_ordinal,
-            "member_count": fraction.member_count,
+            "commitment_protocol": COMMITMENT_PROTOCOL,
+            "fraction_index": commitment_fraction.fraction_index,
+            "start_ordinal": commitment_fraction.start_ordinal,
+            "end_ordinal": commitment_fraction.end_ordinal,
+            "member_count": commitment_fraction.member_count,
             "fraction_size": self.plan.fraction_size,
             "total_items": self.plan.total_items,
             "fraction_count": self.plan.fraction_count,
-            "manifest_hash": fraction.manifest_hash,
-            "merge_root": self.plan.merge_root,
+            "fraction_commitment_root": commitment_fraction.root,
+            "corpus_commitment_root": self.commitment_work.public.root,
             "disclosure_mode": disclosure_mode.value,
             "bundle_sha256": bundle_sha256,
         }
         receipt = evidence_receipt(
             "fraction_publication.envelope",
-            {"fraction_manifest_hash": fraction.manifest_hash, "merge_root": self.plan.merge_root},
+            {
+                "fraction_commitment_root": commitment_fraction.root,
+                "corpus_commitment_root": self.commitment_work.public.root,
+            },
             core,
         )
         return FractionPublicationEnvelope(
             schema=SCHEMA,
             corpus_id=self.corpus_id,
             source_protocol=self.plan.protocol,
-            fraction_index=fraction.fraction_index,
-            start_ordinal=fraction.start_ordinal,
-            end_ordinal=fraction.end_ordinal,
-            member_count=fraction.member_count,
+            commitment_protocol=COMMITMENT_PROTOCOL,
+            fraction_index=commitment_fraction.fraction_index,
+            start_ordinal=commitment_fraction.start_ordinal,
+            end_ordinal=commitment_fraction.end_ordinal,
+            member_count=commitment_fraction.member_count,
             fraction_size=self.plan.fraction_size,
             total_items=self.plan.total_items,
             fraction_count=self.plan.fraction_count,
-            manifest_hash=fraction.manifest_hash,
-            merge_root=self.plan.merge_root,
+            fraction_commitment_root=commitment_fraction.root,
+            corpus_commitment_root=self.commitment_work.public.root,
             disclosure_mode=disclosure_mode,
             bundle_sha256=bundle_sha256,
             receipt=receipt,
@@ -163,29 +199,36 @@ class FractionPublicationBridge:
             raise FractionPublicationError("envelope corpus_id does not belong to this bridge")
         if envelope.source_protocol != self.plan.protocol:
             raise FractionPublicationError("envelope source protocol does not match this fraction plan")
-        if envelope.merge_root != self.plan.merge_root:
-            raise FractionPublicationError("envelope merge_root does not match this fraction plan")
-        fraction = self._fraction(envelope.fraction_index)
-        expected = (
-            fraction.start_ordinal,
-            fraction.end_ordinal,
-            fraction.member_count,
+        if envelope.commitment_protocol != COMMITMENT_PROTOCOL:
+            raise FractionPublicationError("envelope commitment protocol does not match this bridge")
+        if envelope.corpus_commitment_root != self.commitment_work.public.root:
+            raise FractionPublicationError("envelope corpus commitment root does not match this bridge")
+
+        expected = self._commitment_fraction(envelope.fraction_index)
+        expected_tuple = (
+            expected.start_ordinal,
+            expected.end_ordinal,
+            expected.member_count,
             self.plan.fraction_size,
             self.plan.total_items,
             self.plan.fraction_count,
-            fraction.manifest_hash,
+            expected.root,
         )
-        actual = (
+        actual_tuple = (
             envelope.start_ordinal,
             envelope.end_ordinal,
             envelope.member_count,
             envelope.fraction_size,
             envelope.total_items,
             envelope.fraction_count,
-            envelope.manifest_hash,
+            envelope.fraction_commitment_root,
         )
-        if actual != expected:
-            raise FractionPublicationError("envelope structural fields do not match the canonical fraction plan")
+        if actual_tuple != expected_tuple:
+            raise FractionPublicationError("envelope commitment fields do not match the canonical commitment plan")
+
+        _require_sha256(envelope.fraction_commitment_root, field="fraction_commitment_root")
+        _require_sha256(envelope.corpus_commitment_root, field="corpus_commitment_root")
+
         if envelope.disclosure_mode is DisclosureMode.METADATA_ONLY and envelope.bundle_sha256 is not None:
             raise FractionPublicationError("METADATA_ONLY envelope must not contain bundle_sha256")
         if envelope.disclosure_mode in {DisclosureMode.REDACTED_BUNDLE, DisclosureMode.PUBLIC_BUNDLE}:
@@ -226,21 +269,24 @@ class FractionPublicationBridge:
             "resource_type": "dataset",
             "creators": list(cleaned_creators),
             "description": (
-                "Governed structural publication envelope for one corpus fraction. "
-                "The fraction manifest hash and corpus merge root commit to structural "
-                "integrity; they do not by themselves authorize disclosure of source content."
+                "MARXIV.Prepared structural publication envelope for one corpus fraction. "
+                "The public roots are salted domain-separated commitments. Private salts, "
+                "source identifiers and deterministic structural roots remain in staging. "
+                "A commitment proves binding to a staged corpus state; it does not authorize disclosure."
             ),
             "keywords": [
                 "matverse",
                 "corpus-fractions",
                 envelope.source_protocol,
+                envelope.commitment_protocol,
                 "governed-publication",
             ],
             "notes": {
                 "fraction_index": envelope.fraction_index,
-                "manifest_hash": envelope.manifest_hash,
-                "merge_root": envelope.merge_root,
+                "fraction_commitment_root": envelope.fraction_commitment_root,
+                "corpus_commitment_root": envelope.corpus_commitment_root,
                 "disclosure_mode": envelope.disclosure_mode.value,
+                "marxiv_stage": "Prepared",
             },
         }
         output = {
@@ -248,6 +294,7 @@ class FractionPublicationBridge:
             "action": "zenodo.create_draft",
             "target": f"zenodo:{self.corpus_id}:F{envelope.fraction_index}",
             "requires_authorization": True,
+            "marxiv_stage": "Prepared",
             "metadata": metadata,
             "generated_files": {manifest_name: manifest_text},
             "external_files": external_files,
@@ -262,6 +309,7 @@ class FractionPublicationBridge:
             action="zenodo.create_draft",
             target=output["target"],
             requires_authorization=True,
+            marxiv_stage="Prepared",
             metadata=metadata,
             generated_files={manifest_name: manifest_text},
             external_files=tuple(external_files),
