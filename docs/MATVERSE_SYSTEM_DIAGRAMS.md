@@ -12,6 +12,8 @@ Canonical terminology used here:
 - Organism = governed information + admitted capabilities + causal continuity.
 - Bridge = governed mediation/admission/transition mechanism across partitions,
   capabilities and substrates.
+- `Q-Gate` = historical/UI alias for the `Ω-GATE::CanPublish` projection, not a
+  second constitutional organ.
 
 ## 1. L0-L7 working structural view
 
@@ -54,32 +56,37 @@ stateDiagram-v2
 The organism is not the model executing one step. The identity-bearing object is
 its governed state, authority, lineage and admitted capability set.
 
-## 3. Corpus fractions + No-Left-Behind
+## 3. Corpus coverage + private fractions + public commitments
 
 ```mermaid
 flowchart TD
-    K["Known universe K"] --> S1["Exhaustive sweep"]
+    K["Known accessible universe K"] --> S1["Complete sweep"]
     S1 --> CR["CoverageRegistry"]
-    CR --> Q{"New / missing / orphan items?"}
-    Q -->|yes| R["Classify / relate / adjudicate / supersede"]
+    CR --> D{"Δobjects=0?<br/>Δsources=0?<br/>missing=0?<br/>R_ext=∅?"}
+    D -->|no| R["Classify / relate / adjudicate / extend source scope"]
     R --> S1
-    Q -->|no| Z{"Two consecutive zero-delta complete sweeps?"}
+    D -->|yes| Z{"Two consecutive clean complete sweeps<br/>over same scope hash?"}
     Z -->|no| S1
     Z -->|yes| SAT["DISCOVERY_SATURATED"]
 
     SAT --> CM["Canonical membership + ordering"]
-    CM --> FP["matverse.corpus-fractions.v1"]
+    CM --> FP["matverse.corpus-fractions.v1<br/>private deterministic plan"]
     FP --> F1["F1"]
     FP --> F2["F2"]
     FP --> FN["Fn"]
-    F1 --> MR["fraction merge_root"]
-    F2 --> MR
-    FN --> MR
+    F1 --> SR["private structural merge_root"]
+    F2 --> SR
+    FN --> SR
+    FP --> HC["matverse.corpus-commitments.v1"]
+    HC --> PR["public salted fraction roots"]
+    PR --> CR2["public corpus commitment root"]
 ```
 
-`DISCOVERY_SATURATED` is scoped: it means two complete sweeps over the same
-registered partition set found no new or missing objects. It does not claim that
-nothing exists outside the accessible universe.
+`DISCOVERY_SATURATED` is scoped and closed under currently observed source
+references. It does not claim that nothing exists outside the accessible universe.
+
+The deterministic structural `merge_root` is kept private when the source material
+is private or low entropy. Public publication integrity uses salted commitments.
 
 ## 4. Fraction publication governance
 
@@ -87,33 +94,39 @@ nothing exists outside the accessible universe.
 sequenceDiagram
     autonumber
     participant C as Canonical corpus
-    participant F as Fraction Bridge
-    participant G as Governance
-    participant P as Publication Bridge
-    participant Z as Zenodo Executor
+    participant F as Fraction/Commitment Bridge
+    participant A as Body-A proposer
+    participant D as Body-D adjudicator
+    participant X as Body-X executor
+    participant Z as Zenodo/provider
 
-    C->>F: verified FractionPlan + merge_root
-    F->>F: build privacy-safe envelope
-    F->>G: request disclosure classification
-    alt metadata only
-        G-->>F: METADATA_ONLY
-        F->>P: manifest-only Zenodo draft plan
-    else redacted/public bundle
-        G-->>F: REDACTED_BUNDLE or PUBLIC_BUNDLE + bundle hash
-        F->>P: draft plan + expected bundle hash
-    end
-    P->>G: request external-write authorization
-    alt no matching authorization
-        G-->>P: HOLD/BLOCK
-    else authorized
-        G-->>P: authorization receipt
-        P->>Z: zenodo.create_draft / zenodo.publish
-        Z-->>P: provider result
+    C->>F: private FractionPlan
+    F->>F: salted commitment work
+    F-->>A: privacy-safe envelope
+    A->>D: Ω-GATE::CanPublish proposal
+    Note over A,D: default HOLD / MARXIV.Prepared
+    alt BLOCK or TTL expiry
+        D-->>A: BLOCK
+    else independent ADMIT
+        D-->>A: ADMIT / MARXIV.Approved
+        Note over A,D: no provider call yet
+        X->>Z: external write with scoped credential
+        Z-->>X: provider receipt
+        X-->>F: MARXIV.Submitted receipt
     end
 ```
 
-The `merge_root` proves structural integrity. It does **not** authorize disclosure.
-Raw chats, private files or source bundles are never made public by default.
+Rules:
+
+```text
+Body-A != Body-D != Body-X
+Prepared != Approved != Submitted
+commitment root != disclosure authorization
+ADMIT != external execution
+```
+
+Raw chats, private files, deterministic source hashes and salts are never made
+public by default.
 
 ## 5. Complete Bridge planes
 
@@ -126,7 +139,7 @@ flowchart LR
       MF["Model / capability federation\nGPT · Claude · Manus · MiniMax · local runtimes"]
       RD["Runtime discovery / executor binding"]
       PB["Publication bridge\nGit · HF · arXiv · Zenodo"]
-      CF["Corpus fractions / semantic continuity"]
+      CF["Corpus fractions / commitments / semantic continuity"]
     end
 
     G --> IF
@@ -145,7 +158,26 @@ flowchart LR
     O --> G
 ```
 
-## 6. Ontological compression
+## 6. Capability admission
+
+```mermaid
+flowchart TD
+    ENV["Environment / host / provider"] --> DISC["DISCOVERED capability"]
+    DISC --> SPEC["Contract / permissions / authority scope"]
+    SPEC --> IMPL["Implementation binding"]
+    IMPL --> TEST["Tests + evidence"]
+    TEST --> GOV{"Governance"}
+    GOV -->|ADMIT| CAP["Admitted capability"]
+    GOV -->|HOLD| HOLD["HOLD"]
+    GOV -->|BLOCK| BLOCK["BLOCKED"]
+    CAP --> PHY["Organism physiology"]
+    PHY --> E["Receipt / evidence"]
+    E --> GOV
+```
+
+`SkillCreated != SkillAdmitted`.
+
+## 7. Ontological compression
 
 ```text
 MatVerse   = informational possibility field
@@ -155,5 +187,5 @@ Bridge     = governed admission + transition + mediation
 Capability = possibility of transformation
 Organism   = governed information + admitted capabilities + causal continuity
 Physiology = causal exercise of admitted capabilities over governed information
-Evidence   = record that a proposed/possible transition was actually evaluated or actualized
+Evidence   = record that a proposed/possible transition was evaluated or actualized
 ```
