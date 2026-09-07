@@ -1,0 +1,142 @@
+openapi: 3.1.0
+info:
+  title: MatVerse Ω-Gate Admission API
+  version: 1.0.0
+  description: >-
+    Governed admission contract for proposed MatVerse state transitions. The API
+    does not invent evidence or thresholds. Callers submit already-evaluated
+    invariant checks with evidence references. Failed checks BLOCK, unresolved
+    checks HOLD, and only fully-resolved passing requests can ADMIT.
+paths:
+  /v1/admit:
+    post:
+      operationId: evaluateOmegaAdmission
+      summary: Evaluate a proposed state transition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdmissionRequest'
+      responses:
+        '200':
+          description: Deterministic Ω-Gate decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdmissionDecision'
+        '400':
+          description: Invalid request shape or digest
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Sha256:
+      type: string
+      pattern: '^[0-9a-f]{64}$'
+    InvariantCheck:
+      type: object
+      additionalProperties: false
+      required:
+        - invariant_id
+        - passed
+        - evidence_ref
+      properties:
+        invariant_id:
+          type: string
+          minLength: 1
+        passed:
+          description: true=PASS, false=FAIL, null=UNRESOLVED
+          type:
+            - boolean
+            - 'null'
+        evidence_ref:
+          type: string
+          minLength: 1
+        observed: {}
+        expected: {}
+    AdmissionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - proposal_id
+        - source_mnb
+        - target_state_hash
+        - principal
+        - requested_action
+        - context_hash
+        - invariants
+      properties:
+        proposal_id:
+          type: string
+          minLength: 1
+        source_mnb:
+          type: string
+          minLength: 1
+          description: Canonical Mem-Nano-Bit / informational-node identifier.
+        target_state_hash:
+          $ref: '#/components/schemas/Sha256'
+        principal:
+          type: string
+          minLength: 1
+        requested_action:
+          type: string
+          minLength: 1
+        context_hash:
+          $ref: '#/components/schemas/Sha256'
+        invariants:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvariantCheck'
+        requires_authorization:
+          type: boolean
+          default: false
+        authorization_ref:
+          type:
+            - string
+            - 'null'
+    AdmissionDecision:
+      type: object
+      additionalProperties: false
+      required:
+        - schema
+        - decision_id
+        - proposal_id
+        - status
+        - reasons
+        - evaluated_invariants
+        - receipt
+      properties:
+        schema:
+          const: matverse.omega-gate.v1
+        decision_id:
+          type: string
+        proposal_id:
+          type: string
+        status:
+          type: string
+          enum:
+            - ADMIT
+            - HOLD
+            - BLOCK
+        reasons:
+          type: array
+          items:
+            type: string
+        evaluated_invariants:
+          type: array
+          items:
+            type: string
+        receipt:
+          type: object
+          description: matverse.evidence-receipt.v1 object
+          additionalProperties: true
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
