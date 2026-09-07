@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from app.evidence import sha256_text
 from app.omega_gate_contract import (
     GateDecision,
@@ -72,3 +74,8 @@ def test_authorization_reference_allows_admission_when_checks_pass():
         )
     )
     assert decision.status is GateDecision.ADMIT
+
+
+def test_non_boolean_invariant_outcome_is_rejected_fail_closed():
+    with pytest.raises(TypeError, match="bool or None"):
+        InvariantCheck("identity", "true", "receipt://identity")  # type: ignore[arg-type]
