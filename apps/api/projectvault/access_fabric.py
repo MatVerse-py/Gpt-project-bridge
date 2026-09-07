@@ -5,9 +5,8 @@ import json
 import os
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import quote, unquote, urlparse
 
@@ -16,6 +15,7 @@ import httpx
 from .auth import Principal
 from .config import Settings
 from .db import Database
+from .provider_adapters import NATIVE_ADAPTERS, NativeProviderUnavailable, native_fetch, native_search, validate_native_options
 from .search import KnowledgeService
 
 ACCESS_PROTOCOL = "matverse.owner-access-fabric.v1"
@@ -24,6 +24,7 @@ REFERENCE_SEPARATOR = "::"
 PARTITION_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 READ_CAPABILITIES = frozenset({"search", "fetch"})
 AUTHORIZATION_MODES = frozenset({"bridge_authorized", "principal_scopes"})
+REMOTE_ADAPTERS = frozenset({"mcp_http"}) | NATIVE_ADAPTERS
 
 
 class PartitionUnavailable(RuntimeError):
@@ -44,6 +45,7 @@ class PartitionSpec:
     credential_env: str | None = None
     search_tool: str = "search"
     fetch_tool: str = "fetch"
+    options: Mapping[str, Any] = field(default_factory=dict)
 
     def public_dict(self, *, credential_configured: bool | None = None) -> dict[str, Any]:
         item: dict[str, Any] = {
@@ -76,11 +78,11 @@ def _valid_partition_id(value: str) -> str:
     return partition_id
 
 
-def _string_set(value: Any, field: str) -> frozenset[str]:
+def _string_set(value: Any, field_name: str) -> frozenset[str]:
     if value is None:
         return frozenset()
     if not isinstance(value, list) or not all(isinstance(item, str) and item.strip() for item in value):
-        raise ValueError(f"{field} must be an array of non-empty strings")
+        raise ValueError(f"{field_name} must be an array of non-empty strings")
     return frozenset(item.strip() for item in value)
 
 
@@ -94,14 +96,10 @@ def _endpoint_is_safe(endpoint: str) -> bool:
 def _scope_granted(granted: frozenset[str], required: str) -> bool:
     if required in granted or "*" in granted or "owner:*" in granted:
         return True
-    if "." in required:
-        prefix = required.split(".", 1)[0] + ".*"
-        if prefix in granted:
-            return True
-    if ":" in required:
-        prefix = required.split(":", 1)[0] + ":*"
-        if prefix in granted:
-            return True
+    if "." in required and required.split(".", 1)[0] + ".*" in granted:
+        return True
+    if ":" in required and required.split(":", 1)[0] + ":*" in granted:
+        return True
     return False
 
 
@@ -133,6 +131,18 @@ def _local_spec(settings: Settings) -> PartitionSpec:
     )
 
 
+def _credential_env(raw: Mapping[str, Any], partition_id: str, *, required: bool) -> str | None:
+    value = raw.get("credential_env")
+    if value is None:
+        if required:
+            raise ValueError(f"Partition {partition_id} requires credential_env")
+        return None
+    env_name = str(value).strip()
+    if not env_name or not re.fullmatch(r"[A-Z_][A-Z0-9_]*", env_name):
+        raise ValueError(f"Partition {partition_id} has invalid credential_env")
+    return env_name
+
+
 def load_partition_specs(settings: Settings) -> tuple[PartitionSpec, ...]:
     specs: list[PartitionSpec] = [_local_spec(settings)]
     path = settings.partition_registry_path
@@ -159,13 +169,16 @@ def load_partition_specs(settings: Settings) -> tuple[PartitionSpec, ...]:
         seen.add(partition_id)
 
         adapter = str(raw.get("adapter") or "").strip()
-        if adapter != "mcp_http":
+        if adapter not in REMOTE_ADAPTERS:
             raise ValueError(f"Unsupported adapter for {partition_id}: {adapter!r}")
-        endpoint = str(raw.get("endpoint") or "").strip()
-        if not endpoint or not _endpoint_is_safe(endpoint):
-            raise ValueError(
-                f"Partition {partition_id} endpoint must use HTTPS or loopback HTTP"
-            )
+
+        endpoint: str | None = None
+        if adapter == "mcp_http":
+            endpoint = str(raw.get("endpoint") or "").strip()
+            if not endpoint or not _endpoint_is_safe(endpoint):
+                raise ValueError(f"Partition {partition_id} endpoint must use HTTPS or loopback HTTP")
+        elif raw.get("endpoint") is not None:
+            raise ValueError(f"Partition {partition_id} native adapter does not accept custom endpoint")
 
         capabilities = _string_set(raw.get("capabilities", ["search", "fetch"]), "capabilities")
         if not capabilities or not capabilities.issubset(READ_CAPABILITIES):
@@ -179,15 +192,15 @@ def load_partition_specs(settings: Settings) -> tuple[PartitionSpec, ...]:
             )
         required_scopes = _string_set(raw.get("required_scopes"), "required_scopes")
         if authorization_mode == "principal_scopes" and not required_scopes:
-            raise ValueError(
-                f"Partition {partition_id} with principal_scopes requires required_scopes"
-            )
+            raise ValueError(f"Partition {partition_id} with principal_scopes requires required_scopes")
 
-        credential_env = raw.get("credential_env")
-        if credential_env is not None:
-            credential_env = str(credential_env).strip()
-            if not credential_env or not re.fullmatch(r"[A-Z_][A-Z0-9_]*", credential_env):
-                raise ValueError(f"Partition {partition_id} has invalid credential_env")
+        options = raw.get("options", {})
+        if not isinstance(options, dict):
+            raise ValueError(f"Partition {partition_id} options must be an object")
+        if adapter in NATIVE_ADAPTERS:
+            validate_native_options(adapter, options)
+
+        credential_env = _credential_env(raw, partition_id, required=adapter in NATIVE_ADAPTERS)
 
         specs.append(
             PartitionSpec(
@@ -203,6 +216,7 @@ def load_partition_specs(settings: Settings) -> tuple[PartitionSpec, ...]:
                 credential_env=credential_env,
                 search_tool=str(raw.get("search_tool") or "search"),
                 fetch_tool=str(raw.get("fetch_tool") or "fetch"),
+                options=dict(options),
             )
         )
     return tuple(specs)
@@ -220,13 +234,19 @@ class AccessFabric:
             return True
         return bool(os.getenv(spec.credential_env))
 
+    def _provider_token(self, spec: PartitionSpec) -> str:
+        if not spec.credential_env:
+            raise PartitionUnavailable("provider_credential_not_configured")
+        token = os.getenv(spec.credential_env)
+        if not token:
+            raise PartitionUnavailable("provider_credential_not_configured")
+        return token
+
     def _authorization(self, spec: PartitionSpec, principal: Principal) -> tuple[str, str | None]:
         if not spec.enabled:
             return "DISABLED", "partition_disabled"
         if spec.authorization_mode == "principal_scopes":
-            missing = sorted(
-                scope for scope in spec.required_scopes if not _scope_granted(principal.scopes, scope)
-            )
+            missing = sorted(scope for scope in spec.required_scopes if not _scope_granted(principal.scopes, scope))
             if missing:
                 return "DENIED", "missing_principal_scopes:" + ",".join(missing)
         elif not _scope_granted(principal.scopes, self.settings.required_scope):
@@ -238,13 +258,11 @@ class AccessFabric:
     def list_partitions(self, principal: Principal) -> dict[str, Any]:
         partitions: list[dict[str, Any]] = []
         for spec in self.specs.values():
-            auth_status, reason = self._authorization(spec, principal)
+            status, reason = self._authorization(spec, principal)
             item = spec.public_dict(
-                credential_configured=self._provider_credential_configured(spec)
-                if spec.adapter != "projectvault"
-                else None
+                credential_configured=self._provider_credential_configured(spec) if spec.adapter != "projectvault" else None
             )
-            item["access_status"] = auth_status
+            item["access_status"] = status
             if reason:
                 item["access_reason"] = reason
             partitions.append(item)
@@ -261,23 +279,23 @@ class AccessFabric:
         entries = []
         for spec in selected:
             status, reason = self._authorization(spec, principal)
-            entries.append(
-                {
-                    "partition_id": spec.partition_id,
-                    "access_status": status,
-                    "reason": reason,
-                    "rule": (
-                        "Explicit Bridge registration + authenticated owner access"
-                        if spec.authorization_mode == "bridge_authorized"
-                        else "Authenticated owner access + partition-specific principal scopes"
-                    ),
-                    "provider_boundary": (
-                        "Remote provider authorization remains independently enforced"
-                        if spec.adapter == "mcp_http"
-                        else "Local indexed Project Vault boundary"
-                    ),
-                }
-            )
+            if spec.adapter == "projectvault":
+                boundary = "Local indexed Project Vault boundary"
+            elif spec.adapter == "mcp_http":
+                boundary = "Remote MCP provider authorization remains independently enforced"
+            else:
+                boundary = f"Native {spec.adapter} provider authorization remains independently enforced"
+            entries.append({
+                "partition_id": spec.partition_id,
+                "access_status": status,
+                "reason": reason,
+                "rule": (
+                    "Explicit Bridge registration + authenticated owner access"
+                    if spec.authorization_mode == "bridge_authorized"
+                    else "Authenticated owner access + partition-specific principal scopes"
+                ),
+                "provider_boundary": boundary,
+            })
         return {
             "protocol": ACCESS_PROTOCOL,
             "principle": (
@@ -291,7 +309,7 @@ class AccessFabric:
         if requested is None:
             return list(self.specs.values())
         raw = [str(item).strip().lower() for item in requested if str(item).strip()]
-        if not raw or raw == ["*"] or "*" in raw:
+        if not raw or "*" in raw:
             return list(self.specs.values())
         selected: list[PartitionSpec] = []
         seen: set[str] = set()
@@ -307,27 +325,20 @@ class AccessFabric:
     def _remote_headers(self, spec: PartitionSpec) -> dict[str, str]:
         headers = {"accept": "application/json", "content-type": "application/json"}
         if spec.credential_env:
-            token = os.getenv(spec.credential_env)
-            if not token:
-                raise PartitionUnavailable("provider_credential_not_configured")
-            headers["authorization"] = f"Bearer {token}"
+            headers["authorization"] = f"Bearer {self._provider_token(spec)}"
         return headers
 
     def _remote_tool_call(self, spec: PartitionSpec, tool_name: str, arguments: Mapping[str, Any]) -> dict[str, Any]:
         if not spec.endpoint:
             raise PartitionUnavailable("partition_endpoint_missing")
-        request_id = str(uuid.uuid4())
         payload = {
             "jsonrpc": "2.0",
-            "id": request_id,
+            "id": str(uuid.uuid4()),
             "method": "tools/call",
             "params": {"name": tool_name, "arguments": dict(arguments)},
         }
         try:
-            with httpx.Client(
-                timeout=float(self.settings.partition_timeout_seconds),
-                follow_redirects=False,
-            ) as client:
+            with httpx.Client(timeout=float(self.settings.partition_timeout_seconds), follow_redirects=False) as client:
                 response = client.post(spec.endpoint, headers=self._remote_headers(spec), json=payload)
                 response.raise_for_status()
                 body = response.json()
@@ -344,7 +355,6 @@ class AccessFabric:
             raise PartitionUnavailable("provider_missing_result")
         if result.get("isError"):
             raise PartitionUnavailable("provider_tool_error")
-
         structured = result.get("structuredContent")
         if isinstance(structured, dict):
             return structured
@@ -365,6 +375,18 @@ class AccessFabric:
             payload = self.knowledge.search(query, limit=limit)
         elif spec.adapter == "mcp_http":
             payload = self._remote_tool_call(spec, spec.search_tool, {"query": query})
+        elif spec.adapter in NATIVE_ADAPTERS:
+            try:
+                payload = native_search(
+                    spec.adapter,
+                    token=self._provider_token(spec),
+                    query=query,
+                    limit=limit,
+                    options=spec.options,
+                    timeout=float(self.settings.partition_timeout_seconds),
+                )
+            except NativeProviderUnavailable as exc:
+                raise PartitionUnavailable(str(exc)) from exc
         else:
             raise PartitionUnavailable("unsupported_adapter")
         raw_results = payload.get("results")
@@ -396,6 +418,18 @@ class AccessFabric:
             payload = self.knowledge.fetch(item_id)
         elif spec.adapter == "mcp_http":
             payload = self._remote_tool_call(spec, spec.fetch_tool, {"id": item_id})
+        elif spec.adapter in NATIVE_ADAPTERS:
+            try:
+                payload = native_fetch(
+                    spec.adapter,
+                    token=self._provider_token(spec),
+                    item_id=item_id,
+                    options=spec.options,
+                    timeout=float(self.settings.partition_timeout_seconds),
+                    max_bytes=self.settings.max_indexable_file_bytes,
+                )
+            except NativeProviderUnavailable as exc:
+                raise PartitionUnavailable(str(exc)) from exc
         else:
             raise PartitionUnavailable("unsupported_adapter")
         if not isinstance(payload, dict):
@@ -432,13 +466,7 @@ class AccessFabric:
             "skipped_partitions": skipped,
             "result_count": result_count,
         }
-        self.db.audit(
-            principal.subject,
-            f"access_fabric.{action}",
-            resource_id,
-            receipt["receipt_id"],
-            receipt,
-        )
+        self.db.audit(principal.subject, f"access_fabric.{action}", resource_id, receipt["receipt_id"], receipt)
         return receipt
 
     def search(
@@ -459,7 +487,6 @@ class AccessFabric:
         results: list[dict[str, Any]] = []
         accessed: list[str] = []
         skipped: list[dict[str, str]] = []
-
         for spec in specs:
             if len(results) >= effective_limit:
                 break
@@ -478,7 +505,6 @@ class AccessFabric:
                 continue
             accessed.append(spec.partition_id)
             results.extend(partition_results[:remaining])
-
         receipt = self._receipt(
             principal=principal,
             action="search",
@@ -489,19 +515,9 @@ class AccessFabric:
             skipped=skipped,
             result_count=len(results),
         )
-        return {
-            "protocol": ACCESS_PROTOCOL,
-            "results": results,
-            "access_receipt": receipt,
-        }
+        return {"protocol": ACCESS_PROTOCOL, "results": results, "access_receipt": receipt}
 
-    def fetch(
-        self,
-        principal: Principal,
-        reference: str,
-        *,
-        purpose: str | None = None,
-    ) -> dict[str, Any]:
+    def fetch(self, principal: Principal, reference: str, *, purpose: str | None = None) -> dict[str, Any]:
         partition_id, item_id = _decode_reference(reference.strip())
         if partition_id not in self.specs:
             raise KeyError(partition_id)
