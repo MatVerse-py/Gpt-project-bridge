@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import pytest
+
 from app.core import Decision
 from app.deterministic_lab import DeterministicFaultPlan, DeterministicTelemetry, FaultDirective, FaultKind
 from app.organism_loop import GovernedOrganism
 from app.physiology import DurableEventJournal, ExecutionResult, HealthState
 from app.physiology_effect_feedback import ClosedLoopPhysiologyEngine, EffectFeedbackPolicy
+
+FEEDBACK_SECRET = "feedback-loop-authentication-secret"
+STATE_KEY = "physiology-effect-feedback:feedback-test-organism"
 
 
 def _organism(runtime_id: str = "feedback-test-runtime") -> GovernedOrganism:
@@ -21,10 +26,20 @@ def _normal_telemetry(cycles: int = 20) -> DeterministicTelemetry:
     return DeterministicTelemetry(plan=DeterministicFaultPlan(seed=1, cycles=cycles, directives=()))
 
 
+def _engine(*, journal, telemetry, executor, runtime_id="feedback-test-runtime", feedback_policy=None):
+    return ClosedLoopPhysiologyEngine(
+        organism=_organism(runtime_id=runtime_id),
+        journal=journal,
+        telemetry=telemetry,
+        executor=executor,
+        feedback_state_secret=FEEDBACK_SECRET,
+        feedback_policy=feedback_policy,
+    )
+
+
 def test_successful_effect_closes_loop_without_recovery_gate(tmp_path):
     journal = DurableEventJournal(tmp_path / "success.sqlite3")
-    engine = ClosedLoopPhysiologyEngine(
-        organism=_organism(),
+    engine = _engine(
         journal=journal,
         telemetry=_normal_telemetry(),
         executor=lambda proposal: ExecutionResult(status="OK", effect={"resource": proposal.get("resource")}),
@@ -60,12 +75,7 @@ def test_post_effect_homeostatic_degradation_changes_next_cycle(tmp_path):
         executions.append(dict(proposal))
         return ExecutionResult(status="OK", effect={"done": True})
 
-    engine = ClosedLoopPhysiologyEngine(
-        organism=_organism(),
-        journal=journal,
-        telemetry=telemetry,
-        executor=executor,
-    )
+    engine = _engine(journal=journal, telemetry=telemetry, executor=executor)
 
     first = engine.tick(proposal={"action": "READ", "resource": "sensor"})
     assert first.cycle.health is HealthState.NORMAL
@@ -97,12 +107,7 @@ def test_recovery_must_reference_origin_and_clear_only_after_measured_normal_eff
             return ExecutionResult(status="ERROR", effect={"reason": "synthetic failure"})
         return ExecutionResult(status="OK", effect={"recovered": True})
 
-    engine = ClosedLoopPhysiologyEngine(
-        organism=_organism(),
-        journal=journal,
-        telemetry=_normal_telemetry(),
-        executor=executor,
-    )
+    engine = _engine(journal=journal, telemetry=_normal_telemetry(), executor=executor)
 
     failed = engine.tick(proposal={"action": "READ", "resource": "sensor"})
     assert failed.effect_status == "ERROR"
@@ -130,12 +135,7 @@ def test_executor_exception_becomes_causal_feedback_not_only_a_log(tmp_path):
     def executor(_proposal):
         raise RuntimeError("device disappeared")
 
-    engine = ClosedLoopPhysiologyEngine(
-        organism=_organism(),
-        journal=journal,
-        telemetry=_normal_telemetry(),
-        executor=executor,
-    )
+    engine = _engine(journal=journal, telemetry=_normal_telemetry(), executor=executor)
 
     failed = engine.tick(proposal={"action": "READ", "resource": "usb-device"})
     assert failed.cycle.decision is Decision.PASS
@@ -153,8 +153,7 @@ def test_executor_exception_becomes_causal_feedback_not_only_a_log(tmp_path):
 def test_feedback_state_survives_journal_reopen(tmp_path):
     path = tmp_path / "durable-feedback.sqlite3"
     first_journal = DurableEventJournal(path)
-    first_engine = ClosedLoopPhysiologyEngine(
-        organism=_organism(),
+    first_engine = _engine(
         journal=first_journal,
         telemetry=_normal_telemetry(),
         executor=lambda proposal: ExecutionResult(status="FAIL", effect={"proposal": dict(proposal)}),
@@ -165,11 +164,11 @@ def test_feedback_state_survives_journal_reopen(tmp_path):
     first_journal.close()
 
     second_journal = DurableEventJournal(path)
-    second_engine = ClosedLoopPhysiologyEngine(
-        organism=_organism(runtime_id="feedback-test-runtime-2"),
+    second_engine = _engine(
         journal=second_journal,
         telemetry=_normal_telemetry(),
         executor=lambda proposal: ExecutionResult(status="OK", effect={"proposal": dict(proposal)}),
+        runtime_id="feedback-test-runtime-2",
     )
     assert second_engine.feedback.recovery_required is True
     assert second_engine.feedback.recovery_for_cycle_id == origin
@@ -179,10 +178,59 @@ def test_feedback_state_survives_journal_reopen(tmp_path):
     second_journal.close()
 
 
+def test_feedback_state_tamper_is_rejected_on_reopen(tmp_path):
+    path = tmp_path / "tamper.sqlite3"
+    journal = DurableEventJournal(path)
+    engine = _engine(
+        journal=journal,
+        telemetry=_normal_telemetry(),
+        executor=lambda proposal: ExecutionResult(status="FAIL", effect={"proposal": dict(proposal)}),
+    )
+    failed = engine.tick(proposal={"action": "READ"})
+    assert failed.recovery_required is True
+
+    stored = journal.get_state(STATE_KEY)
+    assert stored["payload"]["recovery_required"] is True
+    stored["payload"]["recovery_required"] = False
+    journal.set_state(STATE_KEY, stored)
+    journal.close()
+
+    reopened = DurableEventJournal(path)
+    with pytest.raises(ValueError, match="state authentication failed"):
+        _engine(
+            journal=reopened,
+            telemetry=_normal_telemetry(),
+            executor=lambda proposal: ExecutionResult(status="OK", effect={"proposal": dict(proposal)}),
+        )
+    reopened.close()
+
+
+def test_wrong_feedback_state_secret_is_rejected(tmp_path):
+    path = tmp_path / "wrong-secret.sqlite3"
+    journal = DurableEventJournal(path)
+    engine = _engine(
+        journal=journal,
+        telemetry=_normal_telemetry(),
+        executor=lambda proposal: ExecutionResult(status="FAIL", effect={"proposal": dict(proposal)}),
+    )
+    engine.tick(proposal={"action": "READ"})
+    journal.close()
+
+    reopened = DurableEventJournal(path)
+    with pytest.raises(ValueError, match="state authentication failed"):
+        ClosedLoopPhysiologyEngine(
+            organism=_organism(runtime_id="feedback-test-runtime-2"),
+            journal=reopened,
+            telemetry=_normal_telemetry(),
+            executor=lambda proposal: ExecutionResult(status="OK", effect={"proposal": dict(proposal)}),
+            feedback_state_secret="wrong-feedback-secret",
+        )
+    reopened.close()
+
+
 def test_feedback_policy_can_require_multiple_failures_before_gating(tmp_path):
     journal = DurableEventJournal(tmp_path / "threshold.sqlite3")
-    engine = ClosedLoopPhysiologyEngine(
-        organism=_organism(),
+    engine = _engine(
         journal=journal,
         telemetry=_normal_telemetry(),
         executor=lambda proposal: ExecutionResult(status="FAIL", effect={"proposal": dict(proposal)}),
