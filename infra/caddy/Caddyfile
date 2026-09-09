@@ -1,0 +1,18 @@
+{$GPB_DOMAIN} {
+  encode zstd gzip
+
+  @mcp path /mcp /.well-known/oauth-protected-resource
+  handle @mcp {
+    reverse_proxy api:8787
+  }
+
+  handle {
+    reverse_proxy web:3000
+  }
+
+  header {
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    Referrer-Policy no-referrer
+  }
+}

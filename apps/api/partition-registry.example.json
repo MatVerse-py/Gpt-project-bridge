@@ -1,0 +1,78 @@
+{
+  "protocol": "matverse.owner-access-fabric.v1",
+  "partitions": [
+    {
+      "partition_id": "github-code",
+      "title": "Owner GitHub Code",
+      "adapter": "github_rest",
+      "credential_env": "OWNER_GITHUB_TOKEN",
+      "authorization_mode": "bridge_authorized",
+      "capabilities": ["search", "fetch"],
+      "options": {
+        "kind": "code",
+        "repository": "MatVerse-py/Gpt-project-bridge"
+      },
+      "enabled": false
+    },
+    {
+      "partition_id": "drive",
+      "title": "Owner Google Drive",
+      "adapter": "google_drive",
+      "credential_env": "OWNER_GOOGLE_ACCESS_TOKEN",
+      "authorization_mode": "bridge_authorized",
+      "capabilities": ["search", "fetch"],
+      "enabled": false
+    },
+    {
+      "partition_id": "mail",
+      "title": "Owner Gmail",
+      "adapter": "gmail",
+      "credential_env": "OWNER_GOOGLE_ACCESS_TOKEN",
+      "authorization_mode": "principal_scopes",
+      "required_scopes": ["mail.read"],
+      "capabilities": ["search", "fetch"],
+      "options": {
+        "user_id": "me"
+      },
+      "enabled": false
+    },
+    {
+      "partition_id": "calendar",
+      "title": "Owner Google Calendar",
+      "adapter": "google_calendar",
+      "credential_env": "OWNER_GOOGLE_ACCESS_TOKEN",
+      "authorization_mode": "bridge_authorized",
+      "capabilities": ["search", "fetch"],
+      "options": {
+        "calendar_id": "primary",
+        "past_days": 365,
+        "future_days": 365
+      },
+      "enabled": false
+    },
+    {
+      "partition_id": "notion",
+      "title": "Owner Notion",
+      "adapter": "notion",
+      "credential_env": "OWNER_NOTION_TOKEN",
+      "authorization_mode": "bridge_authorized",
+      "capabilities": ["search", "fetch"],
+      "options": {
+        "max_blocks": 200
+      },
+      "enabled": false
+    },
+    {
+      "partition_id": "chatgpt-host",
+      "title": "Host-provided ChatGPT Project/File partition",
+      "adapter": "mcp_http",
+      "endpoint": "https://host-provided-mcp.example.com/mcp",
+      "credential_env": "OWNER_CHATGPT_HOST_MCP_TOKEN",
+      "authorization_mode": "bridge_authorized",
+      "capabilities": ["search", "fetch"],
+      "search_tool": "search",
+      "fetch_tool": "fetch",
+      "enabled": false
+    }
+  ]
+}
