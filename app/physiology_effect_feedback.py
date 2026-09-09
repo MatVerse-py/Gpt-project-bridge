@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import re
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping
 
@@ -19,6 +22,7 @@ from .physiology import (
 )
 
 SCHEMA_VERSION = "matverse.physiology-effect-feedback.v1"
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -78,7 +82,7 @@ class ClosedLoopPhysiologyEngine:
         Sense -> Analyze -> Plan -> Authorize -> Execute -> Effect -> Memory.
 
     This wrapper adds the missing causal edge:
-        Effect -> fresh measurement -> feedback state -> next-cycle gate.
+        Effect -> fresh measurement -> authenticated feedback state -> next-cycle gate.
 
     A failed or homeostatically harmful effect is therefore not only recorded;
     it changes which proposals can execute on subsequent cycles. Recovery is
@@ -92,31 +96,28 @@ class ClosedLoopPhysiologyEngine:
         journal: DurableEventJournal,
         telemetry: NativeTelemetry,
         executor: Executor | None,
+        feedback_state_secret: str,
         homeostatic_policy: HomeostaticPolicy | None = None,
         feedback_policy: EffectFeedbackPolicy | None = None,
     ) -> None:
+        if not isinstance(feedback_state_secret, str) or not feedback_state_secret:
+            raise ValueError("feedback_state_secret must be a non-empty string")
         self.organism = organism
         self.journal = journal
         self.telemetry = telemetry
         self.feedback_policy = feedback_policy or EffectFeedbackPolicy()
         self._executor = executor
+        self._feedback_state_secret = feedback_state_secret
         self._captured_result: ExecutionResult | None = None
         self._captured_error: dict[str, str] | None = None
         self._state_key = f"physiology-effect-feedback:{self.organism.organism_id}"
-        self._feedback_state = self._validate_state(
-            self.journal.get_state(
-                self._state_key,
-                {
-                    "schema": SCHEMA_VERSION,
-                    "failure_streak": 0,
-                    "recovery_required": False,
-                    "recovery_for_cycle_id": None,
-                    "last_effect_status": None,
-                    "last_post_effect_health": None,
-                    "last_feedback_receipt_hash": None,
-                },
-            )
-        )
+
+        stored_state = self.journal.get_state(self._state_key, None)
+        if stored_state is None:
+            self._feedback_state = self._empty_state()
+        else:
+            self._feedback_state = self._load_persisted_state(stored_state)
+
         wrapped_executor: Executor | None = None if executor is None else self._execute_and_capture
         self.engine = PhysiologyEngine(
             organism=organism,
@@ -125,6 +126,18 @@ class ClosedLoopPhysiologyEngine:
             policy=homeostatic_policy,
             executor=wrapped_executor,
         )
+
+    @staticmethod
+    def _empty_state() -> dict[str, Any]:
+        return {
+            "schema": SCHEMA_VERSION,
+            "failure_streak": 0,
+            "recovery_required": False,
+            "recovery_for_cycle_id": None,
+            "last_effect_status": None,
+            "last_post_effect_health": None,
+            "last_feedback_receipt_hash": None,
+        }
 
     @staticmethod
     def _validate_state(value: Any) -> dict[str, Any]:
@@ -151,7 +164,7 @@ class ClosedLoopPhysiologyEngine:
             except ValueError as exc:
                 raise ValueError("invalid last_post_effect_health") from exc
         receipt_hash = value.get("last_feedback_receipt_hash")
-        if receipt_hash is not None and (not isinstance(receipt_hash, str) or len(receipt_hash) != 64):
+        if receipt_hash is not None and (not isinstance(receipt_hash, str) or _SHA256_RE.fullmatch(receipt_hash) is None):
             raise ValueError("last_feedback_receipt_hash must be a SHA-256 hex string or null")
         return {
             "schema": SCHEMA_VERSION,
@@ -163,8 +176,31 @@ class ClosedLoopPhysiologyEngine:
             "last_feedback_receipt_hash": receipt_hash,
         }
 
+    def _state_mac(self, payload: Mapping[str, Any]) -> str:
+        return hmac.new(
+            self._feedback_state_secret.encode("utf-8"),
+            canonical_json(dict(payload)).encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+    def _load_persisted_state(self, stored: Any) -> dict[str, Any]:
+        if not isinstance(stored, dict) or set(stored) != {"payload", "state_mac"}:
+            raise ValueError("invalid persisted effect feedback envelope")
+        payload = stored.get("payload")
+        supplied_mac = stored.get("state_mac")
+        if not isinstance(payload, dict) or not isinstance(supplied_mac, str):
+            raise ValueError("invalid persisted effect feedback envelope")
+        expected_mac = self._state_mac(payload)
+        if not hmac.compare_digest(expected_mac, supplied_mac):
+            raise ValueError("effect feedback state authentication failed")
+        return self._validate_state(payload)
+
     def _persist_state(self) -> None:
-        self.journal.set_state(self._state_key, self._feedback_state)
+        payload = json.loads(canonical_json(self._feedback_state))
+        self.journal.set_state(
+            self._state_key,
+            {"payload": payload, "state_mac": self._state_mac(payload)},
+        )
 
     @property
     def feedback(self) -> FeedbackSnapshot:
