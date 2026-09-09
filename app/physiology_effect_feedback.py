@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import re
+import threading
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping
 
@@ -38,7 +39,11 @@ class EffectFeedbackPolicy:
     failures_before_recovery_gate: int = 1
 
     def __post_init__(self) -> None:
-        normalized = tuple(item.strip().upper() for item in self.success_statuses if isinstance(item, str) and item.strip())
+        normalized = tuple(
+            item.strip().upper()
+            for item in self.success_statuses
+            if isinstance(item, str) and item.strip()
+        )
         if not normalized:
             raise ValueError("success_statuses must contain at least one non-empty status")
         if len(normalized) != len(set(normalized)):
@@ -87,6 +92,10 @@ class ClosedLoopPhysiologyEngine:
     A failed or homeostatically harmful effect is therefore not only recorded;
     it changes which proposals can execute on subsequent cycles. Recovery is
     fail-closed and must reference the cycle that opened the recovery gate.
+
+    `tick` is serialized per engine instance. This is intentional: the physiology
+    state and the captured executor outcome form one causal transaction and must
+    not be interleaved across concurrent callers.
     """
 
     def __init__(
@@ -111,6 +120,7 @@ class ClosedLoopPhysiologyEngine:
         self._captured_result: ExecutionResult | None = None
         self._captured_error: dict[str, str] | None = None
         self._state_key = f"physiology-effect-feedback:{self.organism.organism_id}"
+        self._tick_lock = threading.RLock()
 
         stored_state = self.journal.get_state(self._state_key, None)
         if stored_state is None:
@@ -150,7 +160,9 @@ class ClosedLoopPhysiologyEngine:
             raise ValueError("failure_streak must be >= 0")
         recovery_required = bool(value.get("recovery_required", False))
         recovery_for = value.get("recovery_for_cycle_id")
-        if recovery_for is not None and (not isinstance(recovery_for, str) or not recovery_for):
+        if recovery_for is not None and (
+            not isinstance(recovery_for, str) or not recovery_for
+        ):
             raise ValueError("recovery_for_cycle_id must be a non-empty string or null")
         if recovery_required != (recovery_for is not None):
             raise ValueError("recovery_required and recovery_for_cycle_id are inconsistent")
@@ -164,7 +176,10 @@ class ClosedLoopPhysiologyEngine:
             except ValueError as exc:
                 raise ValueError("invalid last_post_effect_health") from exc
         receipt_hash = value.get("last_feedback_receipt_hash")
-        if receipt_hash is not None and (not isinstance(receipt_hash, str) or _SHA256_RE.fullmatch(receipt_hash) is None):
+        if receipt_hash is not None and (
+            not isinstance(receipt_hash, str)
+            or _SHA256_RE.fullmatch(receipt_hash) is None
+        ):
             raise ValueError("last_feedback_receipt_hash must be a SHA-256 hex string or null")
         return {
             "schema": SCHEMA_VERSION,
@@ -210,7 +225,9 @@ class ClosedLoopPhysiologyEngine:
             recovery_required=bool(self._feedback_state["recovery_required"]),
             recovery_for_cycle_id=self._feedback_state["recovery_for_cycle_id"],
             last_effect_status=self._feedback_state["last_effect_status"],
-            last_post_effect_health=None if raw_health is None else HealthState(raw_health),
+            last_post_effect_health=None
+            if raw_health is None
+            else HealthState(raw_health),
             last_feedback_receipt_hash=self._feedback_state["last_feedback_receipt_hash"],
         )
 
@@ -246,7 +263,9 @@ class ClosedLoopPhysiologyEngine:
             }
         )
 
-    def _recovery_gate(self, proposal: Mapping[str, Any] | None) -> tuple[bool, str | None]:
+    def _recovery_gate(
+        self, proposal: Mapping[str, Any] | None
+    ) -> tuple[bool, str | None]:
         recovery_for = self._feedback_state["recovery_for_cycle_id"]
         if recovery_for is None or proposal is None:
             return True, None
@@ -275,10 +294,9 @@ class ClosedLoopPhysiologyEngine:
         )
         return receipt["receipt_hash"]
 
-    def _record_effect_feedback(self, cycle: CycleResult, *, was_recovery_attempt: bool) -> tuple[HealthState, str, str]:
-        post_sample = self.telemetry.sample()
-        post_assessment = self.engine.controller.assess(post_sample, journal_ok=self.journal.integrity_check())
-
+    def _record_effect_feedback(
+        self, cycle: CycleResult, *, was_recovery_attempt: bool
+    ) -> tuple[HealthState | None, str, str]:
         if self._captured_result is not None:
             effect_status = str(self._captured_result.status)
         elif self._captured_error is not None:
@@ -286,23 +304,53 @@ class ClosedLoopPhysiologyEngine:
         else:
             effect_status = "UNKNOWN"
 
+        post_sample = None
+        post_assessment = None
+        measurement_error: dict[str, str] | None = None
+        try:
+            post_sample = self.telemetry.sample()
+            post_assessment = self.engine.controller.assess(
+                post_sample,
+                journal_ok=self.journal.integrity_check(),
+            )
+        except Exception as exc:
+            measurement_error = {
+                "error_type": type(exc).__name__,
+                "error_message": str(exc),
+            }
+
         transport_success = self.feedback_policy.accepts(effect_status)
-        homeostasis_success = post_assessment.state is HealthState.NORMAL
-        effect_success = transport_success and homeostasis_success
+        homeostasis_success = (
+            post_assessment is not None
+            and post_assessment.state is HealthState.NORMAL
+        )
+        effect_success = (
+            transport_success
+            and homeostasis_success
+            and measurement_error is None
+        )
 
         if effect_success:
             self._feedback_state["failure_streak"] = 0
             self._feedback_state["recovery_required"] = False
             self._feedback_state["recovery_for_cycle_id"] = None
         else:
-            self._feedback_state["failure_streak"] = int(self._feedback_state["failure_streak"]) + 1
-            if int(self._feedback_state["failure_streak"]) >= self.feedback_policy.failures_before_recovery_gate:
+            self._feedback_state["failure_streak"] = (
+                int(self._feedback_state["failure_streak"]) + 1
+            )
+            if (
+                int(self._feedback_state["failure_streak"])
+                >= self.feedback_policy.failures_before_recovery_gate
+            ):
                 if self._feedback_state["recovery_for_cycle_id"] is None:
                     self._feedback_state["recovery_for_cycle_id"] = cycle.cycle_id
                 self._feedback_state["recovery_required"] = True
 
+        post_health = None if post_assessment is None else post_assessment.state
         self._feedback_state["last_effect_status"] = effect_status
-        self._feedback_state["last_post_effect_health"] = post_assessment.state.value
+        self._feedback_state["last_post_effect_health"] = (
+            None if post_health is None else post_health.value
+        )
 
         feedback_inputs = {
             "schema": SCHEMA_VERSION,
@@ -311,9 +359,16 @@ class ClosedLoopPhysiologyEngine:
             "was_recovery_attempt": bool(was_recovery_attempt),
             "effect_status": effect_status,
             "executor_error": self._captured_error,
-            "post_effect_telemetry": asdict(post_sample),
-            "post_effect_health": post_assessment.state.value,
-            "post_effect_reasons": list(post_assessment.reasons),
+            "measurement_error": measurement_error,
+            "post_effect_telemetry": None
+            if post_sample is None
+            else asdict(post_sample),
+            "post_effect_health": None
+            if post_health is None
+            else post_health.value,
+            "post_effect_reasons": []
+            if post_assessment is None
+            else list(post_assessment.reasons),
         }
         feedback_outputs = {
             "effect_success": effect_success,
@@ -321,7 +376,11 @@ class ClosedLoopPhysiologyEngine:
             "recovery_required": self._feedback_state["recovery_required"],
             "recovery_for_cycle_id": self._feedback_state["recovery_for_cycle_id"],
         }
-        receipt = evidence_receipt("PHYSIOLOGY_EFFECT_FEEDBACK", feedback_inputs, feedback_outputs)
+        receipt = evidence_receipt(
+            "PHYSIOLOGY_EFFECT_FEEDBACK",
+            feedback_inputs,
+            feedback_outputs,
+        )
         self._feedback_state["last_feedback_receipt_hash"] = receipt["receipt_hash"]
         self._persist_state()
         self.journal.append(
@@ -336,7 +395,7 @@ class ClosedLoopPhysiologyEngine:
             causation_id=f"{cycle.cycle_id}:effect",
             correlation_id=cycle.cycle_id,
         )
-        return post_assessment.state, effect_status, receipt["receipt_hash"]
+        return post_health, effect_status, receipt["receipt_hash"]
 
     def tick(
         self,
@@ -347,12 +406,35 @@ class ClosedLoopPhysiologyEngine:
         signature_valid: bool = True,
         transition_valid: bool = True,
     ) -> ClosedLoopCycleResult:
-        proposal_copy = None if proposal is None else json.loads(canonical_json(dict(proposal)))
+        with self._tick_lock:
+            return self._tick_locked(
+                proposal=proposal,
+                human=human,
+                ontology_ok=ontology_ok,
+                signature_valid=signature_valid,
+                transition_valid=transition_valid,
+            )
+
+    def _tick_locked(
+        self,
+        *,
+        proposal: Mapping[str, Any] | None,
+        human: Mapping[str, Any] | None,
+        ontology_ok: bool,
+        signature_valid: bool,
+        transition_valid: bool,
+    ) -> ClosedLoopCycleResult:
+        proposal_copy = (
+            None
+            if proposal is None
+            else json.loads(canonical_json(dict(proposal)))
+        )
         allowed, gate_reason = self._recovery_gate(proposal_copy)
         was_recovery_attempt = bool(
             proposal_copy is not None
             and self._feedback_state["recovery_for_cycle_id"] is not None
-            and proposal_copy.get("recovery_for") == self._feedback_state["recovery_for_cycle_id"]
+            and proposal_copy.get("recovery_for")
+            == self._feedback_state["recovery_for_cycle_id"]
         )
 
         self._captured_result = None
