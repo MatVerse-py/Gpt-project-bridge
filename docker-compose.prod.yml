@@ -1,0 +1,30 @@
+services:
+  api:
+    environment:
+      PROJECTVAULT_PUBLIC_BASE_URL: https://${GPB_DOMAIN:?Set GPB_DOMAIN}
+      PROJECTVAULT_AUTH_MODE: hybrid
+      PROJECTVAULT_OIDC_ISSUER: ${PROJECTVAULT_OIDC_ISSUER:?Set OIDC issuer}
+      PROJECTVAULT_OIDC_AUDIENCE: ${PROJECTVAULT_OIDC_AUDIENCE:?Set OIDC audience}
+      PROJECTVAULT_OIDC_JWKS_URL: ${PROJECTVAULT_OIDC_JWKS_URL:?Set OIDC JWKS URL}
+  gateway:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    environment:
+      GPB_DOMAIN: ${GPB_DOMAIN:?Set GPB_DOMAIN}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  caddy_data:
+  caddy_config:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sqlite3
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -157,6 +158,9 @@ class FederationAuthorityKeyRegistry:
     hash-chained ledger before commit.
     """
 
+    def __init__(self, connect: Callable[[], sqlite3.Connection] | None = None) -> None:
+        self._connect = connect or storage._connect
+
     def _ensure_tables(self, conn: object) -> None:
         conn.execute(
             """CREATE TABLE IF NOT EXISTS federation_authority_keys (
@@ -232,7 +236,7 @@ class FederationAuthorityKeyRegistry:
         if record.revoked_at is not None:
             raise ValueError("new key registration cannot start revoked")
         _require_text(actor_id, "actor_id")
-        conn = storage._connect()
+        conn = self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
             self._ensure_tables(conn)
@@ -341,7 +345,7 @@ class FederationAuthorityKeyRegistry:
         _require_text(actor_id, "actor_id")
         if not isinstance(effective_at, int):
             raise ValueError("effective_at must be an integer unix timestamp")
-        conn = storage._connect()
+        conn = self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
             self._ensure_tables(conn)
@@ -398,7 +402,7 @@ class FederationAuthorityKeyRegistry:
             conn.close()
 
     def get_key(self, key_id: str) -> AuthorityKeyRecord | None:
-        conn = storage._connect()
+        conn = self._connect()
         try:
             self._ensure_tables(conn)
             row = conn.execute(
@@ -410,7 +414,7 @@ class FederationAuthorityKeyRegistry:
 
     def list_authority_keys(self, authority_id: str) -> tuple[AuthorityKeyRecord, ...]:
         _require_text(authority_id, "authority_id")
-        conn = storage._connect()
+        conn = self._connect()
         try:
             self._ensure_tables(conn)
             rows = conn.execute(
@@ -443,7 +447,7 @@ class FederationAuthorityKeyRegistry:
             target_key_id=target_key_id,
         )
 
-        conn = storage._connect()
+        conn = self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
             self._ensure_tables(conn)
@@ -551,7 +555,7 @@ class FederationAuthorityKeyRegistry:
             conn.close()
 
     def get_relation_binding(self, relation_id: str) -> FederationRelationKeyBinding | None:
-        conn = storage._connect()
+        conn = self._connect()
         try:
             self._ensure_tables(conn)
             row = conn.execute(
