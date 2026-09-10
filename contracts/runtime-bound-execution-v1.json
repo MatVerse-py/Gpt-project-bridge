@@ -1,0 +1,47 @@
+{
+  "protocol_version": "matverse.runtime-bound-execution.v1",
+  "purpose": "Bind validated runtime/model identity to a governed physiology execution and its observable evidence without granting execution authority.",
+  "authority_boundary": {
+    "runtime_binding_grants_authority": false,
+    "hdb_omega_remain_authoritative": true,
+    "invalid_or_mismatched_binding": "HOLD_BEFORE_PHYSIOLOGY_EXECUTION"
+  },
+  "required_chain": [
+    "runtime_discovery",
+    "execution_binding",
+    "runtime_bound_executor",
+    "hdb_omega_decision",
+    "physiology_execution_if_pass",
+    "effect_observation",
+    "memory_commit",
+    "runtime_bound_evidence_receipt",
+    "observable_receipt_replay"
+  ],
+  "binding_requirements": {
+    "binding_hash_verified": true,
+    "canonical_shape_only": true,
+    "unknown_fields_rejected": true,
+    "runtime_identity_exact": true,
+    "required_model_digest_immutable": true,
+    "executor_binding_hash_matches": true,
+    "executor_identity_matches": true,
+    "binding_origin_attested": false
+  },
+  "trust_boundary": {
+    "hashes_provide": "INTEGRITY_AND_LINKAGE",
+    "hashes_do_not_provide": "ORIGIN_AUTHENTICATION",
+    "serialized_untrusted_binding": "HOLD_UNLESS_INDEPENDENT_HOST_OR_ISSUER_ATTESTATION_EXISTS"
+  },
+  "privacy_boundary": {
+    "runtime_bound_event_contains_raw_proposal": false,
+    "proposal_represented_by": "sha256",
+    "noncanonical_binding_metadata": "REJECT"
+  },
+  "replay_semantics": {
+    "EXACT_MATCH": "record hash, binding, receipt inputs, receipt outputs, and receipt recomputation match",
+    "DIVERGENT": "observable record or receipt graph differs",
+    "HOLD": "record lacks required material or uses an unsupported schema",
+    "provider_reexecution_proven": false
+  },
+  "promotion_boundary": "Signed host/issuer binding attestation plus live Ollama/llama.cpp adapter execution remain outside v1."
+}
