@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from typing import Any, Mapping
+from urllib.parse import urlparse
 
 import httpx
 
@@ -38,17 +39,38 @@ class OpenAIProviderError(RuntimeError):
         self.provider_code = provider_code
 
 
+def _validate_base_url(value: str) -> str:
+    candidate = value.strip().rstrip("/")
+    parsed = urlparse(candidate)
+    if not parsed.scheme or not parsed.netloc:
+        raise OpenAIConfigurationError("OPENAI_BASE_URL must be an absolute URL")
+    if parsed.username or parsed.password:
+        raise OpenAIConfigurationError("OPENAI_BASE_URL must not contain credentials")
+    if parsed.query or parsed.fragment:
+        raise OpenAIConfigurationError("OPENAI_BASE_URL must not contain query or fragment")
+    if parsed.scheme == "http" and parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+        raise OpenAIConfigurationError("plaintext OPENAI_BASE_URL is allowed only on loopback")
+    if parsed.scheme not in {"http", "https"}:
+        raise OpenAIConfigurationError("OPENAI_BASE_URL must use http or https")
+    return candidate
+
+
 @dataclass(frozen=True)
 class OpenAIRuntimeConfig:
     api_key: str = field(repr=False)
     model: str
     timeout_seconds: float = _DEFAULT_TIMEOUT_SECONDS
     max_output_tokens: int | None = None
+    base_url: str = OPENAI_BASE_URL
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "base_url", _validate_base_url(self.base_url))
 
     @classmethod
     def from_env(cls) -> "OpenAIRuntimeConfig":
         api_key = os.environ.get("OPENAI_API_KEY", "").strip()
         model = os.environ.get("OPENAI_MODEL", "").strip()
+        base_url = os.environ.get("OPENAI_BASE_URL", OPENAI_BASE_URL).strip()
         if not api_key:
             raise OpenAIConfigurationError("OPENAI_API_KEY is not configured")
         if any(ch.isspace() for ch in api_key):
@@ -56,7 +78,9 @@ class OpenAIRuntimeConfig:
         if not model:
             raise OpenAIConfigurationError("OPENAI_MODEL is not configured")
 
-        timeout_raw = os.environ.get("OPENAI_TIMEOUT_SECONDS", str(_DEFAULT_TIMEOUT_SECONDS)).strip()
+        timeout_raw = os.environ.get(
+            "OPENAI_TIMEOUT_SECONDS", str(_DEFAULT_TIMEOUT_SECONDS)
+        ).strip()
         try:
             timeout_seconds = float(timeout_raw)
         except ValueError as exc:
@@ -72,15 +96,20 @@ class OpenAIRuntimeConfig:
             try:
                 max_output_tokens = int(max_tokens_raw)
             except ValueError as exc:
-                raise OpenAIConfigurationError("OPENAI_MAX_OUTPUT_TOKENS must be an integer") from exc
+                raise OpenAIConfigurationError(
+                    "OPENAI_MAX_OUTPUT_TOKENS must be an integer"
+                ) from exc
             if max_output_tokens <= 0:
-                raise OpenAIConfigurationError("OPENAI_MAX_OUTPUT_TOKENS must be positive")
+                raise OpenAIConfigurationError(
+                    "OPENAI_MAX_OUTPUT_TOKENS must be positive"
+                )
 
         return cls(
             api_key=api_key,
             model=model,
             timeout_seconds=timeout_seconds,
             max_output_tokens=max_output_tokens,
+            base_url=base_url,
         )
 
 
@@ -110,13 +139,22 @@ class OpenAIResponseResult:
 def runtime_status_from_env() -> dict[str, Any]:
     api_key_present = bool(os.environ.get("OPENAI_API_KEY", "").strip())
     model = os.environ.get("OPENAI_MODEL", "").strip()
+    try:
+        base_url = _validate_base_url(
+            os.environ.get("OPENAI_BASE_URL", OPENAI_BASE_URL)
+        )
+        base_url_valid = True
+    except OpenAIConfigurationError:
+        base_url = None
+        base_url_valid = False
     return {
         "protocol": OPENAI_RUNTIME_PROTOCOL,
         "provider": "openai",
-        "base_url": OPENAI_BASE_URL,
+        "base_url": base_url,
+        "base_url_valid": base_url_valid,
         "api_key_present": api_key_present,
         "model": model or None,
-        "configured": api_key_present and bool(model),
+        "configured": api_key_present and bool(model) and base_url_valid,
         "store": False,
         "secret_exposure": "forbidden",
     }
@@ -126,15 +164,21 @@ def _validate_metadata(metadata: Mapping[str, str] | None) -> dict[str, str]:
     if metadata is None:
         return {}
     if len(metadata) > _MAX_METADATA_ITEMS:
-        raise ValueError(f"metadata supports at most {_MAX_METADATA_ITEMS} user entries")
+        raise ValueError(
+            f"metadata supports at most {_MAX_METADATA_ITEMS} user entries"
+        )
     validated: dict[str, str] = {}
     for key, value in metadata.items():
         if not isinstance(key, str) or not isinstance(value, str):
             raise ValueError("metadata keys and values must be strings")
         if not key or len(key) > _MAX_METADATA_KEY_LENGTH:
-            raise ValueError(f"metadata keys must be 1..{_MAX_METADATA_KEY_LENGTH} characters")
+            raise ValueError(
+                f"metadata keys must be 1..{_MAX_METADATA_KEY_LENGTH} characters"
+            )
         if len(value) > _MAX_METADATA_VALUE_LENGTH:
-            raise ValueError(f"metadata values must be <= {_MAX_METADATA_VALUE_LENGTH} characters")
+            raise ValueError(
+                f"metadata values must be <= {_MAX_METADATA_VALUE_LENGTH} characters"
+            )
         if key == "matverse_request_hash":
             raise ValueError("matverse_request_hash is reserved")
         validated[key] = value
@@ -153,7 +197,10 @@ def _extract_output_text(payload: Mapping[str, Any]) -> str:
         if not isinstance(content, list):
             continue
         for content_item in content:
-            if not isinstance(content_item, Mapping) or content_item.get("type") != "output_text":
+            if (
+                not isinstance(content_item, Mapping)
+                or content_item.get("type") != "output_text"
+            ):
                 continue
             text = content_item.get("text")
             if isinstance(text, str):
@@ -164,9 +211,13 @@ def _extract_output_text(payload: Mapping[str, Any]) -> str:
 class OpenAIResponsesRuntime:
     """OpenAI Responses API adapter with a MatVerse governance boundary.
 
-    The API key is read only from the process environment. It is never persisted,
-    returned, hashed into receipts, added to metadata, or transferred through the
-    Model Bridge.
+    `api_key` is the authorization credential for the configured endpoint. When
+    the endpoint is the canonical OpenAI API it is the provider key. When the
+    endpoint is a MatVerse blind-secret handler it is an ephemeral capability
+    token; the provider key remains outside this process.
+
+    Authorization material is never persisted, returned, hashed into receipts,
+    added to metadata, or transferred through the Model Bridge.
     """
 
     def __init__(
@@ -210,7 +261,10 @@ class OpenAIResponsesRuntime:
             "model": self.config.model,
             "input": input_text,
             "store": False,
-            "metadata": {**user_metadata, "matverse_request_hash": request_hash},
+            "metadata": {
+                **user_metadata,
+                "matverse_request_hash": request_hash,
+            },
         }
         if instructions:
             body["instructions"] = instructions
@@ -237,7 +291,7 @@ class OpenAIResponsesRuntime:
         }
         try:
             with httpx.Client(
-                base_url=OPENAI_BASE_URL,
+                base_url=self.config.base_url,
                 headers=headers,
                 timeout=self.config.timeout_seconds,
                 transport=self._transport,
@@ -245,15 +299,26 @@ class OpenAIResponsesRuntime:
             ) as client:
                 response = client.post("/responses", json=body)
         except httpx.HTTPError as exc:
-            raise OpenAIProviderError("OpenAI request failed before a valid response was received") from exc
+            raise OpenAIProviderError(
+                "OpenAI request failed before a valid response was received"
+            ) from exc
 
-        provider_request_id = response.headers.get("x-request-id") or response.headers.get("request-id")
+        provider_request_id = response.headers.get(
+            "x-request-id"
+        ) or response.headers.get("request-id")
         if response.status_code < 200 or response.status_code >= 300:
             provider_code: str | None = None
             try:
                 error_payload = response.json()
-                error_obj = error_payload.get("error") if isinstance(error_payload, Mapping) else None
-                if isinstance(error_obj, Mapping) and isinstance(error_obj.get("code"), str):
+                error_obj = (
+                    error_payload.get("error")
+                    if isinstance(error_payload, Mapping)
+                    else None
+                )
+                if (
+                    isinstance(error_obj, Mapping)
+                    and isinstance(error_obj.get("code"), str)
+                ):
                     provider_code = error_obj["code"]
             except ValueError:
                 provider_code = None
@@ -273,14 +338,23 @@ class OpenAIResponsesRuntime:
                 request_id=provider_request_id,
             ) from exc
         if not isinstance(payload, Mapping):
-            raise OpenAIProviderError("OpenAI response must be a JSON object", request_id=provider_request_id)
+            raise OpenAIProviderError(
+                "OpenAI response must be a JSON object",
+                request_id=provider_request_id,
+            )
 
         response_id = payload.get("id")
         model = payload.get("model")
         if not isinstance(response_id, str) or not response_id:
-            raise OpenAIProviderError("OpenAI response is missing an id", request_id=provider_request_id)
+            raise OpenAIProviderError(
+                "OpenAI response is missing an id",
+                request_id=provider_request_id,
+            )
         if not isinstance(model, str) or not model:
-            raise OpenAIProviderError("OpenAI response is missing a model", request_id=provider_request_id)
+            raise OpenAIProviderError(
+                "OpenAI response is missing a model",
+                request_id=provider_request_id,
+            )
 
         output_text = _extract_output_text(payload)
         usage_raw = payload.get("usage")
