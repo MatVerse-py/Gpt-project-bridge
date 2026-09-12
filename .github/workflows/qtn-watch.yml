@@ -1,6 +1,13 @@
 name: QTN Watch
 
 on:
+  pull_request:
+    paths:
+      - "app/qtn_watch.py"
+      - "scripts/run_qtn_watch.py"
+      - "tests/test_qtn_watch.py"
+      - ".github/workflows/qtn-watch.yml"
+      - "docs/QTN_WATCH_V1.md"
   workflow_dispatch:
     inputs:
       threshold:
@@ -15,7 +22,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: qtn-watch
+  group: qtn-watch-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -38,7 +45,16 @@ jobs:
       - name: Run focused tests
         run: python -m pytest -q tests/test_qtn_watch.py
 
-      - name: Run QTN Watch
+      - name: Run collection smoke test
+        if: github.event_name == 'pull_request'
+        env:
+          QTN_WATCH_THRESHOLD: ${{ inputs.threshold || '0.62' }}
+          QTN_WATCH_MIN_SOURCES: "2"
+          QTN_WATCH_TIMEOUT: "20"
+        run: python scripts/run_qtn_watch.py --json
+
+      - name: Run QTN Watch and publish alerts
+        if: github.event_name != 'pull_request'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           QTN_WATCH_THRESHOLD: ${{ inputs.threshold || '0.62' }}
