@@ -9,6 +9,9 @@ on:
       - "docs/TESSEU_CROSS_HOST_V1.md"
   workflow_dispatch:
 
+env:
+  PYTHONPATH: .
+
 permissions:
   contents: read
 
