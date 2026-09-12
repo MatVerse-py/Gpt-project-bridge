@@ -1,0 +1,47 @@
+name: QTN Watch
+
+on:
+  workflow_dispatch:
+    inputs:
+      threshold:
+        description: "Materiality threshold (0..1)"
+        required: false
+        default: "0.62"
+  schedule:
+    - cron: "17 11 * * *"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: qtn-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Run focused tests
+        run: python -m pytest -q tests/test_qtn_watch.py
+
+      - name: Run QTN Watch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          QTN_WATCH_THRESHOLD: ${{ inputs.threshold || '0.62' }}
+          QTN_WATCH_MIN_SOURCES: "2"
+          QTN_WATCH_TIMEOUT: "20"
+        run: python scripts/run_qtn_watch.py --github-issues --json
