@@ -80,21 +80,15 @@ STANDARDIZATION_TERMS = (
     "standards framework",
 )
 
-HIGH_IMPACT_TERMS = (
-    "rfc ",
-    *STANDARDIZATION_TERMS,
-    "demonstrat",
-    "deploy",
+DEMONSTRATION_TITLE_TERMS = (
+    "demonstration",
+    "demonstrated",
+    "experimental",
     "field trial",
+    "deployed",
     "commercial fiber",
-    "prototype",
-    "interoperab",
-    "breakthrough",
-    "record-breaking",
-    "world record",
-    "fault-tolerant",
-    "logical qubit",
-    "final award",
+    "prototype network",
+    "experimental realization",
 )
 
 SOURCE_AUTHORITY = {
@@ -230,11 +224,27 @@ def classify_qtn(item: SourceItem) -> tuple[str, ...]:
     return tuple(matches)
 
 
+def _is_standardization(item: SourceItem, text: str) -> bool:
+    return item.source == "IETF" or "rfc " in text or any(term in text for term in STANDARDIZATION_TERMS)
+
+
+def _is_external_demonstration(item: SourceItem, text: str) -> bool:
+    title_text = f"{item.title} {item.url}".lower()
+    if any(term in title_text for term in DEMONSTRATION_TITLE_TERMS):
+        return True
+    if item.source in {"NIST", "QIA"} and any(
+        term in text
+        for term in ("field trial", "deployed", "commercial fiber", "prototype network", "testbed deployment")
+    ):
+        return True
+    return False
+
+
 def impact_type(item: SourceItem) -> str:
     text = f"{item.title} {item.summary} {item.url}".lower()
-    if item.source == "IETF" or "rfc " in text or any(term in text for term in STANDARDIZATION_TERMS):
+    if _is_standardization(item, text):
         return "STANDARDIZATION"
-    if any(term in text for term in ("demonstrat", "field trial", "deployed", "commercial fiber", "prototype network", "experimental realization")):
+    if _is_external_demonstration(item, text):
         return "EXTERNAL_DEMONSTRATION"
     if any(term in text for term in ("award", "funding", "manufactur", "infrastructure", "testbed deployment")):
         return "INFRASTRUCTURE"
@@ -256,13 +266,24 @@ def recommendation_for(item: SourceItem) -> str:
     return "REVIEW_FOR_DELTA_AND_BENCHMARK"
 
 
+def _has_high_impact_signal(item: SourceItem, text: str) -> bool:
+    title_text = f"{item.title} {item.url}".lower()
+    if _is_standardization(item, text) or _is_external_demonstration(item, text):
+        return True
+    if any(term in title_text for term in ("breakthrough", "record-breaking", "world record", "final award")):
+        return True
+    if any(term in text for term in ("commercial fiber", "interoperab", "fault-tolerant", "logical qubit")):
+        return True
+    return False
+
+
 def score_item(item: SourceItem, qtn_ids: tuple[str, ...]) -> float:
     if not qtn_ids:
         return 0.0
     text = f"{item.title} {item.summary} {item.url}".lower()
     authority = SOURCE_AUTHORITY.get(item.source, 0.20)
     coverage = min(0.30, 0.08 * len(qtn_ids))
-    impact = 0.24 if any(term in text for term in HIGH_IMPACT_TERMS) else 0.08
+    impact = 0.24 if _has_high_impact_signal(item, text) else 0.08
     specificity = 0.12 if any(
         term in text
         for term in (
