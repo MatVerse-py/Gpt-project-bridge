@@ -1,0 +1,97 @@
+name: Tesseu cross-host continuity v1
+
+on:
+  pull_request:
+    paths:
+      - "experiments/tesseu_cross_host_v1.py"
+      - "tests/test_tesseu_cross_host_v1.py"
+      - ".github/workflows/tesseu-cross-host-v1.yml"
+      - "docs/TESSEU_CROSS_HOST_V1.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate authenticated organism capsule
+        run: python experiments/tesseu_cross_host_v1.py seed --output evidence/tesseu/capsule.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tesseu-capsule
+          path: evidence/tesseu/capsule.json
+          if-no-files-found: error
+
+  restore:
+    needs: seed
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arm_id: linux
+            runtime_id: tesseu-runtime-linux
+            os: ubuntu-24.04
+          - arm_id: windows
+            runtime_id: tesseu-runtime-windows
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: tesseu-capsule
+          path: evidence/tesseu
+      - name: Restore exact capsule and continue causal lineage
+        run: >-
+          python experiments/tesseu_cross_host_v1.py restore
+          --capsule evidence/tesseu/capsule.json
+          --runtime-id ${{ matrix.runtime_id }}
+          --arm-id ${{ matrix.arm_id }}
+          --output evidence/tesseu/${{ matrix.arm_id }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tesseu-host-${{ matrix.arm_id }}
+          path: evidence/tesseu/${{ matrix.arm_id }}.json
+          if-no-files-found: error
+
+  compare:
+    if: always()
+    needs: restore
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install focused test dependency
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run focused invariance tests
+        run: python -m pytest -q tests/test_tesseu_cross_host_v1.py
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: tesseu-host-*
+          path: evidence/tesseu/hosts
+          merge-multiple: true
+      - name: Compare cross-host causal invariants
+        run: >-
+          python experiments/tesseu_cross_host_v1.py compare
+          --input-dir evidence/tesseu/hosts
+          --output evidence/tesseu/cross_host_report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tesseu-cross-host-evidence
+          path: evidence/tesseu/cross_host_report.json
+          if-no-files-found: error
