@@ -52,6 +52,16 @@ def test_generic_standard_word_does_not_mean_standardization() -> None:
     assert impact_type(item) == "RESEARCH_ADVANCE"
 
 
+def test_rhetorical_demonstrate_in_abstract_is_not_external_demonstration() -> None:
+    item = SourceItem(
+        source="arXiv",
+        title="Analytical bounds for noisy quantum memories",
+        url="https://arxiv.org/abs/2609.00002",
+        summary="We demonstrate mathematically that the bound is tight for the studied model.",
+    )
+    assert impact_type(item) == "RESEARCH_ADVANCE"
+
+
 def test_low_relevance_item_is_filtered() -> None:
     item = SourceItem(
         source="NIST",
