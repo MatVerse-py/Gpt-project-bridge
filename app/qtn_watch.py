@@ -15,8 +15,9 @@ from xml.etree import ElementTree
 import httpx
 
 USER_AGENT = "MatVerse-QTN-Watch/1.0 (+https://github.com/MatVerse-py/Gpt-project-bridge)"
-DEFAULT_THRESHOLD = 0.62
+DEFAULT_THRESHOLD = 0.68
 DEFAULT_TIMEOUT = 20.0
+DEFAULT_MAX_AGE_DAYS = 60
 
 ARXIV_QUERY = " OR ".join(
     [
@@ -68,11 +69,20 @@ QTN_RULES: dict[str, tuple[str, ...]] = {
 
 SCOPE_TERMS = tuple(sorted({term for values in QTN_RULES.values() for term in values} | {"quantum", "post-quantum", "pqc"}))
 
-HIGH_IMPACT_TERMS = (
-    "rfc ",
-    "standard",
+STANDARDIZATION_TERMS = (
     "standardization",
     "standardisation",
+    "standardized",
+    "standardised",
+    "technical standard",
+    "industry standard",
+    "interoperability standard",
+    "standards framework",
+)
+
+HIGH_IMPACT_TERMS = (
+    "rfc ",
+    *STANDARDIZATION_TERMS,
     "demonstrat",
     "deploy",
     "field trial",
@@ -80,7 +90,8 @@ HIGH_IMPACT_TERMS = (
     "prototype",
     "interoperab",
     "breakthrough",
-    "record",
+    "record-breaking",
+    "world record",
     "fault-tolerant",
     "logical qubit",
     "final award",
@@ -166,6 +177,53 @@ def _digest(item: SourceItem) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _infer_published_at(title: str, url: str) -> str | None:
+    exact_url = re.search(r"/(20\d{2})/(0[1-9]|1[0-2])/(0[1-9]|[12]\d|3[01])/", url)
+    if exact_url:
+        year, month, day = map(int, exact_url.groups())
+        try:
+            return datetime(year, month, day, tzinfo=timezone.utc).isoformat()
+        except ValueError:
+            return None
+
+    title_dmy = re.match(r"\s*(0?[1-9]|[12]\d|3[01])[.\-/](0?[1-9]|1[0-2])[.\-/](20\d{2})\b", title)
+    if title_dmy:
+        day, month, year = map(int, title_dmy.groups())
+        try:
+            return datetime(year, month, day, tzinfo=timezone.utc).isoformat()
+        except ValueError:
+            return None
+
+    title_ymd = re.match(r"\s*(20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b", title)
+    if title_ymd:
+        year, month, day = map(int, title_ymd.groups())
+        try:
+            return datetime(year, month, day, tzinfo=timezone.utc).isoformat()
+        except ValueError:
+            return None
+
+    month_url = re.search(r"/(20\d{2})/(0[1-9]|1[0-2])(?:/|$)", url)
+    if month_url:
+        year, month = map(int, month_url.groups())
+        return datetime(year, month, 1, tzinfo=timezone.utc).isoformat()
+    return None
+
+
+def _within_age(published_at: str | None, *, now: datetime | None = None) -> bool:
+    if not published_at:
+        return False
+    try:
+        published = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if published.tzinfo is None:
+        published = published.replace(tzinfo=timezone.utc)
+    reference = now or datetime.now(timezone.utc)
+    max_age_days = max(1, int(os.environ.get("QTN_WATCH_MAX_AGE_DAYS", str(DEFAULT_MAX_AGE_DAYS))))
+    age_seconds = (reference - published.astimezone(timezone.utc)).total_seconds()
+    return -86400 <= age_seconds <= max_age_days * 86400
+
+
 def classify_qtn(item: SourceItem) -> tuple[str, ...]:
     haystack = f"{item.title} {item.summary} {item.url}".lower()
     matches = [qtn_id for qtn_id, terms in QTN_RULES.items() if any(term in haystack for term in terms)]
@@ -174,11 +232,11 @@ def classify_qtn(item: SourceItem) -> tuple[str, ...]:
 
 def impact_type(item: SourceItem) -> str:
     text = f"{item.title} {item.summary} {item.url}".lower()
-    if "rfc " in text or "standard" in text or item.source == "IETF":
+    if item.source == "IETF" or "rfc " in text or any(term in text for term in STANDARDIZATION_TERMS):
         return "STANDARDIZATION"
-    if any(term in text for term in ("demonstrat", "field trial", "deployed", "commercial fiber", "prototype network")):
+    if any(term in text for term in ("demonstrat", "field trial", "deployed", "commercial fiber", "prototype network", "experimental realization")):
         return "EXTERNAL_DEMONSTRATION"
-    if any(term in text for term in ("award", "funding", "manufactur", "infrastructure")):
+    if any(term in text for term in ("award", "funding", "manufactur", "infrastructure", "testbed deployment")):
         return "INFRASTRUCTURE"
     if any(term in text for term in ("post-quantum", "pqc", "ml-kem", "ml-dsa", "qkd")):
         return "SECURITY_MIGRATION"
@@ -205,7 +263,22 @@ def score_item(item: SourceItem, qtn_ids: tuple[str, ...]) -> float:
     authority = SOURCE_AUTHORITY.get(item.source, 0.20)
     coverage = min(0.30, 0.08 * len(qtn_ids))
     impact = 0.24 if any(term in text for term in HIGH_IMPACT_TERMS) else 0.08
-    specificity = 0.12 if any(term in text for term in ("quantum internet", "repeater", "qkd", "ml-kem", "ml-dsa", "teleport", "error correction", "quantum memory")) else 0.04
+    specificity = 0.12 if any(
+        term in text
+        for term in (
+            "quantum network",
+            "quantum internet",
+            "repeater",
+            "qkd",
+            "ml-kem",
+            "ml-dsa",
+            "teleport",
+            "error correction",
+            "quantum memory",
+            "quantum compiler",
+            "quantum random",
+        )
+    ) else 0.04
     return round(min(1.0, authority + coverage + impact + specificity), 3)
 
 
@@ -266,7 +339,7 @@ def fetch_arxiv(client: httpx.Client) -> list[SourceItem]:
             if link.attrib.get("rel") == "alternate" and link.attrib.get("href"):
                 url = link.attrib["href"]
                 break
-        if title and url:
+        if title and url and _within_age(published):
             items.append(SourceItem("arXiv", title, url, published, summary))
     return items
 
@@ -286,37 +359,40 @@ def _fetch_html_source(client: httpx.Client, *, source: str, url: str, max_links
         scope_text = f"{title} {link}".lower()
         if not any(term in scope_text for term in SCOPE_TERMS):
             continue
-        items.append(SourceItem(source, title, link))
+        items.append(SourceItem(source, title, link, _infer_published_at(title, link)))
         if len(items) >= max_links:
             break
     return items
 
 
 def fetch_nist(client: httpx.Client) -> list[SourceItem]:
-    return _fetch_html_source(
+    items = _fetch_html_source(
         client,
         source="NIST",
         url="https://www.nist.gov/news-events/news-updates/topic/249281",
         max_links=50,
     )
+    return [item for item in items if _within_age(item.published_at)]
 
 
 def fetch_ietf(client: httpx.Client) -> list[SourceItem]:
-    return _fetch_html_source(
+    items = _fetch_html_source(
         client,
         source="IETF",
-        url="https://datatracker.ietf.org/doc/search?activedrafts=on&by=group&group=&name=quantum&rfcs=on&sort=-date",
+        url="https://datatracker.ietf.org/doc/search?activedrafts=on&by=group&group=&name=quantum&sort=-date",
         max_links=80,
     )
+    return [item for item in items if "/doc/draft-" in item.url]
 
 
 def fetch_qia(client: httpx.Client) -> list[SourceItem]:
-    return _fetch_html_source(
+    items = _fetch_html_source(
         client,
         source="QIA",
         url="https://quantuminternetalliance.org/news/",
         max_links=50,
     )
+    return [item for item in items if _within_age(item.published_at)]
 
 
 FETCHERS = {
