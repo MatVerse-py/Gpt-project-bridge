@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import subprocess
+import sys
+from pathlib import Path
+
 from app.qtn_watch import SourceItem, classify_qtn, evaluate, impact_type, score_item
 
 
@@ -59,3 +63,17 @@ def test_duplicate_url_is_collapsed() -> None:
     b = SourceItem("IETF", "Quantum internet protocol stack standard duplicate", "https://example.org/1")
     findings = evaluate([a, b], threshold=0.5)
     assert len(findings) == 1
+
+
+def test_runner_bootstraps_repository_import_path() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [sys.executable, "scripts/run_qtn_watch.py", "--help"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "QTN-001..QTN-028" in result.stdout
