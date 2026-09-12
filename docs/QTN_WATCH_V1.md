@@ -16,14 +16,18 @@ The default zero-cost source set is:
 
 - arXiv API — current research candidates;
 - NIST quantum-information news — public research/infrastructure signals;
-- IETF Datatracker — RFCs and active Internet-Drafts relevant to quantum/PQC networking;
-- Quantum Internet Alliance — quantum-network prototype/ecosystem developments.
+- IETF Datatracker — active Internet-Drafts relevant to quantum/PQC networking;
+- Quantum Internet Alliance — recent quantum-network prototype/ecosystem developments.
 
 Each source is isolated. The run is fail-closed if the configured minimum source quorum is not met. Default quorum: 2 of 4 sources.
 
+## Recency policy
+
+The monitor is a change detector, not a static bibliography. Dated arXiv, NIST and QIA items are admitted only within the configured age window, default `60` days. NIST and QIA publication dates are inferred from their canonical date-bearing URLs/titles when the listing page does not expose structured dates. IETF ingestion is restricted to active draft document pages; historical RFCs and review-page links are excluded from the alert feed.
+
 ## Pipeline
 
-`source -> normalize -> QTN mapping -> materiality score -> classification -> dedup -> bounded GitHub issue`
+`source -> recency -> normalize -> QTN mapping -> materiality score -> classification -> dedup -> bounded GitHub issue`
 
 The mapping is explicit and deterministic in `app/qtn_watch.py`.
 
@@ -33,10 +37,10 @@ The score combines:
 
 - source authority;
 - number of affected QTN objects;
-- high-impact terms such as standard, RFC, deployment, field trial, prototype, interoperability, fault tolerance and logical qubits;
+- high-impact signals such as RFC/standards activity, deployment, field trial, prototype, interoperability, fault tolerance and logical qubits;
 - domain specificity.
 
-Default threshold: `0.62`.
+Default threshold: `0.68`.
 
 The score is a triage score, not scientific confidence and not proof of novelty.
 
@@ -47,6 +51,8 @@ The score is a triage score, not scientific confidence and not proof of novelty.
 - `REVIEW_ENGINEERING_READINESS`
 - `UPDATE_CRYPTOGRAPHIC_BASELINE`
 - `REVIEW_FOR_DELTA_AND_BENCHMARK`
+
+A generic occurrence of the word `standard` does not classify a paper as standardization. Standardization requires IETF provenance, RFC context, or explicit standardization terminology.
 
 ## Deduplication
 
@@ -79,9 +85,10 @@ GitHub Actions runs the watch daily and also supports `workflow_dispatch`.
 
 ## Configuration
 
-- `QTN_WATCH_THRESHOLD` — default `0.62`;
+- `QTN_WATCH_THRESHOLD` — default `0.68`;
 - `QTN_WATCH_MIN_SOURCES` — default `2`;
 - `QTN_WATCH_TIMEOUT` — request timeout in seconds, default `20`;
+- `QTN_WATCH_MAX_AGE_DAYS` — maximum age for dated news/research items, default `60`;
 - `QTN_WATCH_ARXIV_MAX` — maximum arXiv entries, default `40`;
 - `QTN_WATCH_MAX_ALERTS` — maximum new findings in one issue, default `20`;
 - `QTN_WATCH_ISSUE_SCAN_PAGES` — maximum 100-item issue pages scanned for prior digests, default `10`.
