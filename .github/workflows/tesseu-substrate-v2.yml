@@ -1,0 +1,82 @@
+name: Tesseu substrate heterogeneity v2
+
+on:
+  pull_request:
+    paths:
+      - "experiments/tesseu_substrate_v2.py"
+      - "tests/test_tesseu_substrate_v2.py"
+      - ".github/workflows/tesseu-substrate-v2.yml"
+      - "docs/TESSEU_SUBSTRATE_V2.md"
+      - "evidence/tesseu/reference_capsule_v1.json"
+  workflow_dispatch:
+
+env:
+  PYTHONPATH: .
+
+permissions:
+  contents: read
+
+jobs:
+  restore:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arm_id: github-x64
+            runtime_id: tesseu-runtime-github-x64
+            os: ubuntu-24.04
+          - arm_id: github-arm64
+            runtime_id: tesseu-runtime-github-arm64
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Restore frozen reference capsule on substrate arm
+        run: >-
+          python experiments/tesseu_substrate_v2.py restore
+          --capsule evidence/tesseu/reference_capsule_v1.json
+          --runtime-id ${{ matrix.runtime_id }}
+          --arm-id ${{ matrix.arm_id }}
+          --provider-id github-actions
+          --output evidence/tesseu/${{ matrix.arm_id }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tesseu-substrate-${{ matrix.arm_id }}
+          path: evidence/tesseu/${{ matrix.arm_id }}.json
+          if-no-files-found: error
+
+  compare:
+    if: always()
+    needs: restore
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install repository test dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Run focused Tesseu v2 tests
+        run: python -m pytest -q tests/test_tesseu_substrate_v2.py
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: tesseu-substrate-github-*
+          path: evidence/tesseu/substrates
+          merge-multiple: true
+      - name: Compare x64 and ARM64 causal invariants
+        run: >-
+          python experiments/tesseu_substrate_v2.py compare
+          --input-dir evidence/tesseu/substrates
+          --output evidence/tesseu/substrate_v2_report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tesseu-substrate-v2-evidence
+          path: evidence/tesseu/substrate_v2_report.json
+          if-no-files-found: warn

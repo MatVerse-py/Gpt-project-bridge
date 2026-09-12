@@ -1,0 +1,50 @@
+{
+  "capsule_hash": "979c26b96fbd15c892ccf1926682ac338d05e8a3c26042878d72b2c1572a9606",
+  "claims_boundary": {
+    "cross_host": "testable by distinct CI host jobs",
+    "cross_os": "testable when at least two operating systems complete",
+    "external_provider": "HOLD until an independently operated compute provider reproduces the capsule",
+    "hardware_independence": "HOLD unless independently attested heterogeneous hardware is present"
+  },
+  "constitutional_contract_hash": "a64dcf43b1b24910896f3488ba33fff7b23ef585268c30517dc94aa9fbb2cd94",
+  "continuation_event_id": "TESSEU-CONTINUE-001",
+  "frozen_contract_hash": "f67ac7e8a508b9c7a7a8ecb90f165005d19d1819c9473cacd8326e9863779c62",
+  "gate_fingerprint": "5b322ca7d9e66c398171131a2d633307598d0983d37ec3376f644ee78228cd2b",
+  "organism_id": "tesseu-organism-001",
+  "pre_continuation_state_root": "1076c25c23abbdf2b3030422f6d5e0b742f44ffdddf850000c9798df8b1aee89",
+  "schema": "matverse.tesseu-cross-host.v1",
+  "seed_event_id": "TESSEU-SEED-001",
+  "semantic_lineage_hash": "7665fd6733ddd74f263dfe5b9ad17da14b748b1c874c8f2bbcfe9a31cb5623b6",
+  "snapshot": {
+    "constitutional_contract_hash": "a64dcf43b1b24910896f3488ba33fff7b23ef585268c30517dc94aa9fbb2cd94",
+    "constraints": [],
+    "gate_fingerprint": "5b322ca7d9e66c398171131a2d633307598d0983d37ec3376f644ee78228cd2b",
+    "lineage": [
+      {
+        "decision": "PASS",
+        "event_id": "TESSEU-SEED-001",
+        "gate_inputs": {
+          "human": null,
+          "ontology_ok": true,
+          "signature_valid": true,
+          "transition_valid": true
+        },
+        "matched_constraint_id": null,
+        "proposal": {
+          "action": "OBSERVE",
+          "payload": "portable-organism-state",
+          "phase": "seed"
+        },
+        "reason": "admissible transition",
+        "receipt_hash": "74159e2281d63f568b9e02324d5004e5d66a0c95ac6beecec0368d268e1b5004",
+        "runtime_id": "tesseu-seed-runtime",
+        "type": "EVALUATION"
+      }
+    ],
+    "organism_id": "tesseu-organism-001",
+    "schema": "matverse.organism-loop.v1",
+    "state_mac": "b0c11bee0f2948769f34913b73cce2bd307b11d583c34a917708212a569d91d6",
+    "state_root": "1076c25c23abbdf2b3030422f6d5e0b742f44ffdddf850000c9798df8b1aee89"
+  },
+  "snapshot_hash": "d9552876412627e8741986206d872df084947977455e94bf2f89dba853b9562b"
+}
