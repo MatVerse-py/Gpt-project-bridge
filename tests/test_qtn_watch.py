@@ -2,9 +2,18 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
-from app.qtn_watch import SourceItem, classify_qtn, evaluate, impact_type, score_item
+from app.qtn_watch import (
+    SourceItem,
+    _infer_published_at,
+    _within_age,
+    classify_qtn,
+    evaluate,
+    impact_type,
+    score_item,
+)
 
 
 def test_qtn_routing_and_resource_allocation_mapping() -> None:
@@ -33,6 +42,16 @@ def test_pqc_standardization_is_not_matverse_validation() -> None:
     assert finding.validation_class == "EXTERNAL_RELEVANCE_NOT_MATVERSE_VALIDATION"
 
 
+def test_generic_standard_word_does_not_mean_standardization() -> None:
+    item = SourceItem(
+        source="arXiv",
+        title="Standard model analysis for quantum memory dynamics",
+        url="https://arxiv.org/abs/2609.00001",
+        summary="A theoretical quantum memory analysis without standards activity.",
+    )
+    assert impact_type(item) == "RESEARCH_ADVANCE"
+
+
 def test_low_relevance_item_is_filtered() -> None:
     item = SourceItem(
         source="NIST",
@@ -56,6 +75,16 @@ def test_demonstration_classification() -> None:
     assert "QTN-001" in finding.qtn_ids
     assert "QTN-013" in finding.qtn_ids
     assert finding.recommendation == "ADD_EXTERNAL_BASELINE_AND_RETEST"
+
+
+def test_date_inference_and_recency_window() -> None:
+    published = _infer_published_at(
+        "Quantum network field trial",
+        "https://example.org/2026/09/09/quantum-network-field-trial/",
+    )
+    assert published == "2026-09-09T00:00:00+00:00"
+    assert _within_age(published, now=datetime(2026, 9, 12, tzinfo=timezone.utc))
+    assert not _within_age("2025-01-01T00:00:00+00:00", now=datetime(2026, 9, 12, tzinfo=timezone.utc))
 
 
 def test_duplicate_url_is_collapsed() -> None:
