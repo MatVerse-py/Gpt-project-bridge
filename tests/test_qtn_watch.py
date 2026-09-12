@@ -1,0 +1,61 @@
+from __future__ import annotations
+
+from app.qtn_watch import SourceItem, classify_qtn, evaluate, impact_type, score_item
+
+
+def test_qtn_routing_and_resource_allocation_mapping() -> None:
+    item = SourceItem(
+        source="arXiv",
+        title="Coherence-aware routing and resource allocation in quantum networks",
+        url="https://example.org/paper",
+        summary="Adaptive path selection with entanglement fidelity constraints.",
+    )
+    mapped = set(classify_qtn(item))
+    assert {"QTN-001", "QTN-002", "QTN-012", "QTN-013", "QTN-027"}.issubset(mapped)
+
+
+def test_pqc_standardization_is_not_matverse_validation() -> None:
+    item = SourceItem(
+        source="IETF",
+        title="RFC 10024 Post-Quantum Traditional Hybrid Key Agreement Mechanisms for TLS 1.3",
+        url="https://datatracker.ietf.org/doc/rfc10024/",
+    )
+    findings = evaluate([item], threshold=0.5)
+    assert len(findings) == 1
+    finding = findings[0]
+    assert "QTN-011" in finding.qtn_ids
+    assert finding.impact_type == "STANDARDIZATION"
+    assert finding.recommendation == "REBASE_AGAINST_EXTERNAL_STANDARD"
+    assert finding.validation_class == "EXTERNAL_RELEVANCE_NOT_MATVERSE_VALIDATION"
+
+
+def test_low_relevance_item_is_filtered() -> None:
+    item = SourceItem(
+        source="NIST",
+        title="Ordinary materials measurement update",
+        url="https://example.org/materials",
+    )
+    assert classify_qtn(item) == ()
+    assert score_item(item, ()) == 0.0
+    assert evaluate([item], threshold=0.1) == []
+
+
+def test_demonstration_classification() -> None:
+    item = SourceItem(
+        source="NIST",
+        title="Quantum network demonstrated over commercial fiber",
+        url="https://example.org/quantum-network",
+        summary="Entanglement distribution was demonstrated in a field trial.",
+    )
+    assert impact_type(item) == "EXTERNAL_DEMONSTRATION"
+    finding = evaluate([item], threshold=0.5)[0]
+    assert "QTN-001" in finding.qtn_ids
+    assert "QTN-013" in finding.qtn_ids
+    assert finding.recommendation == "ADD_EXTERNAL_BASELINE_AND_RETEST"
+
+
+def test_duplicate_url_is_collapsed() -> None:
+    a = SourceItem("IETF", "Quantum internet protocol stack standard", "https://example.org/1")
+    b = SourceItem("IETF", "Quantum internet protocol stack standard duplicate", "https://example.org/1")
+    findings = evaluate([a, b], threshold=0.5)
+    assert len(findings) == 1
