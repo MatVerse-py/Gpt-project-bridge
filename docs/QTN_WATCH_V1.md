@@ -23,7 +23,7 @@ Each source is isolated. The run is fail-closed if the configured minimum source
 
 ## Pipeline
 
-`source -> normalize -> QTN mapping -> materiality score -> classification -> dedup -> GitHub issue`
+`source -> normalize -> QTN mapping -> materiality score -> classification -> dedup -> bounded GitHub issue`
 
 The mapping is explicit and deterministic in `app/qtn_watch.py`.
 
@@ -50,11 +50,15 @@ The score is a triage score, not scientific confidence and not proof of novelty.
 
 ## Deduplication
 
-Each source item receives a deterministic SHA-256 digest over canonicalized source, title and URL. GitHub issue search checks the marker:
+Each source item receives a deterministic SHA-256 digest over canonicalized source, title and URL. Existing issues are scanned in bounded pages for the marker:
 
 `<!-- qtn-watch:<digest> -->`
 
-A previously reported item is not emitted again.
+A previously reported item is not emitted again. Deduplication uses the repository Issues API instead of one Search API call per finding, avoiding search-rate-limit amplification.
+
+## Bounded publication
+
+A single run publishes at most `QTN_WATCH_MAX_ALERTS` new findings (default: 20). Remaining unreported findings stay eligible for subsequent runs. This keeps issue bodies bounded and prevents first-run alert floods.
 
 ## Operation
 
@@ -78,7 +82,9 @@ GitHub Actions runs the watch daily and also supports `workflow_dispatch`.
 - `QTN_WATCH_THRESHOLD` — default `0.62`;
 - `QTN_WATCH_MIN_SOURCES` — default `2`;
 - `QTN_WATCH_TIMEOUT` — request timeout in seconds, default `20`;
-- `QTN_WATCH_ARXIV_MAX` — maximum arXiv entries, default `40`.
+- `QTN_WATCH_ARXIV_MAX` — maximum arXiv entries, default `40`;
+- `QTN_WATCH_MAX_ALERTS` — maximum new findings in one issue, default `20`;
+- `QTN_WATCH_ISSUE_SCAN_PAGES` — maximum 100-item issue pages scanned for prior digests, default `10`.
 
 ## Failure policy
 
