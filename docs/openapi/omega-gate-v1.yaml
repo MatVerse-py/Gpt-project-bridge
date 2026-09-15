@@ -1,0 +1,373 @@
+openapi: 3.1.0
+info:
+  title: MatVerse Ω-Gate API
+  version: 1.1.1
+  description: >-
+    Canonical Ω-Gate interfaces. /v1/admit is the generic stateless invariant
+    evaluator. A bare authorization_ref is never authority: the server must
+    resolve it to a trusted active record bound to principal, requested_action
+    and target_state_hash before ADMIT. Q-Gate is not a second organ:
+    publication uses the Ω-GATE::CanPublish projection with explicit Body-A
+    proposer, Body-D adjudicator and Body-X executor separation. HOLD is
+    fail-closed and expires to BLOCK. ADMIT never means external execution.
+paths:
+  /v1/admit:
+    post:
+      operationId: evaluateOmegaAdmission
+      summary: Evaluate invariant evidence for a proposed state transition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdmissionRequest'
+      responses:
+        '200':
+          description: Deterministic ADMIT/HOLD/BLOCK decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdmissionDecision'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /v1/can-publish/proposals:
+    post:
+      operationId: proposeCanPublish
+      summary: Body-A submits a publication/canonization proposal
+      description: >-
+        Creates MARXIV.Prepared in HOLD. No provider network write occurs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishProposalRequest'
+      responses:
+        '202':
+          description: Proposal registered in HOLD / MARXIV.Prepared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishProposal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/can-publish/proposals/{proposal_id}/adjudicate:
+    post:
+      operationId: adjudicateCanPublish
+      summary: Body-D independently adjudicates a HOLD proposal
+      description: >-
+        There is no override/admit endpoint. The adjudicator principal MUST differ
+        from the proposer principal. ADMIT maps to MARXIV.Approved, not Submitted,
+        and performs no external provider call.
+      parameters:
+        - $ref: '#/components/parameters/ProposalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdjudicationRequest'
+      responses:
+        '200':
+          description: Proposal independently adjudicated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishProposal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Proposal is no longer HOLD or principal separation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/can-publish/proposals/{proposal_id}/execute:
+    post:
+      operationId: executeCanPublish
+      summary: Body-X records the externally executed action
+      description: >-
+        The executor principal MUST differ from both proposer and adjudicator.
+        This endpoint requires an existing provider receipt and is the only
+        CanPublish transition that can reach MARXIV.Submitted.
+      parameters:
+        - $ref: '#/components/parameters/ProposalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecutionRequest'
+      responses:
+        '200':
+          description: External effect recorded as MARXIV.Submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishProposal'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          description: Proposal has not been independently adjudicated ADMIT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  parameters:
+    ProposalId:
+      name: proposal_id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+
+  responses:
+    BadRequest:
+      description: Invalid request shape, digest or TTL
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: State conflict or separation-of-principals violation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Proposal not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Sha256:
+      type: string
+      pattern: '^(0x)?[0-9a-f]{64}$'
+
+    InvariantCheck:
+      type: object
+      additionalProperties: false
+      required: [invariant_id, passed, evidence_ref]
+      properties:
+        invariant_id:
+          type: string
+          minLength: 1
+        passed:
+          description: true=PASS, false=FAIL, null=UNRESOLVED
+          type: [boolean, 'null']
+        evidence_ref:
+          type: string
+          minLength: 1
+        observed: {}
+        expected: {}
+
+    AdmissionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        [proposal_id, source_mnb, target_state_hash, principal,
+         requested_action, context_hash, invariants]
+      properties:
+        proposal_id: {type: string, minLength: 1}
+        source_mnb:
+          type: string
+          minLength: 1
+          description: Canonical Mem-Nano-Bit / informational-node identifier.
+        target_state_hash:
+          $ref: '#/components/schemas/Sha256'
+        principal: {type: string, minLength: 1}
+        requested_action: {type: string, minLength: 1}
+        context_hash:
+          $ref: '#/components/schemas/Sha256'
+        invariants:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvariantCheck'
+        requires_authorization:
+          type: boolean
+          default: false
+        authorization_ref:
+          type: [string, 'null']
+          description: >-
+            Opaque reference only. If authorization is required, the server MUST
+            resolve this reference to a trusted active AuthorizationRecord bound
+            to principal, requested_action and target_state_hash. A non-empty
+            string by itself cannot authorize ADMIT.
+
+    AuthorizationRecord:
+      type: object
+      additionalProperties: false
+      required:
+        [authorization_ref, principal, requested_action, target_state_hash,
+         evidence_ref, active]
+      properties:
+        authorization_ref:
+          type: string
+          minLength: 1
+        principal:
+          type: string
+          minLength: 1
+        requested_action:
+          type: string
+          minLength: 1
+        target_state_hash:
+          $ref: '#/components/schemas/Sha256'
+        evidence_ref:
+          type: string
+          minLength: 1
+        active:
+          type: boolean
+
+    AdmissionDecision:
+      type: object
+      additionalProperties: false
+      required:
+        [schema, decision_id, proposal_id, status, reasons,
+         evaluated_invariants, resolved_authorization, receipt]
+      properties:
+        schema:
+          const: matverse.omega-gate.v1
+        decision_id: {type: string}
+        proposal_id: {type: string}
+        status:
+          type: string
+          enum: [ADMIT, HOLD, BLOCK]
+        reasons:
+          type: array
+          items: {type: string}
+        evaluated_invariants:
+          type: array
+          items: {type: string}
+        resolved_authorization:
+          oneOf:
+            - $ref: '#/components/schemas/AuthorizationRecord'
+            - type: 'null'
+        receipt:
+          type: object
+          additionalProperties: true
+          description: matverse.evidence-receipt.v1
+
+    PublishProposalRequest:
+      type: object
+      additionalProperties: false
+      required:
+        [proposal_id, intended_action, payload_hash, proposer_key_id]
+      properties:
+        proposal_id:
+          type: string
+          minLength: 1
+        intended_action:
+          type: string
+          enum: [publish_manifest, publish_bundle, merge, canonize]
+        payload_hash:
+          $ref: '#/components/schemas/Sha256'
+        proposer_key_id:
+          type: string
+          minLength: 1
+          description: Body-A principal.
+        merge_root:
+          oneOf:
+            - $ref: '#/components/schemas/Sha256'
+            - type: 'null'
+          description: Private structural root or governed internal reference; not publication authorization.
+        hold_ttl_seconds:
+          type: integer
+          minimum: 60
+          maximum: 2592000
+          default: 600
+
+    AdjudicationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        [decision, adjudicator_key_id, policy_id, evidence_ref, signature]
+      properties:
+        decision:
+          type: string
+          enum: [ADMIT, BLOCK]
+        adjudicator_key_id:
+          type: string
+          minLength: 1
+          description: Body-D principal; MUST differ from proposer_key_id.
+        policy_id:
+          type: string
+          minLength: 1
+        evidence_ref:
+          type: string
+          minLength: 1
+        signature:
+          type: string
+          minLength: 1
+
+    ExecutionRequest:
+      type: object
+      additionalProperties: false
+      required: [executor_key_id, provider_receipt]
+      properties:
+        executor_key_id:
+          type: string
+          minLength: 1
+          description: Body-X principal; MUST differ from proposer and adjudicator.
+        provider_receipt:
+          type: string
+          minLength: 1
+          description: Evidence returned by the external execution layer.
+
+    PublishProposal:
+      type: object
+      additionalProperties: false
+      required:
+        [schema, proposal_id, intended_action, payload_hash, proposer_key_id,
+         hold_ttl_seconds, gate_decision, marxiv_stage, created_at_ns, expires_at_ns]
+      properties:
+        schema:
+          const: matverse.omega-canpublish.v1
+        proposal_id: {type: string}
+        intended_action: {type: string}
+        payload_hash:
+          $ref: '#/components/schemas/Sha256'
+        proposer_key_id: {type: string}
+        merge_root:
+          type: [string, 'null']
+        hold_ttl_seconds: {type: integer}
+        gate_decision:
+          type: string
+          enum: [HOLD, BLOCK, ADMIT]
+        marxiv_stage:
+          type: string
+          enum: [Prepared, Approved, Submitted]
+        created_at_ns: {type: integer}
+        expires_at_ns: {type: integer}
+        adjudicator_key_id:
+          type: [string, 'null']
+        policy_id:
+          type: [string, 'null']
+        evidence_ref:
+          type: [string, 'null']
+        signature:
+          type: [string, 'null']
+        executor_key_id:
+          type: [string, 'null']
+        provider_receipt:
+          type: [string, 'null']
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
