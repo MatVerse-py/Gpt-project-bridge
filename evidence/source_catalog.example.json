@@ -1,0 +1,16 @@
+{
+  "schema": "matverse.bridge-evidence-catalog.v1",
+  "items": [
+    {
+      "locator": "api://example/record-1",
+      "representation": "API_METADATA",
+      "source_content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_root_id": "example-root-1",
+      "independent": true,
+      "search_text": "ARGUS factual integrity example record",
+      "metadata": {
+        "title": "ARGUS factual integrity example record"
+      }
+    }
+  ]
+}
