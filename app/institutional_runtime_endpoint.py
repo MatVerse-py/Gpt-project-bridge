@@ -6,10 +6,13 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 
 from .auth import Principal, authenticate
+from .auth_trust_plane import management_router, public_router
 from .institutional_projection import ProjectionUnavailable, build_institutional_projection
-from .institutional_protocol import AUTH_METHOD, PROTOCOL_VERSION, RUNTIME_SCHEMA_VERSION
+from .institutional_protocol import PROTOCOL_VERSION, RUNTIME_SCHEMA_VERSION
 
 runtime_router = APIRouter()
+runtime_router.include_router(public_router)
+runtime_router.include_router(management_router)
 _RUNTIME_ID = re.compile(r"^[A-Za-z0-9._:-]{3,128}$")
 
 
@@ -41,6 +44,12 @@ def _projection_or_503() -> dict:
         ) from exc
 
 
+def _wire_authentication(principal: Principal) -> str:
+    if principal.auth_scheme == "HMAC-SHA256-LEGACY":
+        return "HMAC-SHA256"
+    return principal.auth_scheme
+
+
 @runtime_router.get("/institutional/runtime")
 def institutional_runtime(principal: Principal = Depends(authenticate)) -> dict:
     if not principal.allows("institutional:projection:read"):
@@ -50,8 +59,9 @@ def institutional_runtime(principal: Principal = Depends(authenticate)) -> dict:
         "schema_version": RUNTIME_SCHEMA_VERSION,
         "protocol_version": PROTOCOL_VERSION,
         "runtime_id": _runtime_id_or_503(),
-        "authentication": AUTH_METHOD,
+        "authentication": _wire_authentication(principal),
         "authenticated_principal_id": principal.principal_id,
+        "authenticated_key_id": principal.key_id,
         "source": projection["source"],
         "projection_hash": projection["projection"]["projection_hash"],
         "status": "READY",

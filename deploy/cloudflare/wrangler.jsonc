@@ -25,6 +25,7 @@
     }
   ],
   "vars": {
+    "MATVERSE_AUTH_MODE": "ed25519",
     "MATVERSE_RUNTIME_ID": "matverse-cloudflare-pilot-v1",
     "MATVERSE_BUILD_REF": "main",
     "MATVERSE_FROZEN_CONTRACT_HASH": "67743cbe1f4d65983348401d2061e46dec22d57e232854ff263e1d646f600b26"
