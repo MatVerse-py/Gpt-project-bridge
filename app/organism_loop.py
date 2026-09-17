@@ -212,8 +212,15 @@ class GovernedOrganism:
         self.constitutional_contract_hash = constitutional_contract_hash(frozen_contract_hash=frozen_contract_hash)
         self._constraints: dict[str, InheritedConstraint] = {}
         self._lineage: list[dict[str, Any]] = []
+        self._state_generation = 0
+        self._cached_state_root: str | None = None
+        self._cached_state_generation = -1
         if state is not None:
             self._restore(state)
+
+    def _mark_state_mutated(self) -> None:
+        self._state_generation += 1
+        self._cached_state_root = None
 
     def _state_mac(self, payload: Mapping[str, Any]) -> str:
         return hmac.new(self._state_secret.encode("utf-8"), canonical_json(dict(payload)).encode("utf-8"), hashlib.sha256).hexdigest()
@@ -274,11 +281,14 @@ class GovernedOrganism:
         }
 
     def state_root(self) -> str:
-        return stable_hash(self.state_payload())
+        if self._cached_state_root is None or self._cached_state_generation != self._state_generation:
+            self._cached_state_root = stable_hash(self.state_payload())
+            self._cached_state_generation = self._state_generation
+        return self._cached_state_root
 
     def export_state(self) -> dict[str, Any]:
         payload = self.state_payload()
-        return {**payload, "state_root": stable_hash(payload), "state_mac": self._state_mac(payload)}
+        return {**payload, "state_root": self.state_root(), "state_mac": self._state_mac(payload)}
 
     def _evaluation(self, event_id: str) -> dict[str, Any]:
         matches = [item for item in self._lineage if item.get("type") == "EVALUATION" and item.get("event_id") == event_id]
@@ -394,6 +404,7 @@ class GovernedOrganism:
             "constraint_id": constraint.constraint_id,
             "authorizer_id": grant.principal_id,
         })
+        self._mark_state_mutated()
         return constraint
 
     def evaluate(
@@ -459,6 +470,7 @@ class GovernedOrganism:
             "matched_constraint_id": matched_id,
             "receipt_hash": receipt["receipt_hash"],
         })
+        self._mark_state_mutated()
         return LoopResult(
             event_id=event_id,
             decision=decision,
