@@ -33,10 +33,12 @@ jobs:
           --parallel-iterations 400
           --workers 4
           --output organism-root-cache-candidate-v1.json
-      - name: Upload candidate evidence
+      - name: Upload candidate evidence and canonical source snapshot
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: organism-root-cache-candidate-v1
-          path: organism-root-cache-candidate-v1.json
+          path: |
+            organism-root-cache-candidate-v1.json
+            app/organism_loop.py
           if-no-files-found: error
