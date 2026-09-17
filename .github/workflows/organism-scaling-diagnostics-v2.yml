@@ -1,0 +1,46 @@
+name: GovernedOrganism scaling diagnostics v2
+
+on:
+  pull_request:
+    paths:
+      - 'app/organism_loop.py'
+      - 'app/evidence.py'
+      - 'benchmarks/organism_real_bench.py'
+      - 'benchmarks/organism_scaling_diagnostics_v2.py'
+      - 'tests/test_organism_scaling_diagnostics_v2.py'
+      - '.github/workflows/organism-scaling-diagnostics-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Focused regression tests
+        run: python -m pytest -q tests/test_organism_loop.py tests/test_organism_scaling_diagnostics_v2.py
+      - name: Run scaling diagnostics
+        run: >-
+          PYTHONPATH=. python benchmarks/organism_scaling_diagnostics_v2.py
+          --iterations 400
+          --workers 4
+          --modes sequential,thread,process
+          --profile-iterations 600
+          --bucket-size 100
+          --output organism-scaling-diagnostics-v2.json
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: organism-scaling-diagnostics-v2
+          path: organism-scaling-diagnostics-v2.json
+          if-no-files-found: error
