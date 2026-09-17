@@ -1,0 +1,42 @@
+name: GovernedOrganism state-root cache candidate v1
+
+on:
+  pull_request:
+    paths:
+      - 'app/organism_root_cache.py'
+      - 'tests/test_organism_root_cache.py'
+      - 'benchmarks/organism_root_cache_candidate_v1.py'
+      - '.github/workflows/organism-root-cache-candidate-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Prove semantic equivalence
+        run: python -m pytest -q tests/test_organism_loop.py tests/test_organism_root_cache.py
+      - name: Benchmark base versus cached candidate
+        run: >-
+          PYTHONPATH=. python benchmarks/organism_root_cache_candidate_v1.py
+          --sequential-iterations 800
+          --parallel-iterations 400
+          --workers 4
+          --output organism-root-cache-candidate-v1.json
+      - name: Upload candidate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: organism-root-cache-candidate-v1
+          path: organism-root-cache-candidate-v1.json
+          if-no-files-found: error
