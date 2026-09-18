@@ -207,6 +207,13 @@ That stronger property requires a Trust Kernel or authenticated API mutation sur
 
 ## Next promotion gate
 
+Update after consolidation: `app/federation_trust_plane.py` implements the
+authenticated HTTP mutation surface described below. Direct library calls
+still require a trusted administrative caller; independent organizational
+custody remains outside the demonstrated boundary. Overlay domains inject
+their own database connection factory and use locally provisioned public
+keys and immutable relation bindings.
+
 The next meaningful gate is an authenticated mutation surface in the Trust Plane:
 
 ```text
