@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from collections.abc import Mapping as MappingABC
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from enum import Enum
+from types import MappingProxyType
 from typing import Any, Mapping
 
 from .core import stable_hash
@@ -51,6 +53,70 @@ class EvidenceStatus(str, Enum):
     FAILED = "FAILED"
 
 
+def _require_nonempty_string(name: str, value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{name} must be a non-empty string")
+    return value.strip()
+
+
+def _freeze_json(value: Any) -> Any:
+    """Create an immutable, JSON-compatible snapshot of causal content."""
+
+    if isinstance(value, MappingABC):
+        frozen: dict[str, Any] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ValueError("payload mappings must use string keys")
+            frozen[key] = _freeze_json(item)
+        return MappingProxyType(frozen)
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_json(item) for item in value)
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    raise ValueError(f"payload contains unsupported JSON value: {type(value).__name__}")
+
+
+def _thaw_json(value: Any) -> Any:
+    if isinstance(value, MappingABC):
+        return {key: _thaw_json(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw_json(item) for item in value]
+    return value
+
+
+def _canonicalize_timestamp(value: str | None) -> tuple[datetime, str]:
+    if value is None:
+        parsed = datetime.now(timezone.utc)
+    else:
+        raw = _require_nonempty_string("timestamp", value)
+        if raw.endswith("Z"):
+            raw = f"{raw[:-1]}+00:00"
+        try:
+            parsed = datetime.fromisoformat(raw)
+        except ValueError as exc:
+            raise ValueError("timestamp must be a timezone-aware ISO 8601 value") from exc
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError("timestamp must include a timezone")
+        parsed = parsed.astimezone(timezone.utc)
+    return parsed, parsed.isoformat()
+
+
+def _normalize_optional_sequence(value: Any, name: str) -> list[Any]:
+    if value is None:
+        return []
+    if not isinstance(value, (list, tuple)):
+        raise ValueError(f"{name} must be a list or tuple when provided")
+    return list(value)
+
+
+def _normalize_optional_mapping(value: Any, name: str) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, MappingABC):
+        raise ValueError(f"{name} must be a mapping when provided")
+    return dict(value)
+
+
 @dataclass(frozen=True)
 class CausalEnvelope:
     """Provider-neutral unit transported by the Bridge.
@@ -74,17 +140,36 @@ class CausalEnvelope:
     causation_id: str | None
     timestamp: str
     ttl_seconds: int
+    expires_at: str
     signature: str | None
     evidence_refs: tuple[str, ...]
     epistemic_nature: EpistemicNature
     analytic_status: AnalyticStatus
 
     def as_dict(self) -> dict[str, Any]:
-        value = asdict(self)
-        value["epistemic_nature"] = self.epistemic_nature.value
-        value["analytic_status"] = self.analytic_status.value
-        value["protocol_version"] = PROTOCOL_VERSION
-        return value
+        return {
+            "envelope_id": self.envelope_id,
+            "source": self.source,
+            "destination": self.destination,
+            "actor": self.actor,
+            "objective_id": self.objective_id,
+            "capability": self.capability,
+            "payload": _thaw_json(self.payload),
+            "schema": self.schema,
+            "context_refs": self.context_refs,
+            "authority_ref": self.authority_ref,
+            "policy_ref": self.policy_ref,
+            "correlation_id": self.correlation_id,
+            "causation_id": self.causation_id,
+            "timestamp": self.timestamp,
+            "ttl_seconds": self.ttl_seconds,
+            "expires_at": self.expires_at,
+            "signature": self.signature,
+            "evidence_refs": self.evidence_refs,
+            "epistemic_nature": self.epistemic_nature.value,
+            "analytic_status": self.analytic_status.value,
+            "protocol_version": PROTOCOL_VERSION,
+        }
 
 
 def build_envelope(
@@ -109,55 +194,76 @@ def build_envelope(
     signature: str | None = None,
 ) -> CausalEnvelope:
     required = {
-        "source": source,
-        "destination": destination,
-        "actor": actor,
-        "objective_id": objective_id,
-        "capability": capability,
-        "schema": schema,
-        "authority_ref": authority_ref,
-        "policy_ref": policy_ref,
-        "correlation_id": correlation_id,
+        "source": _require_nonempty_string("source", source),
+        "destination": _require_nonempty_string("destination", destination),
+        "actor": _require_nonempty_string("actor", actor),
+        "objective_id": _require_nonempty_string("objective_id", objective_id),
+        "capability": _require_nonempty_string("capability", capability),
+        "schema": _require_nonempty_string("schema", schema),
+        "authority_ref": _require_nonempty_string("authority_ref", authority_ref),
+        "policy_ref": _require_nonempty_string("policy_ref", policy_ref),
+        "correlation_id": _require_nonempty_string("correlation_id", correlation_id),
     }
-    missing = sorted(name for name, value in required.items() if not value.strip())
-    if missing:
-        raise ValueError(f"empty required envelope fields: {', '.join(missing)}")
-    if ttl_seconds <= 0:
-        raise ValueError("ttl_seconds must be positive")
+    if isinstance(ttl_seconds, bool) or not isinstance(ttl_seconds, int) or ttl_seconds <= 0:
+        raise ValueError("ttl_seconds must be a positive integer")
 
-    observed_at = timestamp or datetime.now(timezone.utc).isoformat()
+    observed_time, observed_at = _canonicalize_timestamp(timestamp)
+    expires_at = (observed_time + timedelta(seconds=ttl_seconds)).isoformat()
+    frozen_payload = _freeze_json(payload)
+    canonical_payload = _thaw_json(frozen_payload)
+
     identity = {
         "protocol_version": PROTOCOL_VERSION,
         **required,
-        "payload": dict(payload),
+        "payload": canonical_payload,
         "context_refs": context_refs,
         "causation_id": causation_id,
         "timestamp": observed_at,
+        "ttl_seconds": ttl_seconds,
+        "expires_at": expires_at,
         "evidence_refs": evidence_refs,
         "epistemic_nature": epistemic_nature.value,
         "analytic_status": analytic_status.value,
     }
     return CausalEnvelope(
         envelope_id=stable_hash(identity),
-        source=source,
-        destination=destination,
-        actor=actor,
-        objective_id=objective_id,
-        capability=capability,
-        payload=dict(payload),
-        schema=schema,
+        source=required["source"],
+        destination=required["destination"],
+        actor=required["actor"],
+        objective_id=required["objective_id"],
+        capability=required["capability"],
+        payload=frozen_payload,
+        schema=required["schema"],
         context_refs=context_refs,
-        authority_ref=authority_ref,
-        policy_ref=policy_ref,
-        correlation_id=correlation_id,
+        authority_ref=required["authority_ref"],
+        policy_ref=required["policy_ref"],
+        correlation_id=required["correlation_id"],
         causation_id=causation_id,
         timestamp=observed_at,
         ttl_seconds=ttl_seconds,
+        expires_at=expires_at,
         signature=signature,
         evidence_refs=evidence_refs,
         epistemic_nature=epistemic_nature,
         analytic_status=analytic_status,
     )
+
+
+def assert_envelope_fresh(
+    envelope: CausalEnvelope,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """Fail closed if an envelope is expired before traversal."""
+
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None or current.utcoffset() is None:
+        raise ValueError("now must include a timezone")
+    current = current.astimezone(timezone.utc)
+    expiry, _ = _canonicalize_timestamp(envelope.expires_at)
+    if current >= expiry:
+        raise ValueError("envelope has expired")
+    return True
 
 
 _CODEX_STATUS = {
@@ -181,7 +287,7 @@ _ENGINEERING_SEQUENCE = tuple(EngineeringState)
 def _normalize_evidence(value: Any) -> dict[str, Any]:
     if value is None:
         return {"status": EvidenceStatus.UNKNOWN.value, "ref": None}
-    if isinstance(value, Mapping):
+    if isinstance(value, MappingABC):
         raw_status = str(value.get("status", "UNKNOWN")).upper()
         try:
             status = EvidenceStatus(raw_status)
@@ -239,15 +345,15 @@ def assess_engineering_transition(evidence: Mapping[str, Any] | None = None) -> 
 def normalize_codex_task(task: Mapping[str, Any]) -> dict[str, Any]:
     """Normalize exported/API task metadata; this does not scrape Codex UI."""
 
-    required = ("task_id", "repository", "status")
-    missing = [key for key in required if not str(task.get(key, "")).strip()]
-    if missing:
-        raise ValueError(f"missing Codex task fields: {', '.join(missing)}")
-    raw_status = str(task["status"]).strip().lower()
+    task_id = _require_nonempty_string("task_id", task.get("task_id"))
+    repository = _require_nonempty_string("repository", task.get("repository"))
+    status = _require_nonempty_string("status", task.get("status"))
+    raw_status = status.lower()
     if raw_status not in _CODEX_STATUS:
-        raise ValueError(f"unsupported Codex task status: {task['status']}")
+        raise ValueError(f"unsupported Codex task status: {status}")
 
-    diff = dict(task.get("diff_summary", {}))
+    changed_files = _normalize_optional_sequence(task.get("changed_files"), "changed_files")
+    diff = _normalize_optional_mapping(task.get("diff_summary"), "diff_summary")
     for key in ("additions", "deletions"):
         value = diff.get(key, 0)
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -259,8 +365,8 @@ def normalize_codex_task(task: Mapping[str, Any]) -> dict[str, Any]:
         "bridge_event": "engineering_transition",
         "source": {
             "system": "codex-cloud",
-            "task_id": str(task["task_id"]),
-            "repository": str(task["repository"]),
+            "task_id": task_id,
+            "repository": repository,
             "branch": task.get("branch"),
             "worktree": task.get("worktree"),
         },
@@ -269,7 +375,7 @@ def normalize_codex_task(task: Mapping[str, Any]) -> dict[str, Any]:
             "additions": diff["additions"],
             "deletions": diff["deletions"],
             "objective": task.get("objective"),
-            "changed_files": list(task.get("changed_files", ())),
+            "changed_files": changed_files,
             "failure_reason": task.get("failure_reason"),
             "started_at": task.get("started_at"),
             "finished_at": task.get("finished_at"),
