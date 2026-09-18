@@ -43,6 +43,26 @@ task, repository, branch/worktree, objective, execution status, changed files,
 diff, commit/PR references, failure, timestamps and evidence. It deliberately
 does not scrape `chatgpt.com/codex/cloud`; a UI is not a stable protocol.
 
+### Engineering promotion is not task status
+
+The adapter preserves the following states independently:
+
+```text
+workspace != commit != push != pull request != CI != merge != runtime
+```
+
+An open task and a workspace diff demonstrate only workspace activity. They do
+not demonstrate a commit, push, pull request, passing CI, merge into the
+canonical repository, or live Bridge traversal. `assess_engineering_transition`
+reports every evidence item as `PRESENT`, `FAILED`, or `UNKNOWN`, advances only
+through an unbroken sequence, and reports canonical integration and runtime
+traversal separately.
+
+For the observed task `task_e_6aac90fdeed8832699998eb648a87ff7`, an `OPEN`
+status and `+338/-0` diff support `highest_demonstrated_state=WORKSPACE`; absent
+additional receipts, both canonical integration and runtime traversal remain
+`HOLD`.
+
 ## Attention and relevance boundary
 
 Bridge preserves context and causal lineage but does not decide analytical
@@ -62,6 +82,7 @@ Implemented and tested:
 * independent epistemic and analytic classifications;
 * validation of required routing fields and positive TTL;
 * normalization of Codex operational task metadata and localized statuses.
+* explicit, evidence-bound workspace-to-runtime promotion assessment.
 
 Not claimed:
 

@@ -7,7 +7,7 @@ from typing import Any, Mapping
 
 from .core import stable_hash
 
-PROTOCOL_VERSION = "matverse.bridge.v1"
+PROTOCOL_VERSION = "matverse.bridge.v1.1"
 
 
 class EpistemicNature(str, Enum):
@@ -31,6 +31,24 @@ class ExecutionStatus(str, Enum):
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+
+
+class EngineeringState(str, Enum):
+    """Distinct, non-interchangeable states in engineering promotion."""
+
+    WORKSPACE = "WORKSPACE"
+    COMMIT = "COMMIT"
+    PUSH = "PUSH"
+    PULL_REQUEST = "PULL_REQUEST"
+    CI = "CI"
+    MERGE = "MERGE"
+    RUNTIME = "RUNTIME"
+
+
+class EvidenceStatus(str, Enum):
+    UNKNOWN = "UNKNOWN"
+    PRESENT = "PRESENT"
+    FAILED = "FAILED"
 
 
 @dataclass(frozen=True)
@@ -157,6 +175,66 @@ _CODEX_STATUS = {
     "canceled": ExecutionStatus.CANCELLED,
 }
 
+_ENGINEERING_SEQUENCE = tuple(EngineeringState)
+
+
+def _normalize_evidence(value: Any) -> dict[str, Any]:
+    if value is None:
+        return {"status": EvidenceStatus.UNKNOWN.value, "ref": None}
+    if isinstance(value, Mapping):
+        raw_status = str(value.get("status", "UNKNOWN")).upper()
+        try:
+            status = EvidenceStatus(raw_status)
+        except ValueError as exc:
+            raise ValueError(f"unsupported evidence status: {raw_status}") from exc
+        return {"status": status.value, "ref": value.get("ref")}
+    if isinstance(value, str) and value.strip():
+        return {"status": EvidenceStatus.PRESENT.value, "ref": value}
+    raise ValueError("evidence must be null, a non-empty reference, or a status mapping")
+
+
+def assess_engineering_transition(evidence: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Assess promotion without treating workspace output as canonical or live.
+
+    A later state cannot promote the transition past an unknown or failed earlier
+    state. All seven states remain visible so missing evidence is never inferred.
+    """
+
+    supplied = evidence or {}
+    unexpected = sorted(set(supplied) - {stage.value.lower() for stage in _ENGINEERING_SEQUENCE})
+    if unexpected:
+        raise ValueError(f"unsupported engineering evidence: {', '.join(unexpected)}")
+
+    states: dict[str, dict[str, Any]] = {}
+    highest: EngineeringState | None = None
+    blocked = False
+    for stage in _ENGINEERING_SEQUENCE:
+        key = stage.value.lower()
+        if stage is EngineeringState.WORKSPACE:
+            item = _normalize_evidence(supplied.get(key, {"status": "PRESENT", "ref": None}))
+        else:
+            item = _normalize_evidence(supplied.get(key))
+        states[key] = item
+        if stage is EngineeringState.WORKSPACE:
+            blocked = item["status"] != EvidenceStatus.PRESENT.value
+            if not blocked:
+                highest = stage
+        elif not blocked and item["status"] == EvidenceStatus.PRESENT.value:
+            highest = stage
+        else:
+            blocked = True
+
+    return {
+        "highest_demonstrated_state": highest.value if highest is not None else None,
+        "canonical_integration": (
+            "DEMONSTRATED"
+            if highest in {EngineeringState.MERGE, EngineeringState.RUNTIME}
+            else "HOLD"
+        ),
+        "runtime_traversal": "DEMONSTRATED" if highest is EngineeringState.RUNTIME else "HOLD",
+        "evidence": states,
+    }
+
 
 def normalize_codex_task(task: Mapping[str, Any]) -> dict[str, Any]:
     """Normalize exported/API task metadata; this does not scrape Codex UI."""
@@ -169,19 +247,37 @@ def normalize_codex_task(task: Mapping[str, Any]) -> dict[str, Any]:
     if raw_status not in _CODEX_STATUS:
         raise ValueError(f"unsupported Codex task status: {task['status']}")
 
+    diff = dict(task.get("diff_summary", {}))
+    for key in ("additions", "deletions"):
+        value = diff.get(key, 0)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"diff_summary.{key} must be a non-negative integer")
+        diff[key] = value
+
+    promotion = assess_engineering_transition(task.get("engineering_evidence"))
     return {
-        "task_id": str(task["task_id"]),
-        "repository": str(task["repository"]),
-        "branch": task.get("branch"),
-        "worktree": task.get("worktree"),
-        "objective": task.get("objective"),
-        "execution_status": _CODEX_STATUS[raw_status].value,
-        "changed_files": list(task.get("changed_files", ())),
-        "diff_summary": dict(task.get("diff_summary", {})),
-        "commit_refs": list(task.get("commit_refs", ())),
-        "pr_refs": list(task.get("pr_refs", ())),
-        "failure_reason": task.get("failure_reason"),
-        "started_at": task.get("started_at"),
-        "finished_at": task.get("finished_at"),
-        "evidence_refs": list(task.get("evidence_refs", ())),
+        "bridge_event": "engineering_transition",
+        "source": {
+            "system": "codex-cloud",
+            "task_id": str(task["task_id"]),
+            "repository": str(task["repository"]),
+            "branch": task.get("branch"),
+            "worktree": task.get("worktree"),
+        },
+        "state": {
+            "task": _CODEX_STATUS[raw_status].value,
+            "additions": diff["additions"],
+            "deletions": diff["deletions"],
+            "objective": task.get("objective"),
+            "changed_files": list(task.get("changed_files", ())),
+            "failure_reason": task.get("failure_reason"),
+            "started_at": task.get("started_at"),
+            "finished_at": task.get("finished_at"),
+        },
+        "destination": {
+            "system": "github",
+            "target": task.get("target", "canonical-repository"),
+        },
+        "evidence_required": [stage.value.lower() for stage in _ENGINEERING_SEQUENCE[1:]],
+        "promotion": promotion,
     }

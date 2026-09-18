@@ -3,6 +3,7 @@ import pytest
 from app.bridge_core import (
     AnalyticStatus,
     EpistemicNature,
+    assess_engineering_transition,
     build_envelope,
     normalize_codex_task,
 )
@@ -71,10 +72,64 @@ def test_codex_adapter_normalizes_operational_state_without_ui_dependency():
             "failure_reason": "tests failed",
         }
     )
-    assert task["execution_status"] == "FAILED"
-    assert task["diff_summary"] == {"additions": 91, "deletions": 4}
+    assert task["state"]["task"] == "FAILED"
+    assert task["state"]["additions"] == 91
+    assert task["state"]["deletions"] == 4
+    assert task["promotion"]["highest_demonstrated_state"] == "WORKSPACE"
+    assert task["promotion"]["canonical_integration"] == "HOLD"
+    assert task["promotion"]["runtime_traversal"] == "HOLD"
 
 
 def test_codex_adapter_rejects_unknown_states():
     with pytest.raises(ValueError, match="unsupported"):
         normalize_codex_task({"task_id": "1", "repository": "r", "status": "mystery"})
+
+
+def test_open_codex_task_does_not_imply_commit_pr_ci_merge_or_runtime():
+    task = normalize_codex_task(
+        {
+            "task_id": "task_e_6aac90fdeed8832699998eb648a87ff7",
+            "repository": "Gpt-project-bridge",
+            "branch": "codex/conectar-o-codex-cloud-ao-bridge",
+            "status": "Aberto",
+            "diff_summary": {"additions": 338, "deletions": 0},
+        }
+    )
+    assert task["bridge_event"] == "engineering_transition"
+    assert task["state"]["task"] == "OPEN"
+    assert task["promotion"]["evidence"]["commit"]["status"] == "UNKNOWN"
+    assert task["promotion"]["evidence"]["pull_request"]["status"] == "UNKNOWN"
+    assert task["promotion"]["evidence"]["ci"]["status"] == "UNKNOWN"
+    assert task["promotion"]["evidence"]["merge"]["status"] == "UNKNOWN"
+    assert task["promotion"]["evidence"]["runtime"]["status"] == "UNKNOWN"
+
+
+def test_promotion_is_sequential_and_requires_runtime_evidence_separately():
+    assessed = assess_engineering_transition(
+        {
+            "commit": "commit:abc",
+            "push": "push:origin/topic",
+            "pull_request": "pr:42",
+            "ci": "ci:pass:42",
+            "merge": "merge:def",
+        }
+    )
+    assert assessed["highest_demonstrated_state"] == "MERGE"
+    assert assessed["canonical_integration"] == "DEMONSTRATED"
+    assert assessed["runtime_traversal"] == "HOLD"
+
+    gap = assess_engineering_transition({"commit": "commit:abc", "merge": "merge:def"})
+    assert gap["highest_demonstrated_state"] == "COMMIT"
+    assert gap["canonical_integration"] == "HOLD"
+
+
+def test_codex_adapter_rejects_invalid_diff_counts():
+    with pytest.raises(ValueError, match="additions"):
+        normalize_codex_task(
+            {
+                "task_id": "1",
+                "repository": "r",
+                "status": "open",
+                "diff_summary": {"additions": -1, "deletions": 0},
+            }
+        )
