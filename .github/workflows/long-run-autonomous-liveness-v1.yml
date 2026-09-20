@@ -5,6 +5,9 @@ on:
     paths:
       - 'experiments/long_run_autonomous_liveness_v1.py'
       - '.github/workflows/long-run-autonomous-liveness-v1.yml'
+      - 'app/core.py'
+      - 'app/evidence.py'
+      - 'app/deterministic_lab.py'
       - 'app/physiology.py'
       - 'app/physiology_effect_feedback.py'
       - 'app/organism_loop.py'
@@ -30,9 +33,10 @@ jobs:
       - name: Execute bounded long-run physiology
         id: longrun
         continue-on-error: true
+        env:
+          MATVERSE_LONG_RUN_CYCLES: ${{ github.event.inputs.cycles || '1000' }}
         run: |
-          CYCLES="${{ github.event.inputs.cycles || '1000' }}"
-          PYTHONPATH=. python experiments/long_run_autonomous_liveness_v1.py             --cycles "$CYCLES"             --fail-every 37             --restart-every 100             --output long-run-autonomous-liveness-v1.json
+          PYTHONPATH=. python experiments/long_run_autonomous_liveness_v1.py             --cycles "$MATVERSE_LONG_RUN_CYCLES"             --fail-every 37             --restart-every 100             --output long-run-autonomous-liveness-v1.json
       - name: Upload longitudinal evidence
         if: always()
         uses: actions/upload-artifact@v4
