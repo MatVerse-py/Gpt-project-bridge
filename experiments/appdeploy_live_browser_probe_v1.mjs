@@ -30,28 +30,46 @@ function writeReport(report) {
   console.log(JSON.stringify(payload, null, 2));
 }
 
+async function readBridge(page) {
+  return page.evaluate(() => ({
+    marker: document.body.getAttribute('data-external-challenge'),
+    contract: document.querySelector('#contract')?.textContent ?? '',
+    counter: document.querySelector('#counter')?.textContent ?? '',
+    stateHash: document.querySelector('#stateHash')?.textContent ?? '',
+    selftest: document.querySelector('#selftest')?.textContent ?? '',
+    finalResult: document.querySelector('#result')?.textContent ?? '',
+    resetResult: document.querySelector('#resetResult')?.textContent ?? '',
+    note: document.querySelector('.note')?.textContent ?? '',
+  }));
+}
+
 let browser;
+let bridgePage;
 try {
   browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
   });
 
-  const bridgePage = await browser.newPage();
+  bridgePage = await browser.newPage();
   await bridgePage.goto(bridgeUrl, { waitUntil: 'networkidle2', timeout: 45_000 });
   await bridgePage.waitForFunction(
-    () => document.body.getAttribute('data-external-challenge') === 'PASS_ALL_CONTROLS',
-    { timeout: 45_000 },
+    () => {
+      const contract = document.querySelector('#contract')?.textContent ?? '';
+      const selftest = document.querySelector('#selftest')?.textContent ?? '';
+      return contract !== '' && contract !== 'loading' && selftest !== '' && selftest !== 'loading';
+    },
+    { timeout: 30_000 },
   );
-  const bridge = await bridgePage.evaluate(() => ({
-    marker: document.body.getAttribute('data-external-challenge'),
-    contract: document.querySelector('#contract')?.textContent ?? '',
-    counter: document.querySelector('#counter')?.textContent ?? '',
-    stateHash: document.querySelector('#stateHash')?.textContent ?? '',
-    finalResult: document.querySelector('#result')?.textContent ?? '',
-    resetResult: document.querySelector('#resetResult')?.textContent ?? '',
-    note: document.querySelector('.note')?.textContent ?? '',
-  }));
+
+  let bridge = await readBridge(bridgePage);
+  if (bridge.selftest === 'PASS') {
+    await bridgePage.waitForFunction(
+      () => document.body.getAttribute('data-external-challenge') === 'PASS_ALL_CONTROLS',
+      { timeout: 45_000 },
+    );
+    bridge = await readBridge(bridgePage);
+  }
 
   const brokerPage = await browser.newPage();
   await brokerPage.goto(brokerUrl, { waitUntil: 'networkidle2', timeout: 45_000 });
@@ -76,6 +94,7 @@ try {
   }));
 
   const hardChecks = {
+    bridge_selftest: bridge.selftest === 'PASS',
     bridge_marker: bridge.marker === 'PASS_ALL_CONTROLS',
     bridge_contract: bridge.contract === 'BRIDGE-CAP-ACCUMULATE-0.1',
     bridge_counter: bridge.counter === '3',
@@ -123,6 +142,14 @@ try {
   });
   if (!passed) process.exitCode = 2;
 } catch (error) {
+  let bridgeObserved = null;
+  if (bridgePage) {
+    try {
+      bridgeObserved = await readBridge(bridgePage);
+    } catch {
+      bridgeObserved = null;
+    }
+  }
   writeReport({
     schema: 'matverse.appdeploy-live-browser-probe.v1',
     scope: 'LIVE_PUBLIC_HTTPS_BROWSER_CROSS_INFRASTRUCTURE',
@@ -131,6 +158,7 @@ try {
       bridge: 'APPDEPLOY_EXTERNAL_RUNTIME',
       secret_plane: 'APPDEPLOY_SECRET_BROKER',
     },
+    bridge_observed: bridgeObserved,
     live_browser_cross_infrastructure_pass: false,
     classification: 'HOLD',
     failure: {
