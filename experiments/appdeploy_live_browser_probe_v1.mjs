@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import puppeteer from 'puppeteer-core';
+import puppeteer from 'puppeteer';
 
 const bridgeUrl = 'https://matverse-external-bridge-verifier-8iuh4o.v2.appdeploy.ai/';
 const brokerUrl = 'https://matverse-secret-broker-r0992d.v2.appdeploy.ai/';
+const outPath = 'appdeploy-live-browser-probe-v1.json';
 
 function sortObject(value) {
   if (Array.isArray(value)) return value.map(sortObject);
@@ -22,27 +23,20 @@ function stableHash(value) {
     .digest('hex');
 }
 
-function chromePath() {
-  const candidates = [
-    process.env.CHROME_BIN,
-    '/usr/bin/google-chrome',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-  ].filter(Boolean);
-  const found = candidates.find((candidate) => fs.existsSync(candidate));
-  if (!found) throw new Error('CHROME_NOT_FOUND');
-  return found;
+function writeReport(report) {
+  const payload = { ...report };
+  payload.result_hash = stableHash(payload);
+  fs.writeFileSync(outPath, JSON.stringify(payload, null, 2) + '\n', 'utf8');
+  console.log(JSON.stringify(payload, null, 2));
 }
 
-const browser = await puppeteer.launch({
-  executablePath: chromePath(),
-  headless: true,
-  args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
-});
-
-let report;
+let browser;
 try {
+  browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+  });
+
   const bridgePage = await browser.newPage();
   await bridgePage.goto(bridgeUrl, { waitUntil: 'networkidle2', timeout: 45_000 });
   await bridgePage.waitForFunction(
@@ -106,7 +100,7 @@ try {
   };
 
   const passed = Object.values(hardChecks).every(Boolean);
-  report = {
+  writeReport({
     schema: 'matverse.appdeploy-live-browser-probe.v1',
     scope: 'LIVE_PUBLIC_HTTPS_BROWSER_CROSS_INFRASTRUCTURE',
     source_runtime: 'GITHUB_HOSTED_RUNNER_CHROME',
@@ -118,9 +112,7 @@ try {
     bridge_observed: bridge,
     secret_plane_observed: broker,
     live_browser_cross_infrastructure_pass: passed,
-    classification: passed
-      ? 'LIVE_BROWSER_CROSS_INFRASTRUCTURE_PASS'
-      : 'HOLD',
+    classification: passed ? 'LIVE_BROWSER_CROSS_INFRASTRUCTURE_PASS' : 'HOLD',
     claim_boundary: {
       independent_administrative_witness: false,
       external_pass: 'HOLD',
@@ -128,15 +120,32 @@ try {
       live_provider_model_execution: 'HOLD_NO_PROVIDER_SECRET',
       third_party_governance: 'NOT_PRESENT',
     },
-  };
-  report.result_hash = stableHash(report);
-  fs.writeFileSync(
-    'appdeploy-live-browser-probe-v1.json',
-    JSON.stringify(report, null, 2) + '\n',
-    'utf8',
-  );
-  console.log(JSON.stringify(report, null, 2));
+  });
   if (!passed) process.exitCode = 2;
+} catch (error) {
+  writeReport({
+    schema: 'matverse.appdeploy-live-browser-probe.v1',
+    scope: 'LIVE_PUBLIC_HTTPS_BROWSER_CROSS_INFRASTRUCTURE',
+    source_runtime: 'GITHUB_HOSTED_RUNNER_CHROME',
+    targets: {
+      bridge: 'APPDEPLOY_EXTERNAL_RUNTIME',
+      secret_plane: 'APPDEPLOY_SECRET_BROKER',
+    },
+    live_browser_cross_infrastructure_pass: false,
+    classification: 'HOLD',
+    failure: {
+      name: error?.name ?? 'Error',
+      message: String(error?.message ?? error),
+    },
+    claim_boundary: {
+      independent_administrative_witness: false,
+      external_pass: 'HOLD',
+      world_real_pass: 'HOLD',
+      live_provider_model_execution: 'HOLD_NO_PROVIDER_SECRET',
+      third_party_governance: 'NOT_PRESENT',
+    },
+  });
+  process.exitCode = 2;
 } finally {
-  await browser.close();
+  if (browser) await browser.close();
 }
