@@ -9,6 +9,8 @@ on:
       - 'tests/test_homeostatic_supervisor.py'
       - 'tests/test_physiology_effect_feedback.py'
       - 'experiments/bounded_autonomous_recovery_v1.py'
+      - 'experiments/longitudinal_liveness_v1.py'
+      - 'experiments/autonomous_regulation_v1.py'
       - '.github/workflows/bounded-autonomous-recovery-v1.yml'
   workflow_dispatch:
 
@@ -39,11 +41,14 @@ jobs:
       - name: Execute autonomous regulation experiment
         run: PYTHONPATH=. python experiments/autonomous_regulation_v1.py
       - name: Upload evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: bounded-autonomous-recovery-v1
           path: |
             bounded-autonomous-recovery-v1.json
+            bounded-autonomous-recovery-v1-evidence.json
+            bounded-autonomous-recovery-v1.sqlite3
             longitudinal-liveness-v1.json
             autonomous-regulation-v1.json
           if-no-files-found: error
