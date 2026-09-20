@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from app.core import Decision, stable_hash
 from app.deterministic_lab import DeterministicFaultPlan, DeterministicTelemetry
@@ -12,9 +13,20 @@ from app.organism_loop import GovernedOrganism
 from app.physiology import DurableEventJournal, ExecutionResult, HealthState
 from app.physiology_effect_feedback import ClosedLoopPhysiologyEngine
 
+JOURNAL_PATH = Path("bounded-autonomous-recovery-v1.sqlite3")
+EVIDENCE_PATH = Path("bounded-autonomous-recovery-v1-evidence.json")
+
+
+def _reset_journal() -> None:
+    for suffix in ("", "-wal", "-shm"):
+        path = Path(str(JOURNAL_PATH) + suffix)
+        if path.exists():
+            path.unlink()
+
 
 def main() -> int:
-    journal = DurableEventJournal("bounded-autonomous-recovery-v1.sqlite3")
+    _reset_journal()
+    journal = DurableEventJournal(JOURNAL_PATH)
     organism = GovernedOrganism(
         organism_id="bounded-autonomous-exp-organism",
         frozen_contract_hash="d" * 64,
@@ -83,7 +95,33 @@ def main() -> int:
         and calls[1].get("recovery_for") == origin
         and len(proposal_events) == 1
         and len(outcome_events) == 1
+        and proposal_events[0].causation_id
+        == f"{perturbation.cycle.cycle.cycle_id}:effect-feedback"
+        and "inputs" in outcome_events[0].payload
     )
+
+    evidence = {
+        "schema": "matverse.bounded-autonomous-recovery-evidence.v1",
+        "journal_integrity": journal.integrity_check(),
+        "events": [
+            {
+                "seq": event.seq,
+                "event_id": event.event_id,
+                "topic": event.topic,
+                "event_type": event.event_type,
+                "payload": event.payload,
+                "created_ns": event.created_ns,
+                "causation_id": event.causation_id,
+                "correlation_id": event.correlation_id,
+                "receipt_hash": event.receipt_hash,
+            }
+            for event in events
+        ],
+    }
+    evidence["evidence_hash"] = stable_hash(evidence)
+    with EVIDENCE_PATH.open("w", encoding="utf-8") as fh:
+        json.dump(evidence, fh, sort_keys=True, indent=2)
+        fh.write("\n")
 
     report = {
         "schema": "matverse.bounded-autonomous-recovery-experiment.v1",
@@ -124,6 +162,7 @@ def main() -> int:
             "autopoiesis": "HOLD",
         },
         "closed_loop_state_root": recovery.cycle.closed_loop_state_root,
+        "evidence_hash": evidence["evidence_hash"],
     }
     report["result_hash"] = stable_hash(report)
 
