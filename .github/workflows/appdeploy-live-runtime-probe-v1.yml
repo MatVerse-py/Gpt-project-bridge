@@ -3,7 +3,7 @@ name: appdeploy-live-runtime-probe-v1
 on:
   pull_request:
     paths:
-      - 'experiments/appdeploy_live_runtime_probe_v1.py'
+      - 'experiments/appdeploy_live_browser_probe_v1.mjs'
       - '.github/workflows/appdeploy-live-runtime-probe-v1.yml'
   workflow_dispatch:
 
@@ -13,21 +13,19 @@ permissions:
 jobs:
   live-probe:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: '3.12'
-      - name: Probe live AppDeploy external runtime
-        run: PYTHONPATH=. python experiments/appdeploy_live_runtime_probe_v1.py
-      - name: Probe live AppDeploy secret plane
-        run: PYTHONPATH=. python experiments/appdeploy_secret_plane_probe_v1.py
+          node-version: '22'
+      - name: Install browser probe dependency
+        run: npm install --no-save --no-package-lock puppeteer-core@24.16.0
+      - name: Run live AppDeploy browser probes
+        run: node experiments/appdeploy_live_browser_probe_v1.mjs
       - name: Upload evidence
         uses: actions/upload-artifact@v4
         with:
-          name: appdeploy-live-runtime-probe-v1
-          path: |
-            appdeploy-live-runtime-probe-v1.json
-            appdeploy-secret-plane-probe-v1.json
+          name: appdeploy-live-browser-probe-v1
+          path: appdeploy-live-browser-probe-v1.json
           if-no-files-found: error
