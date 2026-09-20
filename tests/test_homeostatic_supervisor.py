@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 
 from app.core import Decision
@@ -152,3 +155,47 @@ def test_recovery_policy_rejects_reserved_keys():
             action="READ",
             parameters={"action": "EXECUTE"},
         )
+
+
+def test_concurrent_supervisor_calls_cannot_duplicate_recovery_effect(tmp_path):
+    call_lock = threading.Lock()
+    calls: list[dict] = []
+
+    def executor(proposal):
+        with call_lock:
+            calls.append(dict(proposal))
+            number = len(calls)
+        return ExecutionResult(
+            status="FAIL" if number == 1 else "OK",
+            effect={"call": number},
+        )
+
+    journal, engine, supervisor = _supervisor(tmp_path, executor)
+    failed = supervisor.step(proposal={"action": "READ", "resource": "sensor"})
+    assert failed.cycle.recovery_required is True
+
+    start = threading.Barrier(3)
+
+    def recover():
+        start.wait()
+        return supervisor.step()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(recover) for _ in range(2)]
+        start.wait()
+        results = [future.result(timeout=5) for future in futures]
+
+    assert sum(result.autonomous_recovery_attempted for result in results) == 1
+    assert len(calls) == 2
+    assert engine.feedback.recovery_required is False
+
+    events = journal.read(limit=500)
+    assert sum(
+        event.event_type == "BOUNDED_AUTONOMOUS_RECOVERY_PROPOSED"
+        for event in events
+    ) == 1
+    assert sum(
+        event.event_type == "BOUNDED_AUTONOMOUS_RECOVERY_OUTCOME"
+        for event in events
+    ) == 1
+    journal.close()
