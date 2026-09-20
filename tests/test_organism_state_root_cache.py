@@ -76,3 +76,32 @@ def test_export_and_restore_preserve_exact_authenticated_root_with_cache():
     )
     assert restored.state_root() == exported["state_root"]
     assert restored.export_state()["state_root"] == exported["state_root"]
+
+
+def test_internal_hash_view_remains_exact_across_lineage_growth():
+    organism = _make()
+    for i in range(75):
+        organism.evaluate(
+            event_id=f"canonical-hash-view-{i}",
+            proposal={
+                "action": "EXECUTE" if i % 3 == 0 else "OBSERVE",
+                "tool": "shell" if i % 3 == 0 else "python",
+                "i": i,
+            },
+        )
+        assert organism.state_root() == stable_hash(organism.state_payload())
+
+
+def test_public_state_payload_remains_defensive_copy_after_hash_view_promotion():
+    organism = _make()
+    original_root = organism.state_root()
+    payload = organism.state_payload()
+
+    payload["lineage"][0]["decision"] = Decision.PASS.value
+    payload["lineage"].append({"type": "FORGED"})
+
+    assert organism.state_root() == original_root
+    assert stable_hash(payload) != original_root
+    fresh = organism.state_payload()
+    assert fresh["lineage"][0]["decision"] != Decision.PASS.value
+    assert all(item.get("type") != "FORGED" for item in fresh["lineage"])
