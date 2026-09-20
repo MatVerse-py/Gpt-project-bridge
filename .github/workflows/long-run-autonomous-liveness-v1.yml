@@ -1,0 +1,53 @@
+name: long-run-autonomous-liveness-v1
+
+on:
+  pull_request:
+    paths:
+      - 'experiments/long_run_autonomous_liveness_v1.py'
+      - '.github/workflows/long-run-autonomous-liveness-v1.yml'
+      - 'app/core.py'
+      - 'app/evidence.py'
+      - 'app/deterministic_lab.py'
+      - 'app/physiology.py'
+      - 'app/physiology_effect_feedback.py'
+      - 'app/organism_loop.py'
+  workflow_dispatch:
+    inputs:
+      cycles:
+        description: 'Requested long-run cycles'
+        required: false
+        default: '1000'
+
+permissions:
+  contents: read
+
+jobs:
+  long-run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Execute bounded long-run physiology
+        id: longrun
+        continue-on-error: true
+        env:
+          MATVERSE_LONG_RUN_CYCLES: ${{ github.event.inputs.cycles || '1000' }}
+        run: |
+          PYTHONPATH=. python experiments/long_run_autonomous_liveness_v1.py             --cycles "$MATVERSE_LONG_RUN_CYCLES"             --fail-every 37             --restart-every 100             --output long-run-autonomous-liveness-v1.json
+      - name: Upload longitudinal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: long-run-autonomous-liveness-v1
+          path: long-run-autonomous-liveness-v1.json
+          if-no-files-found: error
+      - name: Enforce longitudinal gate
+        if: always()
+        run: |
+          if [ "${{ steps.longrun.outcome }}" != "success" ]; then
+            echo "LONG_RUN_AUTONOMOUS_LIVENESS remains HOLD; evidence uploaded."
+            exit 1
+          fi
