@@ -1,0 +1,42 @@
+name: bounded-autonomous-recovery-v1
+
+on:
+  pull_request:
+    paths:
+      - 'app/homeostatic_supervisor.py'
+      - 'app/physiology.py'
+      - 'app/physiology_effect_feedback.py'
+      - 'tests/test_homeostatic_supervisor.py'
+      - 'tests/test_physiology_effect_feedback.py'
+      - 'experiments/bounded_autonomous_recovery_v1.py'
+      - '.github/workflows/bounded-autonomous-recovery-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Closed-loop regression tests
+        run: >-
+          python -m pytest -q
+          tests/test_homeostatic_supervisor.py
+          tests/test_physiology_effect_feedback.py
+      - name: Execute bounded autonomous recovery experiment
+        run: PYTHONPATH=. python experiments/bounded_autonomous_recovery_v1.py
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: bounded-autonomous-recovery-v1
+          path: bounded-autonomous-recovery-v1.json
+          if-no-files-found: error
