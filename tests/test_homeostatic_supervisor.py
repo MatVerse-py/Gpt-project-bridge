@@ -199,3 +199,112 @@ def test_concurrent_supervisor_calls_cannot_duplicate_recovery_effect(tmp_path):
         for event in events
     ) == 1
     journal.close()
+
+
+
+def test_blocked_recovery_retry_gets_unique_attempt_and_persists_receipt_inputs(tmp_path):
+    calls: list[dict] = []
+
+    def executor(proposal):
+        calls.append(dict(proposal))
+        return ExecutionResult(
+            status="FAIL" if len(calls) == 1 else "OK",
+            effect={"call": len(calls)},
+        )
+
+    journal, engine, supervisor = _supervisor(tmp_path, executor)
+    failed = supervisor.step(proposal={"action": "READ", "resource": "sensor"})
+    assert failed.cycle.recovery_required is True
+
+    blocked = supervisor.step(signature_valid=False)
+    assert blocked.cycle.effective_decision is Decision.BLOCK
+    assert blocked.cycle.recovery_required is True
+
+    recovered = supervisor.step()
+    assert recovered.cycle.effective_decision is Decision.PASS
+    assert recovered.cycle.recovery_required is False
+
+    events = journal.read(limit=500)
+    proposed = [
+        event for event in events
+        if event.event_type == "BOUNDED_AUTONOMOUS_RECOVERY_PROPOSED"
+    ]
+    outcomes = [
+        event for event in events
+        if event.event_type == "BOUNDED_AUTONOMOUS_RECOVERY_OUTCOME"
+    ]
+    assert len(proposed) == 2
+    assert len(outcomes) == 2
+    assert proposed[0].event_id != proposed[1].event_id
+    assert proposed[0].payload["inputs"]["attempt_number"] == 1
+    assert proposed[1].payload["inputs"]["attempt_number"] == 2
+    assert "inputs" in outcomes[0].payload
+    assert "recovery_cycle_id" in outcomes[0].payload["inputs"]
+    assert outcomes[1].causation_id == proposed[1].event_id
+    journal.close()
+
+
+def test_pending_recovery_cannot_resume_under_different_policy_after_restart(tmp_path):
+    calls: list[dict] = []
+
+    def executor(proposal):
+        calls.append(dict(proposal))
+        return ExecutionResult(status="FAIL", effect={"call": len(calls)})
+
+    journal, engine, supervisor = _supervisor(tmp_path, executor)
+    failed = supervisor.step(proposal={"action": "READ", "resource": "sensor"})
+    assert failed.cycle.recovery_required is True
+    journal.close()
+
+    reopened = DurableEventJournal(tmp_path / "bounded-autonomous.sqlite3")
+    reopened_engine = ClosedLoopPhysiologyEngine(
+        organism=_organism(),
+        journal=reopened,
+        telemetry=_telemetry(),
+        executor=executor,
+        feedback_state_secret=FEEDBACK_SECRET,
+    )
+    with pytest.raises(ValueError, match="policy fingerprint mismatch"):
+        BoundedHomeostaticSupervisor(
+            engine=reopened_engine,
+            recovery_policy=BoundedRecoveryPolicy.build(
+                action="WRITE",
+                parameters={"resource": "sensor"},
+            ),
+        )
+    assert reopened_engine.feedback.recovery_required is True
+    reopened.close()
+
+
+def test_retry_causal_link_tracks_latest_feedback_event(tmp_path):
+    calls: list[dict] = []
+
+    def executor(proposal):
+        calls.append(dict(proposal))
+        if len(calls) <= 2:
+            return ExecutionResult(status="FAIL", effect={"call": len(calls)})
+        return ExecutionResult(status="OK", effect={"call": len(calls)})
+
+    journal, engine, supervisor = _supervisor(tmp_path, executor)
+    failed = supervisor.step(proposal={"action": "READ", "resource": "sensor"})
+    origin = failed.cycle.recovery_for_cycle_id
+    assert origin is not None
+
+    retry_one = supervisor.step()
+    assert retry_one.cycle.recovery_required is True
+    latest_feedback_event_id = f"{retry_one.cycle.cycle.cycle_id}:effect-feedback"
+
+    retry_two = supervisor.step()
+    assert retry_two.cycle.recovery_required is False
+
+    proposed = [
+        event for event in journal.read(limit=500)
+        if event.event_type == "BOUNDED_AUTONOMOUS_RECOVERY_PROPOSED"
+    ]
+    assert len(proposed) == 2
+    assert proposed[1].causation_id == latest_feedback_event_id
+    assert (
+        proposed[1].payload["inputs"]["source_feedback_event_id"]
+        == latest_feedback_event_id
+    )
+    journal.close()
