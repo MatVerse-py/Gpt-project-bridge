@@ -270,19 +270,29 @@ class GovernedOrganism:
             if not isinstance(item.get("receipt_hash"), str):
                 raise ValueError("evaluation receipt hash missing from lineage")
 
-    def state_payload(self) -> dict[str, Any]:
+    def _state_hash_view(self) -> dict[str, Any]:
+        """Internal read-only serialization view for exact canonical state hashing.
+
+        The lineage reference is private and never returned to callers. This avoids
+        cloning the lineage solely for hashing while preserving the exact canonical
+        bytes produced by stable_hash(state_payload()).
+        """
         return {
             "schema": SCHEMA_VERSION,
             "organism_id": self.organism_id,
             "constitutional_contract_hash": self.constitutional_contract_hash,
             "gate_fingerprint": self.gate_fingerprint,
             "constraints": [asdict(self._constraints[key]) for key in sorted(self._constraints)],
-            "lineage": _json_clone(self._lineage),
+            "lineage": self._lineage,
         }
+
+    def state_payload(self) -> dict[str, Any]:
+        payload = self._state_hash_view()
+        return {**payload, "lineage": _json_clone(self._lineage)}
 
     def state_root(self) -> str:
         if self._cached_state_root is None or self._cached_state_generation != self._state_generation:
-            self._cached_state_root = stable_hash(self.state_payload())
+            self._cached_state_root = stable_hash(self._state_hash_view())
             self._cached_state_generation = self._state_generation
         return self._cached_state_root
 
