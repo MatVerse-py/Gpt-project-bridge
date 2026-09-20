@@ -16,6 +16,7 @@ from app.physiology_effect_feedback import ClosedLoopPhysiologyEngine
 SCHEMA = "matverse.long-run-autonomous-liveness.v1"
 FEEDBACK_SECRET = "matverse-long-run-feedback-v1"
 STATE_SECRET = "matverse-long-run-state-v1"
+ORGANISM_STATE_KEY = "long-run:organism-state"
 
 
 @dataclass
@@ -46,13 +47,14 @@ class PlannedExecutor:
         )
 
 
-def _organism() -> GovernedOrganism:
+def _organism(state: Mapping[str, Any] | None = None) -> GovernedOrganism:
     return GovernedOrganism(
         organism_id="long-run-autonomous-liveness-v1",
         frozen_contract_hash="b" * 64,
         runtime_id="long-run-runtime-v1",
         state_secret=STATE_SECRET,
         authority_secrets={"independent-authorizer": "long-run-authority-v1"},
+        state=state,
     )
 
 
@@ -61,17 +63,42 @@ def _engine(
     journal: DurableEventJournal,
     executor: PlannedExecutor,
     cycles: int,
+    organism_state: Mapping[str, Any] | None = None,
 ) -> ClosedLoopPhysiologyEngine:
     telemetry = DeterministicTelemetry(
-        plan=DeterministicFaultPlan(seed=20260920, cycles=max(cycles * 3, 1), directives=())
+        plan=DeterministicFaultPlan(
+            seed=20260920,
+            cycles=max(cycles * 3, 1),
+            directives=(),
+        )
     )
     return ClosedLoopPhysiologyEngine(
-        organism=_organism(),
+        organism=_organism(organism_state),
         journal=journal,
         telemetry=telemetry,
         executor=executor,
         feedback_state_secret=FEEDBACK_SECRET,
     )
+
+
+def _persist_organism_state(
+    journal: DurableEventJournal,
+    engine: ClosedLoopPhysiologyEngine,
+) -> str:
+    state = engine.organism.export_state()
+    journal.set_state(ORGANISM_STATE_KEY, state)
+    return str(state["state_root"])
+
+
+def _read_all_events(journal: DurableEventJournal) -> list[Any]:
+    events: list[Any] = []
+    after_seq = 0
+    while True:
+        batch = journal.read(after_seq=after_seq, limit=10_000)
+        if not batch:
+            return events
+        events.extend(batch)
+        after_seq = batch[-1].seq
 
 
 def run_long_run(
@@ -91,20 +118,34 @@ def run_long_run(
     executor = PlannedExecutor(fail_every=fail_every)
     journal = DurableEventJournal(db_path)
     engine = _engine(journal=journal, executor=executor, cycles=cycles)
+    _persist_organism_state(journal, engine)
 
     restarts = 0
     completed = 0
     pass_decisions = 0
     hold_decisions = 0
     recovery_cycles = 0
-    state_roots: list[str] = []
+    closed_loop_state_roots: list[str] = []
+    organism_state_roots: list[str] = [engine.organism.state_root()]
+    restart_continuity_checks: list[bool] = []
 
     try:
         while completed < cycles:
             if restart_every and completed and completed % restart_every == 0:
+                expected_root = engine.organism.state_root()
                 journal.close()
                 journal = DurableEventJournal(db_path)
-                engine = _engine(journal=journal, executor=executor, cycles=cycles)
+                persisted_state = journal.get_state(ORGANISM_STATE_KEY, None)
+                if not isinstance(persisted_state, dict):
+                    raise RuntimeError("persisted organism state missing at restart")
+                engine = _engine(
+                    journal=journal,
+                    executor=executor,
+                    cycles=cycles,
+                    organism_state=persisted_state,
+                )
+                restored_root = engine.organism.state_root()
+                restart_continuity_checks.append(restored_root == expected_root)
                 restarts += 1
 
             proposal: dict[str, Any] = {
@@ -118,16 +159,14 @@ def run_long_run(
 
             result = engine.tick(proposal=proposal)
             completed += 1
-            state_roots.append(result.closed_loop_state_root)
+            closed_loop_state_roots.append(result.closed_loop_state_root)
+            organism_state_roots.append(_persist_organism_state(journal, engine))
 
             if result.effective_decision is Decision.PASS:
                 pass_decisions += 1
             elif result.effective_decision is Decision.HOLD:
                 hold_decisions += 1
 
-        # The requested run must end in a stable state. If the final requested
-        # cycle opened recovery, perform one bounded recovery drain cycle and
-        # record it separately instead of falsely declaring stable liveness.
         drain_cycles = 0
         if engine.feedback.recovery_required:
             drain_cycles = 1
@@ -140,19 +179,26 @@ def run_long_run(
                 }
             )
             recovery_cycles += 1
-            state_roots.append(result.closed_loop_state_root)
+            closed_loop_state_roots.append(result.closed_loop_state_root)
+            organism_state_roots.append(_persist_organism_state(journal, engine))
             if result.effective_decision is Decision.PASS:
                 pass_decisions += 1
             elif result.effective_decision is Decision.HOLD:
                 hold_decisions += 1
 
-        events = journal.read(limit=10_000)
+        events = _read_all_events(journal)
         final_feedback = engine.feedback
         final_cycle_seq = int(
             journal.get_state(
                 f"physiology:{engine.organism.organism_id}",
                 {"cycle_seq": -1},
             )["cycle_seq"]
+        )
+        persisted_final_organism = journal.get_state(ORGANISM_STATE_KEY, None)
+        final_organism_state_matches = (
+            isinstance(persisted_final_organism, dict)
+            and persisted_final_organism.get("state_root")
+            == engine.organism.state_root()
         )
 
         hard_checks = {
@@ -162,9 +208,28 @@ def run_long_run(
             "all_injected_failures_recovered":
                 executor.successful_recoveries == executor.injected_failures,
             "restarts_exercised": restart_every == 0 or restarts > 0,
+            "restart_organism_continuity":
+                restart_every == 0
+                or (
+                    len(restart_continuity_checks) == restarts
+                    and all(restart_continuity_checks)
+                ),
+            "final_organism_state_persisted": final_organism_state_matches,
             "cycle_sequence_monotonic": final_cycle_seq == cycles + drain_cycles,
-            "state_roots_present": len(state_roots) == cycles + drain_cycles
-                and all(isinstance(x, str) and len(x) == 64 for x in state_roots),
+            "closed_loop_state_roots_present":
+                len(closed_loop_state_roots) == cycles + drain_cycles
+                and all(
+                    isinstance(root, str) and len(root) == 64
+                    for root in closed_loop_state_roots
+                ),
+            "organism_state_roots_present":
+                len(organism_state_roots) == cycles + drain_cycles + 1
+                and all(
+                    isinstance(root, str) and len(root) == 64
+                    for root in organism_state_roots
+                ),
+            "organism_state_evolves":
+                len(set(organism_state_roots)) == len(organism_state_roots),
             "no_unexpected_hold": hold_decisions == 0,
             "events_persisted": len(events) > cycles,
         }
@@ -179,6 +244,7 @@ def run_long_run(
             "completed_cycles": completed,
             "final_cycle_seq": final_cycle_seq,
             "restarts": restarts,
+            "restart_continuity_checks": restart_continuity_checks,
             "executor_invocations": executor.invocations,
             "injected_failures": executor.injected_failures,
             "successful_recoveries": executor.successful_recoveries,
@@ -186,12 +252,15 @@ def run_long_run(
             "pass_decisions": pass_decisions,
             "hold_decisions": hold_decisions,
             "event_count": len(events),
-            "final_closed_loop_state_root": state_roots[-1],
+            "initial_organism_state_root": organism_state_roots[0],
+            "final_organism_state_root": engine.organism.state_root(),
+            "final_closed_loop_state_root": closed_loop_state_roots[-1],
             "hard_checks": hard_checks,
             "classification": (
                 "LOCAL_LONG_RUN_AUTONOMOUS_LIVENESS_PASS" if passed else "HOLD"
             ),
             "claim_boundary": {
+                "process_restart_reproduction": "NOT_TESTED",
                 "external_reproduction": "HOLD",
                 "world_real_homeostasis": "HOLD",
                 "world_real_pass": "HOLD",
@@ -234,9 +303,16 @@ def main() -> int:
             db_path=args.db,
         )
 
-    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     print(json.dumps(report, indent=2, sort_keys=True))
-    return 0 if report["classification"] == "LOCAL_LONG_RUN_AUTONOMOUS_LIVENESS_PASS" else 2
+    return (
+        0
+        if report["classification"] == "LOCAL_LONG_RUN_AUTONOMOUS_LIVENESS_PASS"
+        else 2
+    )
 
 
 if __name__ == "__main__":
