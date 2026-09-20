@@ -13,19 +13,29 @@ permissions:
 jobs:
   live-probe:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Install browser probe dependency
-        run: npm install --no-save --no-package-lock puppeteer-core@24.16.0
+        run: npm install --no-save --no-package-lock puppeteer@24.16.0
       - name: Run live AppDeploy browser probes
+        id: probe
+        continue-on-error: true
         run: node experiments/appdeploy_live_browser_probe_v1.mjs
       - name: Upload evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: appdeploy-live-browser-probe-v1
           path: appdeploy-live-browser-probe-v1.json
           if-no-files-found: error
+      - name: Enforce probe result
+        if: always()
+        run: |
+          if [ "${{ steps.probe.outcome }}" != "success" ]; then
+            echo "Live probe classified as HOLD/failure. Evidence was uploaded above."
+            exit 1
+          fi
