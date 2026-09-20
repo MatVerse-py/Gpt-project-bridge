@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -84,6 +85,7 @@ class BoundedHomeostaticSupervisor:
     ) -> None:
         self.engine = engine
         self.recovery_policy = recovery_policy
+        self._step_lock = threading.RLock()
 
     def step(
         self,
@@ -93,6 +95,24 @@ class BoundedHomeostaticSupervisor:
         ontology_ok: bool = True,
         signature_valid: bool = True,
         transition_valid: bool = True,
+    ) -> SupervisorStepResult:
+        with self._step_lock:
+            return self._step_locked(
+                proposal=proposal,
+                human=human,
+                ontology_ok=ontology_ok,
+                signature_valid=signature_valid,
+                transition_valid=transition_valid,
+            )
+
+    def _step_locked(
+        self,
+        *,
+        proposal: Mapping[str, Any] | None,
+        human: Mapping[str, Any] | None,
+        ontology_ok: bool,
+        signature_valid: bool,
+        transition_valid: bool,
     ) -> SupervisorStepResult:
         feedback = self.engine.feedback
         if not feedback.recovery_required:
