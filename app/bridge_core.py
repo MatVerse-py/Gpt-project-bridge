@@ -8,6 +8,7 @@ from types import MappingProxyType
 from typing import Any, Mapping
 
 from .core import stable_hash
+from .metrology import MetrologicalTemporalState, normalize_metrology
 
 PROTOCOL_VERSION = "matverse.bridge.v1.1"
 
@@ -145,6 +146,7 @@ class CausalEnvelope:
     evidence_refs: tuple[str, ...]
     epistemic_nature: EpistemicNature
     analytic_status: AnalyticStatus
+    metrology: Mapping[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -168,6 +170,7 @@ class CausalEnvelope:
             "evidence_refs": self.evidence_refs,
             "epistemic_nature": self.epistemic_nature.value,
             "analytic_status": self.analytic_status.value,
+            "metrology": _thaw_json(self.metrology) if self.metrology is not None else None,
             "protocol_version": PROTOCOL_VERSION,
         }
 
@@ -192,6 +195,7 @@ def build_envelope(
     timestamp: str | None = None,
     ttl_seconds: int = 3600,
     signature: str | None = None,
+    metrology: Mapping[str, Any] | MetrologicalTemporalState | None = None,
 ) -> CausalEnvelope:
     required = {
         "source": _require_nonempty_string("source", source),
@@ -211,6 +215,8 @@ def build_envelope(
     expires_at = (observed_time + timedelta(seconds=ttl_seconds)).isoformat()
     frozen_payload = _freeze_json(payload)
     canonical_payload = _thaw_json(frozen_payload)
+    normalized_metrology = normalize_metrology(metrology)
+    frozen_metrology = _freeze_json(normalized_metrology) if normalized_metrology is not None else None
 
     identity = {
         "protocol_version": PROTOCOL_VERSION,
@@ -224,6 +230,7 @@ def build_envelope(
         "evidence_refs": evidence_refs,
         "epistemic_nature": epistemic_nature.value,
         "analytic_status": analytic_status.value,
+        "metrology": normalized_metrology,
     }
     return CausalEnvelope(
         envelope_id=stable_hash(identity),
@@ -246,6 +253,7 @@ def build_envelope(
         evidence_refs=evidence_refs,
         epistemic_nature=epistemic_nature,
         analytic_status=analytic_status,
+        metrology=frozen_metrology,
     )
 
 
