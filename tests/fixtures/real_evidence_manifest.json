@@ -1,0 +1,110 @@
+{
+  "schema": "matverse.real-evidence-fixtures.v2",
+  "fixtures": [
+    {
+      "id": "zenodo-paper-03-mnb-html",
+      "representation": "SAVED_HTML",
+      "source_file": "19112289.html",
+      "expected": {
+        "citation_title": "MatVerse Paper 03: MNB - Substrato Mem-nano-Bits",
+        "citation_author": "Arêas, Mateus Alves",
+        "citation_doi": "10.5281/zenodo.19112289",
+        "canonical_url": "https://zenodo.org/records/19112289",
+        "orcid": "0009-0008-2973-4047"
+      },
+      "evidence_rule": "structured_html_metadata"
+    },
+    {
+      "id": "zenodo-paper-04-acoa-html",
+      "representation": "SAVED_HTML",
+      "source_file": "19112294.html",
+      "expected": {
+        "citation_title": "MatVerse Paper 04: ACOA - Autopoiese Antifragilidade",
+        "citation_author": "Arêas, Mateus Alves",
+        "citation_doi": "10.5281/zenodo.19112294",
+        "canonical_url": "https://zenodo.org/records/19112294",
+        "orcid": "0009-0008-2973-4047"
+      },
+      "evidence_rule": "structured_html_metadata"
+    },
+    {
+      "id": "orcid-snapshot-2026-06-20",
+      "representation": "SAVED_PDF",
+      "source_file": "Mateus Arêas (0009-0008-2973-4047) - ORCID(1).pdf",
+      "expected": {
+        "orcid": "0009-0008-2973-4047",
+        "captured_date": "2026-06-20"
+      },
+      "evidence_rule": "saved_pdf_snapshot"
+    },
+    {
+      "id": "authorea-o-organismo-snapshot",
+      "representation": "SAVED_PDF",
+      "source_file": "O ORGANISMO — A Consciência Distribuída _ Authorea.pdf",
+      "expected": {
+        "title": "O ORGANISMO — A Consciência Distribuída",
+        "publication_date": "2025-12-02",
+        "doi": "10.22541/au.176463806.67728089/v1"
+      },
+      "evidence_rule": "saved_pdf_snapshot"
+    },
+    {
+      "id": "hf-matversehub-snapshot",
+      "representation": "SAVED_PDF",
+      "source_file": "MatverseHub (MatVerse_Hub).pdf",
+      "expected": {
+        "orcid": "0009-0008-2973-4047",
+        "captured_date": "2026-06-20"
+      },
+      "evidence_rule": "saved_pdf_snapshot"
+    },
+    {
+      "id": "urano-osx-console-image",
+      "representation": "SCREENSHOT",
+      "source_file": "4aba2f46-72a2-4a8a-ada6-0c558f581823.png",
+      "model_generated": false,
+      "expected_visible": ["URANO OSX", "MatVerse Organism Console", "MNB Explorer", "Q-Gate", "Ledger", "Replay", "Witness", "Cassandra", "ACOA"],
+      "evidence_rule": "visual_observation_only"
+    },
+    {
+      "id": "matverse-entry-system-image",
+      "representation": "SCREENSHOT",
+      "source_file": "409e021b-93f4-46c0-986e-172d89dcac2f.png",
+      "model_generated": false,
+      "expected_visible": ["MATVERSE", "ENTRY SYSTEM V1.0", "CASSANDRA DISPONÍVEL", "DOMÍNIO ATIVO"],
+      "evidence_rule": "visual_observation_only"
+    },
+    {
+      "id": "plugin-options-image",
+      "representation": "SCREENSHOT",
+      "source_file": "cd6f2db3-7559-476e-8aea-d3aa9bf88c11.png",
+      "model_generated": false,
+      "expected_visible": ["Meus plugins", "GitHub", "Hugging Face"],
+      "evidence_rule": "ui_availability_not_account_authorization"
+    },
+    {
+      "id": "crossref-zenodo-suggestion-image",
+      "representation": "SCREENSHOT",
+      "source_file": "Screenshot 2026-06-20 01.53.39.png",
+      "model_generated": false,
+      "expected_visible": ["Crossref", "Zenodo"],
+      "evidence_rule": "ui_context_only_no_external_payload"
+    },
+    {
+      "id": "production-gate-v03-generated-report-image",
+      "representation": "GENERATED_IMAGE",
+      "source_file": "chart-1(2).png",
+      "model_generated": true,
+      "expected_visible": ["Production Gate v0.3", "PASS_LOCAL_PRODUCTION__HOLD_EXTERNAL_WITNESS", "M_global=0.7505", "M_local=0.8388"],
+      "evidence_rule": "generated_visual_not_independent"
+    },
+    {
+      "id": "omega-seed-genesis-image",
+      "representation": "GENERATED_IMAGE",
+      "source_file": "Implantação do SVCA Lab Genesis.png",
+      "model_generated": true,
+      "expected_visible": ["Ω-SEED Genesis Artifact Deployed", "GitHub", "Hugging Face", "Sepolia Blockchain", "Zenodo Archive"],
+      "evidence_rule": "not_independent_external_evidence"
+    }
+  ]
+}
