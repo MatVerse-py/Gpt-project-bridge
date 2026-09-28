@@ -1,0 +1,178 @@
+name: Executor transplant Sol-Astra-Sol v1
+
+on:
+  pull_request:
+    paths:
+      - "app/core.py"
+      - "app/openai_runtime.py"
+      - "app/organism_loop.py"
+      - "experiments/cross_runtime/contract.json"
+      - "experiments/executor_transplant/**"
+      - "tests/test_executor_transplant.py"
+      - "tests/test_blind_secret_proxy.py"
+      - ".github/workflows/executor-transplant-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime
+        run: pip install -r requirements.txt
+
+      - name: Verify frozen organism substrate
+        run: |
+          git diff --exit-code \
+            b421a7132f13eab7c73f46e7ed5a802c4db6b657 \
+            -- app/core.py app/organism_loop.py experiments/cross_runtime/contract.json
+
+      - name: Compile
+        run: python -m compileall -q app experiments/executor_transplant
+
+      - name: Run offline transplant, secret-plane, and provider regressions
+        run: |
+          pytest -q \
+            tests/test_openai_runtime.py \
+            tests/test_executor_transplant.py \
+            tests/test_blind_secret_proxy.py
+
+  live-transplant:
+    needs: offline-contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime
+        run: pip install -r requirements.txt
+
+      - name: Execute through process-isolated blind-secret handler
+        env:
+          PROVIDER_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          export MATVERSE_SECRET_REF="secret_ref://openai/matverse/executor-transplant"
+          export MATVERSE_OPENAI_BASE_URL="http://127.0.0.1:8787/v1"
+
+          # Missing provider secret remains an explicit non-execution HOLD.
+          # The transplant runner does not inspect OPENAI_API_KEY.
+          if [[ -z "${PROVIDER_OPENAI_API_KEY:-}" ]]; then
+            unset PROVIDER_OPENAI_API_KEY OPENAI_API_KEY || true
+            unset MATVERSE_OPENAI_CAPABILITY_TOKEN MATVERSE_PROXY_TOKEN || true
+            python -m experiments.executor_transplant.run \
+              --contract experiments/executor_transplant/contract.json \
+              --output evidence/executor-transplant-v1/EVIDENCE_PACK.json
+            exit 0
+          fi
+
+          CAPABILITY_TOKEN="$(python - <<'PY'
+          import secrets
+          print(secrets.token_urlsafe(48))
+          PY
+          )"
+          echo "::add-mask::${CAPABILITY_TOKEN}"
+
+          # Only the blind handler child receives the provider key.
+          # The transplant executor receives the short-lived capability instead.
+          OPENAI_API_KEY="${PROVIDER_OPENAI_API_KEY}" \
+          MATVERSE_PROXY_TOKEN="${CAPABILITY_TOKEN}" \
+          MATVERSE_PROXY_MAX_USAGE="3" \
+          MATVERSE_PROXY_TTL_SECONDS="600" \
+            python -m experiments.executor_transplant.blind_secret_proxy \
+              --host 127.0.0.1 --port 8787 \
+              >/tmp/matverse-blind-secret-proxy.log 2>&1 &
+          PROXY_PID=$!
+
+          cleanup() {
+            kill "${PROXY_PID}" 2>/dev/null || true
+            wait "${PROXY_PID}" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          # Remove raw provider secret from the shell environment before
+          # spawning the cognitive executor.
+          unset PROVIDER_OPENAI_API_KEY OPENAI_API_KEY
+          unset MATVERSE_PROXY_TOKEN
+          export MATVERSE_OPENAI_CAPABILITY_TOKEN="${CAPABILITY_TOKEN}"
+          unset CAPABILITY_TOKEN
+
+          PROXY_READY=0
+          for _ in $(seq 1 40); do
+            if curl --fail --silent --show-error \
+              "http://127.0.0.1:8787/healthz" \
+              >/tmp/matverse-secret-health.json; then
+              PROXY_READY=1
+              break
+            fi
+            sleep 0.25
+          done
+
+          if [[ "${PROXY_READY}" != "1" ]]; then
+            # Fail closed: no proxy means no capability is presented to a
+            # provider. Produce auditable HOLD rather than pretending execution.
+            unset MATVERSE_OPENAI_CAPABILITY_TOKEN
+          fi
+
+          python -m experiments.executor_transplant.run \
+            --contract experiments/executor_transplant/contract.json \
+            --output evidence/executor-transplant-v1/EVIDENCE_PACK.json
+
+      - name: Enforce promotion and secret boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path("evidence/executor-transplant-v1/EVIDENCE_PACK.json")
+          evidence = json.loads(p.read_text(encoding="utf-8"))
+          status = evidence["promotion"]["executor_substitution_invariance"]
+          allowed = {
+              "EXECUTOR_SUBSTITUTION_INVARIANCE_PASS",
+              "HOLD_NOT_EXECUTED",
+              "HOLD_PROVIDER_ACCESS",
+              "HOLD_SECRET_CAPABILITY",
+          }
+          secret_plane = evidence["secret_plane"]
+          if secret_plane["provider_secret_exposed_to_executor"] is not False:
+              raise SystemExit("provider-secret isolation invariant failed")
+          if evidence["secret_persisted"] is not False:
+              raise SystemExit("secret persistence invariant failed")
+          if evidence["capability_persisted"] is not False:
+              raise SystemExit("capability persistence invariant failed")
+
+          print(json.dumps({
+              "experiment_result": evidence["experiment_result"],
+              "promotion": status,
+              "secret_ref": secret_plane["secret_ref"],
+              "secret_plane_mode": secret_plane["mode"],
+              "provider_secret_exposed_to_executor":
+                  secret_plane["provider_secret_exposed_to_executor"],
+              "evidence_pack_hash": evidence["evidence_pack_hash"],
+          }, sort_keys=True))
+          if status not in allowed:
+              raise SystemExit(
+                  f"unexpected transplant result requiring review: {status}"
+              )
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: executor-transplant-v1-evidence
+          path: evidence/executor-transplant-v1/EVIDENCE_PACK.json
+          if-no-files-found: error
