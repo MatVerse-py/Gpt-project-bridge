@@ -46,6 +46,10 @@ ARXIV_ARCHIVES = {
 }
 SECRET_MARKERS = ("password", "passwd", "secret", "token", "api_key", "credential")
 PUBLICATION_SCHEMA = "matverse.publication-bridge.v1"
+EXTERNAL_EFFECT_GATE_MESSAGE = (
+    "external effect blocked: HumanApprovalV2 and ExecutionDelegation do not authorize arXiv login or submission; "
+    "a verified marxiv.external-effect-authorization.v1 gate is required and is not implemented"
+)
 
 
 class PublicationBridgeError(RuntimeError):
@@ -260,6 +264,15 @@ def _write_state(path: Path, state: PublicationState) -> None:
     path.write_text(canonical_json(state.model_dump(mode="json")) + "\n", encoding="utf-8")
 
 
+def _require_external_effect_authorization() -> None:
+    # HumanApprovalV2 proves approval of an exact package. ExecutionDelegation
+    # grants only local runtime capabilities. Neither object authorizes an
+    # external login, submission, final click, or publication side effect.
+    # This remains fail-closed until a separately verified
+    # marxiv.external-effect-authorization.v1 implementation exists.
+    raise PublicationBridgeError(EXTERNAL_EFFECT_GATE_MESSAGE)
+
+
 def prepare(manifest_path: Path, work_root: Path) -> PublicationState:
     manifest_path = manifest_path.resolve()
     manifest = _load_manifest(manifest_path)
@@ -344,6 +357,11 @@ def authorize_login(workdir: Path, *, allow_interactive_fallback: bool = False) 
     if bool(email) != bool(password):
         raise PublicationBridgeError("ARXIV_EMAIL and ARXIV_PASSWORD must be supplied together")
 
+    _require_external_effect_authorization()
+
+    # Unreachable until ExternalEffectAuthorization is implemented. Keeping the
+    # transport code below makes the future gate explicit without deleting the
+    # tested transport adapter.
     env = os.environ.copy()
     if email and password:
         env["PAPERPUSH_USERNAME"] = email
@@ -360,6 +378,10 @@ def authorize_login(workdir: Path, *, allow_interactive_fallback: bool = False) 
 
 
 def open_author_review(state_path: Path) -> PublicationState:
+    _require_external_effect_authorization()
+
+    # Unreachable until a separate external-effect authorization has been
+    # cryptographically verified.
     state_path = state_path.resolve()
     raw = json.loads(state_path.read_text(encoding="utf-8"))
     _assert_secret_free(raw)

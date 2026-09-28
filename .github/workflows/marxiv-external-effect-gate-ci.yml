@@ -1,0 +1,61 @@
+name: MARXIV External Effect Gate CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/marxiv_execution_delegation.py'
+      - 'app/marxiv_runtime_publisher.py'
+      - 'app/publication_bridge.py'
+      - 'tests/test_marxiv_external_effect_boundary.py'
+      - 'tests/test_publication_bridge.py'
+      - '.github/workflows/marxiv-external-effect-gate-ci.yml'
+  push:
+    branches: [marxiv/execution-delegation-v1]
+    paths:
+      - 'app/marxiv_execution_delegation.py'
+      - 'app/marxiv_runtime_publisher.py'
+      - 'app/publication_bridge.py'
+      - 'tests/test_marxiv_external_effect_boundary.py'
+      - 'tests/test_publication_bridge.py'
+      - '.github/workflows/marxiv-external-effect-gate-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  external-effect-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install runtime dependencies
+        run: pip install -r requirements.txt
+
+      - name: Compile effect-boundary modules
+        run: |
+          python -m py_compile app/publication_bridge.py
+          python -m py_compile app/marxiv_runtime_publisher.py
+
+      - name: Prove external effects are fail-closed
+        run: |
+          pytest -q \
+            tests/test_publication_bridge.py \
+            tests/test_marxiv_external_effect_boundary.py
+
+      - name: Assert boundary source contains no authorization backdoor
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path('app/publication_bridge.py').read_text(encoding='utf-8')
+          assert 'marxiv.external-effect-authorization.v1' in source
+          assert '_require_external_effect_authorization()' in source
+          assert 'HumanApprovalV2 and ExecutionDelegation do not authorize arXiv login or submission' in source
+          PY

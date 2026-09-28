@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest
@@ -12,6 +11,7 @@ from app.publication_bridge import (
     PublicationBridgeError,
     authorize_login,
     build_values,
+    open_author_review,
     prepare,
     verify,
 )
@@ -117,13 +117,16 @@ def test_prepare_and_verify_are_deterministic(tmp_path: Path, monkeypatch: pytes
     assert result_after_tamper["checks"]["manuscript_hash_match"] is False
 
 
-def test_login_credentials_are_environment_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_login_is_blocked_without_external_effect_authorization_even_with_credentials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     fake = _fake_paperpush(tmp_path)
     monkeypatch.setenv("PAPERPUSH_BIN", str(fake))
     monkeypatch.setenv("ARXIV_EMAIL", "author@example.org")
     monkeypatch.setenv("ARXIV_PASSWORD", "super-secret-fixture")
 
-    authorize_login(tmp_path)
+    with pytest.raises(PublicationBridgeError, match="external effect blocked"):
+        authorize_login(tmp_path)
 
     for path in tmp_path.rglob("*"):
         if path.is_file():
@@ -132,10 +135,17 @@ def test_login_credentials_are_environment_only(tmp_path: Path, monkeypatch: pyt
             assert "author@example.org" not in content
 
 
-def test_partial_credentials_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_partial_credentials_fail_closed_before_effect_gate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     fake = _fake_paperpush(tmp_path)
     monkeypatch.setenv("PAPERPUSH_BIN", str(fake))
     monkeypatch.setenv("ARXIV_EMAIL", "author@example.org")
     monkeypatch.delenv("ARXIV_PASSWORD", raising=False)
-    with pytest.raises(PublicationBridgeError):
+    with pytest.raises(PublicationBridgeError, match="must be supplied together"):
         authorize_login(tmp_path)
+
+
+def test_open_author_review_is_blocked_before_state_or_network(tmp_path: Path) -> None:
+    missing_state = tmp_path / "does-not-exist.json"
+    with pytest.raises(PublicationBridgeError, match="external effect blocked"):
+        open_author_review(missing_state)
+    assert missing_state.exists() is False
