@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpt-project-bridge-api"
+version = "1.2.0"
+description = "Sovereign project knowledge API with REST, FTS5 and MCP."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.128.2",
+  "uvicorn[standard]==0.48.0",
+  "pydantic==2.13.4",
+  "python-multipart==0.0.29",
+  "httpx==0.28.1",
+  "PyJWT[crypto]==2.13.0",
+  "pypdf==5.9.0",
+  "python-docx==1.2.0",
+  "openpyxl==3.1.5",
+  "python-pptx==1.0.2",
+]
+
+[project.optional-dependencies]
+test = ["pytest==9.0.2"]
+
+[project.scripts]
+projectvault = "projectvault.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["projectvault*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

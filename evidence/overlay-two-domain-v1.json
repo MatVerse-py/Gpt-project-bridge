@@ -1,0 +1,50 @@
+{
+  "protocol": "matverse.overlay-acceptance.v1",
+  "status": "PASS_LOCAL",
+  "scope": "two loopback services, separate databases and keys, one administrative host",
+  "contract_hash": "4b4cdc697de8fc2da4f3fb9323ad3837ff48cc2f959be0b904480adff70b0f48",
+  "checks": {
+    "signed_discovery_route_execution": true,
+    "network_partition_with_live_receiver": true,
+    "local_autonomy": true,
+    "durable_outbox_after_restart": true,
+    "reconnection_and_reconciliation": true,
+    "lost_response_retry_without_duplicate_commit": true,
+    "python_to_node_executor_substitution": true,
+    "identity_contract_and_output_preserved": true,
+    "bidirectional_execution": true
+  },
+  "external_independence": "NOT_TESTED",
+  "model_substitution": "NOT_TESTED; executor substitution is Python to Node.js",
+  "tested_at": "2026-09-09T05:46:51.235161+00:00",
+  "source_files": {
+    "app/overlay_domain.py": "f1153fcf2190674570d871c9f0ab4f4c6a26579280af4edfdb4b59f8c4d147b2",
+    "app/overlay_executor.mjs": "f4481fac94ede5fd01a4b54a041bc7c574f42d37e88a26de5bbbf7daf0f0b2c6",
+    "app/overlay_http.py": "366948d62e08a24a8e16d307e3331a2f192c52d9c83c96ebdf99e4b3c4484486",
+    "app/overlay_protocol.py": "2246b3b928608ccd51db8e65a26d7e3dbcc9422b2fd910d744c82241efcc33c5",
+    "app/federation_key_registry.py": "dd27a0f7d307b1e551f0c2bd64981e320cacf53db18ef2e907f7fc913c4fb392",
+    "scripts/run_overlay_acceptance.py": "bf006fafe48fb182371ee24c694a21a57d246375f99acba20f23ba5bd7b5747d",
+    "scripts/overlay.py": "d3c4f046d57e6574d2c8a356d794d393c38498da2b1862a0b34a43eb72fb0ec6"
+  },
+  "input_sha256": "fcae1ccbd7440bb3414c8df2ca0b21454bd2d13bf8bbe06f35436b3f4066a267",
+  "executor_bindings": [
+    {
+      "backend": "python",
+      "contract_hash": "4b4cdc697de8fc2da4f3fb9323ad3837ff48cc2f959be0b904480adff70b0f48",
+      "runtime_sha256": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7",
+      "runtime_version": "3.12.14",
+      "source_sha256": "2246b3b928608ccd51db8e65a26d7e3dbcc9422b2fd910d744c82241efcc33c5"
+    },
+    {
+      "backend": "node",
+      "contract_hash": "4b4cdc697de8fc2da4f3fb9323ad3837ff48cc2f959be0b904480adff70b0f48",
+      "runtime_sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+      "runtime_version": "v24.19.0",
+      "source_sha256": "f4481fac94ede5fd01a4b54a041bc7c574f42d37e88a26de5bbbf7daf0f0b2c6"
+    }
+  ],
+  "result_counts": {
+    "domain-a": 2,
+    "domain-b": 4
+  }
+}
