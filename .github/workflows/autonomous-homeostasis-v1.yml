@@ -1,0 +1,36 @@
+name: autonomous-homeostasis-v1
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'experiments/autonomous_homeostasis_v1.py'
+      - '.github/workflows/autonomous-homeostasis-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  autonomous-homeostasis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Regression tests
+        run: pytest -q tests/test_organism_loop.py tests/test_constitutional_dependency_contract.py
+      - name: Run autonomous homeostasis experiment
+        run: PYTHONPATH=. python experiments/autonomous_homeostasis_v1.py
+      - name: Upload experiment evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: autonomous-homeostasis-v1
+          path: autonomous-homeostasis-v1.json
+          if-no-files-found: error
