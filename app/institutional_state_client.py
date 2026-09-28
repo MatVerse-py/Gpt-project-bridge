@@ -4,12 +4,13 @@ import json
 import os
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 
 _STATE_URL_ENV = "MATVERSE_INSTITUTIONAL_STATE_URL"
 _STATE_TIMEOUT_ENV = "MATVERSE_INSTITUTIONAL_STATE_TIMEOUT_SECONDS"
+_INTERNAL_STATE_HOST = "state.matverse.internal"
 
 
 class InstitutionalStateUnavailable(RuntimeError):
@@ -31,9 +32,16 @@ def _base_url() -> str:
     value = os.environ.get(_STATE_URL_ENV, "").strip().rstrip("/")
     if not value:
         raise InstitutionalStateUnavailable(f"{_STATE_URL_ENV} is not configured")
-    if not (value.startswith("http://") or value.startswith("https://")):
-        raise InstitutionalStateUnavailable(f"{_STATE_URL_ENV} must use http:// or https://")
-    return value
+    parsed = urlparse(value)
+    if parsed.username or parsed.password or not parsed.hostname:
+        raise InstitutionalStateUnavailable(f"{_STATE_URL_ENV} must be a canonical service URL without userinfo")
+    if parsed.scheme == "https":
+        return value
+    if parsed.scheme == "http" and parsed.hostname == _INTERNAL_STATE_HOST:
+        return value
+    raise InstitutionalStateUnavailable(
+        f"{_STATE_URL_ENV} must use authenticated https:// transport; plain http:// is allowed only for {_INTERNAL_STATE_HOST} in-process routing"
+    )
 
 
 def _timeout() -> float:
@@ -77,6 +85,12 @@ def _request_json(method: str, path: str, *, payload: Any | None = None, query: 
         raise InstitutionalStateUnavailable("institutional state service returned invalid JSON") from exc
 
 
+def _object_response(result: Any, operation: str) -> dict[str, Any]:
+    if not isinstance(result, dict):
+        raise InstitutionalStateUnavailable(f"{operation} response must be an object")
+    return result
+
+
 def consume_auth_nonce(principal_id: str, nonce: str, expires_at: int) -> bool:
     if not remote_state_enabled():
         from .storage import consume_auth_nonce as consume_local_auth_nonce
@@ -90,6 +104,130 @@ def consume_auth_nonce(principal_id: str, nonce: str, expires_at: int) -> bool:
     if not isinstance(result, dict) or not isinstance(result.get("consumed"), bool):
         raise InstitutionalStateUnavailable("nonce response is missing consumed boolean")
     return bool(result["consumed"])
+
+
+def fetch_remote_auth_credential(principal_id: str, key_id: str) -> dict[str, Any] | None:
+    path = f"/v1/auth/credentials/{quote(principal_id, safe='')}/{quote(key_id, safe='')}"
+    try:
+        result = _request_json("GET", path)
+    except InstitutionalStateRejected as exc:
+        if exc.status == 404:
+            return None
+        raise
+    result = _object_response(result, "auth credential")
+    principal = result.get("principal")
+    key = result.get("key")
+    if not isinstance(principal, dict) or not isinstance(key, dict):
+        raise InstitutionalStateUnavailable("auth credential response is missing principal/key objects")
+    return result
+
+
+def fetch_remote_principal(principal_id: str) -> dict[str, Any] | None:
+    path = f"/v1/auth/principals/{quote(principal_id, safe='')}"
+    try:
+        result = _request_json("GET", path)
+    except InstitutionalStateRejected as exc:
+        if exc.status == 404:
+            return None
+        raise
+    result = _object_response(result, "principal lookup")
+    if not isinstance(result.get("principal"), dict) or not isinstance(result.get("keys"), list):
+        raise InstitutionalStateUnavailable("principal lookup response is invalid")
+    return result
+
+
+def register_remote_principal(
+    *,
+    principal_id: str,
+    capabilities: list[str],
+    public_key_hex: str,
+    valid_from: int,
+    valid_until: int,
+    actor_id: str,
+) -> dict[str, Any]:
+    path = f"/v1/auth/principals/{quote(principal_id, safe='')}"
+    return _object_response(
+        _request_json(
+            "POST",
+            path,
+            payload={
+                "capabilities": capabilities,
+                "public_key_hex": public_key_hex,
+                "valid_from": valid_from,
+                "valid_until": valid_until,
+                "actor_id": actor_id,
+            },
+        ),
+        "principal registration",
+    )
+
+
+def rotate_remote_principal_key(
+    *,
+    principal_id: str,
+    previous_key_id: str,
+    public_key_hex: str,
+    valid_from: int,
+    valid_until: int,
+    actor_id: str,
+) -> dict[str, Any]:
+    path = (
+        f"/v1/auth/principals/{quote(principal_id, safe='')}/keys/"
+        f"{quote(previous_key_id, safe='')}/rotate"
+    )
+    return _object_response(
+        _request_json(
+            "POST",
+            path,
+            payload={
+                "public_key_hex": public_key_hex,
+                "valid_from": valid_from,
+                "valid_until": valid_until,
+                "actor_id": actor_id,
+            },
+        ),
+        "principal key rotation",
+    )
+
+
+def revoke_remote_principal_key(
+    *,
+    principal_id: str,
+    key_id: str,
+    effective_at: int,
+    reason: str,
+    actor_id: str,
+) -> dict[str, Any]:
+    path = (
+        f"/v1/auth/principals/{quote(principal_id, safe='')}/keys/"
+        f"{quote(key_id, safe='')}/revoke"
+    )
+    return _object_response(
+        _request_json(
+            "POST",
+            path,
+            payload={"effective_at": effective_at, "reason": reason, "actor_id": actor_id},
+        ),
+        "principal key revocation",
+    )
+
+
+def revoke_remote_principal(
+    *,
+    principal_id: str,
+    effective_at: int,
+    reason: str,
+    actor_id: str,
+) -> dict[str, Any]:
+    path = f"/v1/auth/principals/{quote(principal_id, safe='')}/revoke"
+    return _object_response(
+        _request_json(
+            "POST",
+            path,
+            payload={"effective_at": effective_at, "reason": reason, "actor_id": actor_id},
+        ),
+        "principal revocation",
+    )
 
 
 def fetch_state_snapshot() -> dict[str, Any]:

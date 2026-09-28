@@ -23,6 +23,7 @@ PRINCIPALS = {
 def clean_db(tmp_path, monkeypatch):
     db = tmp_path / "matverse-test.db"
     monkeypatch.setattr(storage, "DB_PATH", db)
+    monkeypatch.setenv("MATVERSE_AUTH_MODE", "legacy-hmac")
     monkeypatch.setenv("MATVERSE_PRINCIPALS_JSON", json.dumps(PRINCIPALS))
     yield
 
