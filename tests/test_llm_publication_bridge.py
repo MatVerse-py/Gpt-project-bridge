@@ -29,7 +29,7 @@ def bridge() -> LLMPublicationBridge:
 
 def test_registry_contains_named_llm_capabilities() -> None:
     inventory = CapabilityRegistry(canonical_matverse_capabilities()).public_inventory()
-    assert {item["capability_id"] for item in inventory} == {"gpt", "claude-code", "manus", "minimax", "local"}
+    assert {item["capability_id"] for item in inventory} == {"gpt", "claude", "claude-code", "kilo", "base44", "manus", "minimax", "local"}
 
 
 def test_llm_can_propose_but_not_smuggle_authority() -> None:

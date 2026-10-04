@@ -37,6 +37,10 @@ from .storage import (
 )
 
 app = FastAPI(title="MATVERSE_REAL_v1", version="1.2.0-pass-hardening")
+from .agent_router import router as agent_router
+app.include_router(agent_router)
+from .memory_router import router as memory_router
+app.include_router(memory_router)
 SHA256_PATTERN = r"^[0-9a-fA-F]{64}$"
 PARTICIPANT_PATTERN = r"^[A-Za-z0-9._:-]{1,128}$"
 
