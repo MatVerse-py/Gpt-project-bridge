@@ -110,7 +110,7 @@ def test_mcp_contract(tmp_path: Path) -> None:
 
     listed = client.post("/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
     names = [tool["name"] for tool in listed.json()["result"]["tools"]]
-    assert names == ["search", "fetch", "list_projects", "list_ingestions", "list_unassigned"]
+    assert names == ["search", "fetch", "list_projects", "list_ingestions", "list_unassigned", "resolve_recoverability"]
 
     searched = client.post("/mcp", json={"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "Kalman"}}})
     envelope = json.loads(searched.json()["result"]["content"][0]["text"])
@@ -127,6 +127,58 @@ def test_mcp_contract(tmp_path: Path) -> None:
     unassigned = client.post("/mcp", json={"jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": {"name": "list_unassigned", "arguments": {"limit": 1}}})
     unassigned_result = json.loads(unassigned.json()["result"]["content"][0]["text"])
     assert unassigned_result["documents"][0]["document_id"] == "chat:conv-2"
+
+
+    recoverable = client.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "tools/call",
+            "params": {
+                "name": "resolve_recoverability",
+                "arguments": {"reference": "https://chatgpt.com/g/example/c/conv-1"},
+            },
+        },
+    )
+    recoverable_result = json.loads(recoverable.json()["result"]["content"][0]["text"])
+    assert recoverable_result["canonical_id"] == "chat:conv-1"
+    assert recoverable_result["status"] == "RECOVERABLE"
+    assert recoverable_result["recoverable"] is True
+    assert recoverable_result["proofs"]["ingestion"]["passed"] is True
+    assert recoverable_result["proofs"]["identity"]["passed"] is True
+    assert recoverable_result["proofs"]["authorization"]["passed"] is True
+    assert recoverable_result["next_action"] == "fetch"
+
+    unresolved = client.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "id": 8,
+            "method": "tools/call",
+            "params": {"name": "resolve_recoverability", "arguments": {"reference": "chat:conv-2"}},
+        },
+    )
+    unresolved_result = json.loads(unresolved.json()["result"]["content"][0]["text"])
+    assert unresolved_result["status"] == "IDENTITY_UNRESOLVED"
+    assert unresolved_result["recoverable"] is False
+    assert unresolved_result["proofs"]["ingestion"]["passed"] is True
+    assert unresolved_result["proofs"]["identity"]["passed"] is False
+    assert unresolved_result["next_action"] == "owner_assign_project"
+
+    missing = client.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "id": 9,
+            "method": "tools/call",
+            "params": {"name": "resolve_recoverability", "arguments": {"reference": "chat:not-present"}},
+        },
+    )
+    missing_result = json.loads(missing.json()["result"]["content"][0]["text"])
+    assert missing_result["status"] == "NOT_INGESTED"
+    assert missing_result["recoverable"] is False
+    assert missing_result["next_action"] == "ingest_or_search"
 
 
 def test_origin_guard(tmp_path: Path) -> None:
