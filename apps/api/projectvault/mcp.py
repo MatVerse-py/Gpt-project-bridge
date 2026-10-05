@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
@@ -15,6 +16,24 @@ from .search import KnowledgeService
 
 SUPPORTED_PROTOCOLS = {"2025-03-26", "2025-06-18", "2025-11-25"}
 DEFAULT_PROTOCOL = "2025-06-18"
+RECOVERABILITY_PROTOCOL = "matverse.recoverability.v1"
+
+
+def normalize_object_reference(reference: str) -> str:
+    value = reference.strip()
+    if value.startswith("chat:"):
+        return value
+
+    parsed = urlparse(value)
+    if parsed.scheme and parsed.netloc:
+        parts = [part for part in parsed.path.split("/") if part]
+        if "c" in parts:
+            index = parts.index("c")
+            if index + 1 < len(parts) and parts[index + 1]:
+                return f"chat:{parts[index + 1]}"
+
+    return value
+
 
 
 def rpc_result(request_id: Any, result: Any) -> JSONResponse:
@@ -104,6 +123,19 @@ def tools(settings: Settings) -> list[dict[str, Any]]:
             "securitySchemes": security,
         },
         {
+            "name": "resolve_recoverability",
+            "title": "Resolve object recoverability",
+            "description": "Answer whether an object is ingested, canonically identified, and authorized for retrieval. Accepts a Project Vault ID or a ChatGPT conversation URL. Returns proofs and status only; it does not return the object content.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"reference": {"type": "string", "minLength": 1}},
+                "required": ["reference"],
+                "additionalProperties": False,
+            },
+            "annotations": annotations,
+            "securitySchemes": security,
+        },
+        {
             "name": "list_partitions",
             "title": "List owner-authorized information partitions",
             "description": "Enumerate the read-only partitions explicitly registered in the Owner Access Fabric, their capabilities, provider boundary, and current authorization/availability status. This does not read partition content.",
@@ -163,7 +195,7 @@ def tools(settings: Settings) -> list[dict[str, Any]]:
         },
     ]
     if settings.partition_registry_path is None:
-        return base_tools[:5]
+        return base_tools[:6]
     return base_tools
 
 
@@ -279,6 +311,100 @@ class MCPHandler:
             result = {"documents": documents}
             self.db.audit(principal.subject, "list_unassigned", None, str(request_id), {"result_count": len(documents)})
             return rpc_result(request_id, {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}], "isError": False})
+        if name == "resolve_recoverability":
+            reference = arguments.get("reference")
+            if not isinstance(reference, str) or not reference.strip():
+                raise ValueError("resolve_recoverability requires a non-empty reference string")
+
+            document_id = normalize_object_reference(reference)
+            row = self.db.fetch(document_id)
+            if row is None:
+                result = {
+                    "protocol": RECOVERABILITY_PROTOCOL,
+                    "reference": reference,
+                    "canonical_id": document_id,
+                    "recoverable": False,
+                    "status": "NOT_INGESTED",
+                    "proofs": {
+                        "ingestion": {"passed": False},
+                        "identity": {"passed": False},
+                        "authorization": {"passed": False, "reason": "object_not_ingested"},
+                    },
+                    "next_action": "ingest_or_search",
+                }
+            else:
+                access_report = self.access.explain_access(principal, "projectvault")
+                access_entry = access_report["partitions"][0]
+                access_status = str(access_entry["access_status"])
+                authorized = access_status == "GRANTED"
+
+                source_hash = str(row["source_hash"] or "")
+                ingested_at = str(row["ingested_at"] or "")
+                ingestion_passed = bool(source_hash and ingested_at)
+
+                project_id = str(row["project_id"] or "")
+                attribution_basis = str(row["attribution_basis"] or "")
+                identity_passed = (
+                    project_id != "unassigned"
+                    and bool(project_id)
+                    and attribution_basis not in {"", "no_explicit_project_metadata"}
+                )
+
+                if not ingestion_passed:
+                    status = "INGESTION_UNVERIFIED"
+                    next_action = "reingest_with_provenance"
+                elif not identity_passed:
+                    status = "IDENTITY_UNRESOLVED"
+                    next_action = "owner_assign_project"
+                elif not authorized:
+                    status = "ACCESS_UNAVAILABLE" if access_status == "UNAVAILABLE" else "ACCESS_DENIED"
+                    next_action = "resolve_authorization"
+                else:
+                    status = "RECOVERABLE"
+                    next_action = "fetch"
+
+                result = {
+                    "protocol": RECOVERABILITY_PROTOCOL,
+                    "reference": reference,
+                    "canonical_id": document_id,
+                    "recoverable": status == "RECOVERABLE",
+                    "status": status,
+                    "proofs": {
+                        "ingestion": {
+                            "passed": ingestion_passed,
+                            "source_hash": source_hash if ingestion_passed else None,
+                            "ingested_at": ingested_at if ingestion_passed else None,
+                        },
+                        "identity": {
+                            "passed": identity_passed,
+                            "document_id": str(row["document_id"]),
+                            "conversation_id": str(row["conversation_id"]),
+                            "project_id": project_id,
+                            "project_name": str(row["project_name"] or ""),
+                            "attribution_basis": attribution_basis,
+                        },
+                        "authorization": {
+                            "passed": authorized,
+                            "principal": principal.subject,
+                            "partition_id": "projectvault",
+                            "access_status": access_status,
+                            "reason": access_entry.get("reason"),
+                        },
+                    },
+                    "next_action": next_action,
+                }
+
+            self.db.audit(
+                principal.subject,
+                "resolve_recoverability",
+                document_id,
+                str(request_id),
+                {"status": result["status"], "recoverable": result["recoverable"]},
+            )
+            return rpc_result(
+                request_id,
+                {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}], "isError": False},
+            )
         if name == "list_partitions":
             result = self.access.list_partitions(principal)
             self.db.audit(
