@@ -60,7 +60,8 @@ def test_oauth_state_is_signed_one_time_and_replay_safe(tmp_path: Path) -> None:
 
     token_store_2 = store(tmp_path / "tamper")
     manager_2 = ZenodoOAuthState(token_store_2, "y" * 48)
-    tampered = manager_2.issue()[:-1] + ("A" if manager_2.issue()[-1] != "A" else "B")
+    original = manager_2.issue()
+    tampered = original[:-1] + ("A" if original[-1] != "A" else "B")
     with pytest.raises(ZenodoAuthError):
         manager_2.validate_once(tampered)
 
