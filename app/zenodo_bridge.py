@@ -332,6 +332,11 @@ class ZenodoOAuthClient:
         payload = response.json()
         if not payload.get("access_token"):
             raise ZenodoAuthError("Zenodo OAuth response did not include an access token")
+        # OAuth 2.0 permits the server to omit "scope" when it is identical to
+        # the requested scope. Preserve the effective scope without guessing
+        # when Zenodo explicitly returns a reduced/different scope.
+        if not payload.get("scope"):
+            payload["scope"] = " ".join(self.config.scopes)
         return payload
 
 
