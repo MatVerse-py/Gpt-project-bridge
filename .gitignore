@@ -7,6 +7,7 @@ __pycache__/
 # MatVerse Publication Bridge local state
 .publication/
 .marxiv/
+.data/
 playwright/.auth/
 auth.json
 *.sub
