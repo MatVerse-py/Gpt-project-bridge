@@ -14,9 +14,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from app.qtn_watch import DEFAULT_THRESHOLD, FETCHERS, collect, evaluate, render_markdown
+from app.qtn_watch import DEFAULT_THRESHOLD, FETCHERS, SourceItem, _digest, collect, evaluate, render_markdown
 
 _DIGEST_MARKER = re.compile(r"qtn-watch:([0-9a-f]{64})")
+_URL_MARKER = re.compile(r"(?m)^- URL:\s*(https?://[^\s]+)\s*$")
 
 
 def _github_headers(token: str) -> dict[str, str]:
@@ -44,7 +45,14 @@ def _reported_digests(client: httpx.Client, repo: str, token: str) -> set[str]:
             raise RuntimeError("GitHub issues API returned a non-list payload")
         for row in rows:
             body = row.get("body") or ""
-            reported.update(_DIGEST_MARKER.findall(body))
+            legacy_markers = _DIGEST_MARKER.findall(body)
+            if not legacy_markers:
+                continue
+            reported.update(legacy_markers)
+            # Backfill URL-based identities from existing title-dependent alerts.
+            # Do not republish old findings after changing the digest algorithm.
+            for url in _URL_MARKER.findall(body):
+                reported.add(_digest(SourceItem("legacy", "", url)))
         if len(rows) < 100:
             break
     return reported

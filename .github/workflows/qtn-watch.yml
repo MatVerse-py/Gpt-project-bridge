@@ -8,6 +8,7 @@ on:
       - "tests/test_qtn_watch.py"
       - ".github/workflows/qtn-watch.yml"
       - "docs/QTN_WATCH_V1.md"
+      - "docs/QTN_ISSUE94_DELTA_2026-10-10.md"
   workflow_dispatch:
     inputs:
       threshold:
