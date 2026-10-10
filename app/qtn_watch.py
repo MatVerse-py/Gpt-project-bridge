@@ -246,24 +246,29 @@ def classify_qtn(item: SourceItem) -> tuple[str, ...]:
     return tuple(matches)
 
 
-def _is_standardization(item: SourceItem, text: str) -> bool:
-    """Only authoritative final-standard URLs qualify, never paper rhetoric."""
-    del text
+def _is_rfc_publication(item: SourceItem) -> bool:
+    """An RFC may be Informational/Experimental, not necessarily Standards Track."""
     parsed = urlsplit(item.url)
     host = (parsed.hostname or "").lower()
     path = parsed.path.rstrip("/").lower()
-    if item.source == "IETF":
-        return (
-            (host == "datatracker.ietf.org" and re.fullmatch(r"/doc/(?:html/)?rfc\d+", path) is not None)
-            or (host == "rfc-editor.org" and re.fullmatch(r"/rfc/rfc\d+(?:\.(?:txt|html))?", path) is not None)
-        )
-    if item.source == "NIST":
-        return (
-            (host == "csrc.nist.gov" and re.fullmatch(r"/pubs/fips/\d+/final", path) is not None)
-            or (host == "nvlpubs.nist.gov" and re.fullmatch(r"/nistpubs/fips/nist\.fips\.\d+\.pdf", path) is not None)
-        )
-    return False
+    return item.source == "IETF" and (
+        (host == "datatracker.ietf.org" and re.fullmatch(r"/doc/(?:html/)?rfc\d+", path) is not None)
+        or (host in {"rfc-editor.org", "www.rfc-editor.org"} and re.fullmatch(r"/rfc/rfc\d+(?:\.(?:txt|html))?", path) is not None)
+    )
 
+
+def _is_standardization(item: SourceItem, text: str) -> bool:
+    """An authenticated final NIST FIPS URL supports a standards label."""
+    del text
+    if item.source != "NIST":
+        return False
+    parsed = urlsplit(item.url)
+    host = (parsed.hostname or "").lower()
+    path = parsed.path.rstrip("/").lower()
+    return (
+        (host == "csrc.nist.gov" and re.fullmatch(r"/pubs/fips/\d+/final", path) is not None)
+        or (host == "nvlpubs.nist.gov" and re.fullmatch(r"/nistpubs/fips/nist\.fips\.\d+\.pdf", path) is not None)
+    )
 
 def _is_standards_draft(item: SourceItem) -> bool:
     parsed = urlsplit(item.url)
@@ -290,6 +295,8 @@ def impact_type(item: SourceItem) -> str:
     text = f"{item.title} {item.summary} {item.url}".lower()
     if _is_standardization(item, text):
         return "STANDARDIZATION"
+    if _is_rfc_publication(item):
+        return "RFC_PUBLICATION"
     if _is_standards_draft(item):
         return "STANDARDIZATION_DRAFT"
     if _is_external_demonstration(item, text):
@@ -307,6 +314,8 @@ def recommendation_for(item: SourceItem) -> str:
     impact = impact_type(item)
     if impact == "STANDARDIZATION":
         return "REBASE_AGAINST_EXTERNAL_STANDARD"
+    if impact == "RFC_PUBLICATION":
+        return "VERIFY_RFC_STATUS_BEFORE_REBASE"
     if impact == "STANDARDIZATION_DRAFT":
         return "TRACK_DRAFT_AND_TEST_COMPATIBILITY"
     if impact == "EXTERNAL_DEMONSTRATION":
@@ -320,7 +329,7 @@ def recommendation_for(item: SourceItem) -> str:
 
 def _has_high_impact_signal(item: SourceItem, text: str) -> bool:
     title_text = f"{item.title} {item.url}".lower()
-    if _is_standardization(item, text) or _is_standards_draft(item) or _is_external_demonstration(item, text):
+    if _is_standardization(item, text) or _is_rfc_publication(item) or _is_standards_draft(item) or _is_external_demonstration(item, text):
         return True
     if any(term in title_text for term in ("breakthrough", "record-breaking", "world record", "final award")):
         return True
