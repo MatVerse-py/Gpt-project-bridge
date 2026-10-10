@@ -47,17 +47,18 @@ The score is a triage score, not scientific confidence and not proof of novelty.
 ## Action classes
 
 - `REBASE_AGAINST_EXTERNAL_STANDARD`
+- `VERIFY_RFC_STATUS_BEFORE_REBASE`
 - `TRACK_DRAFT_AND_TEST_COMPATIBILITY`
 - `ADD_EXTERNAL_BASELINE_AND_RETEST`
 - `REVIEW_ENGINEERING_READINESS`
 - `UPDATE_CRYPTOGRAPHIC_BASELINE`
 - `REVIEW_FOR_DELTA_AND_BENCHMARK`
 
-The `STANDARDIZATION` label requires an authoritative **final** RFC or final NIST FIPS URL; titles, abstracts and claimed standardization are insufficient. IETF Internet-Drafts are `STANDARDIZATION_DRAFT`, requiring monitoring and compatibility tests, not immediate rebasing. arXiv PQC/QKD papers remain research unless directly describing an external demonstration. Only explicit authority-sourced migration items receive the `SECURITY_MIGRATION` label.
+The `STANDARDIZATION` label requires an authoritative final NIST FIPS URL. Published IETF RFCs receive `RFC_PUBLICATION` because an RFC can be Informational or Experimental, and the watch does not independently verify its Standards Track status. Titles, abstracts and claimed standardization are insufficient. IETF Internet-Drafts are `STANDARDIZATION_DRAFT`, requiring monitoring and compatibility tests, not immediate rebasing. arXiv PQC/QKD papers remain research unless directly describing an external demonstration. Only explicit authority-sourced migration items receive the `SECURITY_MIGRATION` label.
 
 ## Deduplication
 
-Each source item receives a deterministic SHA-256 digest over its canonical bibliographic URL. The canonicalizer normalizes HTTP/HTTPS, arXiv mirror and version identifiers, DOI host and case, tracking parameters, fragments and query order. Non-tracking query parameters retain identity. Title edits do not generate new papers. Existing issues are scanned in bounded pages for the marker:
+Each source item receives a deterministic SHA-256 digest over its canonical bibliographic URL. The canonicalizer normalizes HTTP/HTTPS, arXiv mirror and version identifiers, DOI host and case, tracking parameters, fragments and query order. Non-tracking query parameters retain identity. Title edits do not generate new papers. Among records sharing a canonical URL, the highest-scoring candidate is kept so an early sparse mirror cannot hide a later informative entry. Existing issues are scanned in bounded pages for the marker:
 
 `<!-- qtn-watch:<digest> -->`
 
