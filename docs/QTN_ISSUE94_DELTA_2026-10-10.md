@@ -70,8 +70,9 @@ by this assessment.**
 
 This branch fixes two concrete watcher defects:
 
-1. `STANDARDIZATION` now requires an authoritative final RFC or final NIST
-   FIPS document URL. IETF Internet-Drafts are
+1. `STANDARDIZATION` now requires an authoritative final NIST FIPS
+   document URL. Published RFCs are `RFC_PUBLICATION` until Standards
+   Track status is independently verified. IETF Internet-Drafts are
    `STANDARDIZATION_DRAFT`; arXiv papers about standards are research.
    Research on QKD does not automatically equal security migration.
 2. Deduplication uses normalized bibliographic URL identity, including
