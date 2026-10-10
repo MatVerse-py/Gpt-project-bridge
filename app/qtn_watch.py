@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import html
-import json
 import os
 import re
 from dataclasses import asdict, dataclass
@@ -157,7 +156,7 @@ def _canonical_url(url: str) -> str:
     if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
         return raw
     host = parsed.hostname.lower()
-    if host.startswith("www."):
+    if host in {"www.arxiv.org", "www.doi.org", "www.dx.doi.org"}:
         host = host[4:]
     if host in {"export.arxiv.org", "arxiv.org"}:
         host = "arxiv.org"
@@ -182,6 +181,8 @@ def _canonical_url(url: str) -> str:
             and key.lower() not in {"fbclid", "gclid", "mc_cid", "mc_eid"}
         )
     )
+    if host == "doi.org":
+        path = path.lower()
     if host in {"arxiv.org", "doi.org"}:
         query = ""
     return urlunsplit(("https", host, path, query, ""))
@@ -344,6 +345,7 @@ def score_item(item: SourceItem, qtn_ids: tuple[str, ...]) -> float:
             "qkd",
             "ml-kem",
             "ml-dsa",
+            "post-quantum",
             "teleport",
             "error correction",
             "quantum memory",
