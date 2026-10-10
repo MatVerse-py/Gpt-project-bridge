@@ -171,7 +171,7 @@ def _canonical_url(url: str) -> str:
         host = f"{host}:{port}"
     path = parsed.path.rstrip("/") or "/"
     if host == "arxiv.org":
-        arxiv = re.fullmatch(r"/(?:abs|pdf)/(\\d{4}\\.\\d{4,5})(?:v\\d+)?(?:\\.pdf)?", path, re.I)
+        arxiv = re.fullmatch(r"/(?:abs|pdf)/(\d{4}\.\d{4,5})(?:v\d+)?(?:\.pdf)?", path, re.I)
         if arxiv:
             path = f"/abs/{arxiv.group(1)}"
     query = urlencode(
@@ -253,13 +253,13 @@ def _is_standardization(item: SourceItem, text: str) -> bool:
     path = parsed.path.rstrip("/").lower()
     if item.source == "IETF":
         return (
-            (host == "datatracker.ietf.org" and re.fullmatch(r"/doc/(?:html/)?rfc\\d+", path) is not None)
-            or (host == "rfc-editor.org" and re.fullmatch(r"/rfc/rfc\\d+(?:\\.(?:txt|html))?", path) is not None)
+            (host == "datatracker.ietf.org" and re.fullmatch(r"/doc/(?:html/)?rfc\d+", path) is not None)
+            or (host == "rfc-editor.org" and re.fullmatch(r"/rfc/rfc\d+(?:\.(?:txt|html))?", path) is not None)
         )
     if item.source == "NIST":
         return (
-            (host == "csrc.nist.gov" and re.fullmatch(r"/pubs/fips/\\d+/final", path) is not None)
-            or (host == "nvlpubs.nist.gov" and re.fullmatch(r"/nistpubs/fips/nist\\.fips\\.\\d+\\.pdf", path) is not None)
+            (host == "csrc.nist.gov" and re.fullmatch(r"/pubs/fips/\d+/final", path) is not None)
+            or (host == "nvlpubs.nist.gov" and re.fullmatch(r"/nistpubs/fips/nist\.fips\.\d+\.pdf", path) is not None)
         )
     return False
 
