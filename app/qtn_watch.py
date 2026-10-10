@@ -357,15 +357,19 @@ def score_item(item: SourceItem, qtn_ids: tuple[str, ...]) -> float:
 
 
 def evaluate(items: Iterable[SourceItem], threshold: float = DEFAULT_THRESHOLD) -> list[Finding]:
-    findings: list[Finding] = []
-    seen_urls: set[str] = set()
+    # Choose the most informative record for each work, independent of arrival order.
+    # A sparse HTTP mirror must not suppress a later richer HTTPS/arXiv entry.
+    best_by_url: dict[str, tuple[SourceItem, tuple[str, ...], float]] = {}
     for item in items:
-        canonical_url = _canonical_url(item.url)
-        if canonical_url in seen_urls:
-            continue
-        seen_urls.add(canonical_url)
+        key = _canonical_url(item.url)
         qtn_ids = classify_qtn(item)
         score = score_item(item, qtn_ids)
+        current = best_by_url.get(key)
+        if current is None or (score, len(item.summary)) > (current[2], len(current[0].summary)):
+            best_by_url[key] = (item, qtn_ids, score)
+
+    findings: list[Finding] = []
+    for item, qtn_ids, score in best_by_url.values():
         if score < threshold:
             continue
         findings.append(
