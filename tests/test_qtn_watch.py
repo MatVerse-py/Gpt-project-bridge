@@ -33,7 +33,7 @@ def test_qtn_routing_and_resource_allocation_mapping() -> None:
     assert {"QTN-001", "QTN-002", "QTN-012", "QTN-013", "QTN-027"}.issubset(mapped)
 
 
-def test_pqc_standardization_is_not_matverse_validation() -> None:
+def test_rfc_publication_not_misreported_as_final_standard_or_validation() -> None:
     item = SourceItem(
         source="IETF",
         title="RFC 10024 Post-Quantum Traditional Hybrid Key Agreement Mechanisms for TLS 1.3",
@@ -43,8 +43,8 @@ def test_pqc_standardization_is_not_matverse_validation() -> None:
     assert len(findings) == 1
     finding = findings[0]
     assert "QTN-011" in finding.qtn_ids
-    assert finding.impact_type == "STANDARDIZATION"
-    assert finding.recommendation == "REBASE_AGAINST_EXTERNAL_STANDARD"
+    assert finding.impact_type == "RFC_PUBLICATION"
+    assert finding.recommendation == "VERIFY_RFC_STATUS_BEFORE_REBASE"
     assert finding.validation_class == "EXTERNAL_RELEVANCE_NOT_MATVERSE_VALIDATION"
 
 
@@ -159,7 +159,7 @@ def test_draft_and_final_standard_are_distinct() -> None:
         "IETF", "RFC 10024 post-quantum key agreement",
         "https://datatracker.ietf.org/doc/rfc10024/",
     )
-    assert impact_type(final_rfc) == "STANDARDIZATION"
+    assert impact_type(final_rfc) == "RFC_PUBLICATION"
     nist_final = SourceItem(
         "NIST", "FIPS 203 ML-KEM post-quantum cryptography",
         "https://csrc.nist.gov/pubs/fips/203/final",
@@ -224,3 +224,19 @@ def test_issue94_eight_arxiv_signals_preserve_external_status() -> None:
         item = SourceItem("arXiv", title, f"https://arxiv.org/abs/{arxiv_id}v1")
         assert impact_type(item) == expected, (arxiv_id, impact_type(item))
         assert evaluate([item], threshold=0.0)[0].validation_class == "EXTERNAL_RELEVANCE_NOT_MATVERSE_VALIDATION"
+
+
+def test_sparse_mirror_cannot_suppress_richer_candidate() -> None:
+    sparse = SourceItem("arXiv", "Quantum", "http://export.arxiv.org/abs/2610.11658v1")
+    rich = SourceItem(
+        "arXiv",
+        "Error-Corrected Quantum Memory on a fault-tolerant logical qubit",
+        "https://arxiv.org/abs/2610.11658v2",
+        summary="A logical qubit demonstration with quantum memory and quantum error correction.",
+    )
+    forward = evaluate([sparse, rich], threshold=0.5)
+    backward = evaluate([rich, sparse], threshold=0.5)
+    assert len(forward) == len(backward) == 1
+    assert forward[0].digest == backward[0].digest
+    assert forward[0].title == backward[0].title == rich.title
+    assert forward[0].score == backward[0].score
