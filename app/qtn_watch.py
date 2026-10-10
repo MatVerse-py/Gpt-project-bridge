@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from typing import Iterable
-from urllib.parse import urljoin
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from xml.etree import ElementTree
 
 import httpx
@@ -68,17 +68,6 @@ QTN_RULES: dict[str, tuple[str, ...]] = {
 }
 
 SCOPE_TERMS = tuple(sorted({term for values in QTN_RULES.values() for term in values} | {"quantum", "post-quantum", "pqc"}))
-
-STANDARDIZATION_TERMS = (
-    "standardization",
-    "standardisation",
-    "standardized",
-    "standardised",
-    "technical standard",
-    "industry standard",
-    "interoperability standard",
-    "standards framework",
-)
 
 DEMONSTRATION_TITLE_TERMS = (
     "demonstration",
@@ -161,14 +150,46 @@ def _normalized(text: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 
-def _digest(item: SourceItem) -> str:
-    payload = json.dumps(
-        {"source": item.source, "title": _normalized(item.title).lower(), "url": item.url},
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
+def _canonical_url(url: str) -> str:
+    """Normalize bibliography URLs without erasing non-tracking query identity."""
+    raw = url.strip()
+    parsed = urlsplit(raw)
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
+        return raw
+    host = parsed.hostname.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if host in {"export.arxiv.org", "arxiv.org"}:
+        host = "arxiv.org"
+    elif host in {"dx.doi.org", "doi.org"}:
+        host = "doi.org"
+    try:
+        port = parsed.port
+    except ValueError:
+        return raw
+    if port is not None and port not in {80, 443}:
+        host = f"{host}:{port}"
+    path = parsed.path.rstrip("/") or "/"
+    if host == "arxiv.org":
+        arxiv = re.fullmatch(r"/(?:abs|pdf)/(\\d{4}\\.\\d{4,5})(?:v\\d+)?(?:\\.pdf)?", path, re.I)
+        if arxiv:
+            path = f"/abs/{arxiv.group(1)}"
+    query = urlencode(
+        sorted(
+            (key, value)
+            for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+            if not key.lower().startswith("utm_")
+            and key.lower() not in {"fbclid", "gclid", "mc_cid", "mc_eid"}
+        )
     )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    if host in {"arxiv.org", "doi.org"}:
+        query = ""
+    return urlunsplit(("https", host, path, query, ""))
+
+
+def _digest(item: SourceItem) -> str:
+    """Stable work identity: title changes, mirrors and arXiv revisions do not re-alert."""
+    return hashlib.sha256(_canonical_url(item.url).encode("utf-8")).hexdigest()
 
 
 def _infer_published_at(title: str, url: str) -> str | None:
@@ -225,7 +246,31 @@ def classify_qtn(item: SourceItem) -> tuple[str, ...]:
 
 
 def _is_standardization(item: SourceItem, text: str) -> bool:
-    return item.source == "IETF" or "rfc " in text or any(term in text for term in STANDARDIZATION_TERMS)
+    """Only authoritative final-standard URLs qualify, never paper rhetoric."""
+    del text
+    parsed = urlsplit(item.url)
+    host = (parsed.hostname or "").lower()
+    path = parsed.path.rstrip("/").lower()
+    if item.source == "IETF":
+        return (
+            (host == "datatracker.ietf.org" and re.fullmatch(r"/doc/(?:html/)?rfc\\d+", path) is not None)
+            or (host == "rfc-editor.org" and re.fullmatch(r"/rfc/rfc\\d+(?:\\.(?:txt|html))?", path) is not None)
+        )
+    if item.source == "NIST":
+        return (
+            (host == "csrc.nist.gov" and re.fullmatch(r"/pubs/fips/\\d+/final", path) is not None)
+            or (host == "nvlpubs.nist.gov" and re.fullmatch(r"/nistpubs/fips/nist\\.fips\\.\\d+\\.pdf", path) is not None)
+        )
+    return False
+
+
+def _is_standards_draft(item: SourceItem) -> bool:
+    parsed = urlsplit(item.url)
+    return (
+        item.source == "IETF"
+        and (parsed.hostname or "").lower() == "datatracker.ietf.org"
+        and re.fullmatch(r"/doc/(?:html/)?draft-[^/]+/?", parsed.path.lower()) is not None
+    )
 
 
 def _is_external_demonstration(item: SourceItem, text: str) -> bool:
@@ -244,11 +289,15 @@ def impact_type(item: SourceItem) -> str:
     text = f"{item.title} {item.summary} {item.url}".lower()
     if _is_standardization(item, text):
         return "STANDARDIZATION"
+    if _is_standards_draft(item):
+        return "STANDARDIZATION_DRAFT"
     if _is_external_demonstration(item, text):
         return "EXTERNAL_DEMONSTRATION"
     if any(term in text for term in ("award", "funding", "manufactur", "infrastructure", "testbed deployment")):
         return "INFRASTRUCTURE"
-    if any(term in text for term in ("post-quantum", "pqc", "ml-kem", "ml-dsa", "qkd")):
+    if item.source in {"NIST", "IETF", "QIA"} and any(
+        term in text for term in ("post-quantum", "pqc", "ml-kem", "ml-dsa", "qkd")
+    ) and any(term in item.title.lower() for term in ("migration", "transition", "rollout", "deployment", "adoption", "deprecation")):
         return "SECURITY_MIGRATION"
     return "RESEARCH_ADVANCE"
 
@@ -257,6 +306,8 @@ def recommendation_for(item: SourceItem) -> str:
     impact = impact_type(item)
     if impact == "STANDARDIZATION":
         return "REBASE_AGAINST_EXTERNAL_STANDARD"
+    if impact == "STANDARDIZATION_DRAFT":
+        return "TRACK_DRAFT_AND_TEST_COMPATIBILITY"
     if impact == "EXTERNAL_DEMONSTRATION":
         return "ADD_EXTERNAL_BASELINE_AND_RETEST"
     if impact == "INFRASTRUCTURE":
@@ -268,7 +319,7 @@ def recommendation_for(item: SourceItem) -> str:
 
 def _has_high_impact_signal(item: SourceItem, text: str) -> bool:
     title_text = f"{item.title} {item.url}".lower()
-    if _is_standardization(item, text) or _is_external_demonstration(item, text):
+    if _is_standardization(item, text) or _is_standards_draft(item) or _is_external_demonstration(item, text):
         return True
     if any(term in title_text for term in ("breakthrough", "record-breaking", "world record", "final award")):
         return True
@@ -307,9 +358,10 @@ def evaluate(items: Iterable[SourceItem], threshold: float = DEFAULT_THRESHOLD) 
     findings: list[Finding] = []
     seen_urls: set[str] = set()
     for item in items:
-        if item.url in seen_urls:
+        canonical_url = _canonical_url(item.url)
+        if canonical_url in seen_urls:
             continue
-        seen_urls.add(item.url)
+        seen_urls.add(canonical_url)
         qtn_ids = classify_qtn(item)
         score = score_item(item, qtn_ids)
         if score < threshold:
