@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from app.qtn_watch import QTN_RULES
+from app.qtn_source_lineage import pointer_identity, version_inventory
 from urllib.parse import urlsplit
 import hashlib
 import json
@@ -60,6 +61,7 @@ def pqc_expansion(record: SourceRecord) -> str:
 
 def review_findings(findings: list[dict], source_items: list[object]) -> list[dict]:
     """Exact source join, fail closed on ambiguous/missing joins or QTN types."""
+    historical_versions = version_inventory(source_items)
     index = defaultdict(list)
     for source in source_items:
         index[(source.source, source.title, source.url)].append(source)
@@ -81,6 +83,17 @@ def review_findings(findings: list[dict], source_items: list[object]) -> list[di
         source = matches[0]
         record = SourceRecord(source.source, source.title, source.url, source.summary, tuple(ids))
         kind, pointer = document_kind(record)
+        scientific_pointer = pointer_identity(record.url)
+        work_id = scientific_pointer["work_id"]
+        observed_versions = historical_versions.get(work_id, [])
+        collision = any(v["metadata_conflict"] for v in observed_versions)
+        lineage_status = (
+            "HOLD_VERSION_METADATA_COLLISION" if collision
+            else "HOLD_UNPINNED_OR_UNKNOWN_VERSION"
+            if scientific_pointer["version_id"] is None
+            else "HOLD_MULTIVERSION_ADJUDICATION" if len(observed_versions) > 1
+            else "HOLD_BODY_UNVERIFIED"
+        )
         expansion = pqc_expansion(record)
         description = (record.title + " " + record.summary).lower()
         subject = ("QUANTUM_CLASSICAL_COMPUTING"
@@ -102,6 +115,15 @@ def review_findings(findings: list[dict], source_items: list[object]) -> list[di
             "source_metadata_fingerprint": metadata_hash,
             "semantic_review_verdict": "HOLD_MANUAL_ADJUDICATION",
             "original_impact_unchanged": finding.get("impact_type"),
+            "source_work_id": work_id,
+            "source_version_id": scientific_pointer["version_id"],
+            "source_version_tag": scientific_pointer["version_tag"],
+            "source_version_pointer": scientific_pointer["version_pointer"],
+            "source_pointer_kind": scientific_pointer["pointer_kind"],
+            "observed_version_inventory": observed_versions,
+            "version_lineage_status": lineage_status,
+            "version_body_sha256": None,  # no verified body bytes fetched
+            "bibliographic_identity_is_not_version_evidence": True,
         }
         # A metadata classification is never a science PASS, RFC status or Gate approval.
         reviewed.append({**finding, "semantic_review": overlay})
