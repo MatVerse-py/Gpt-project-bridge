@@ -47,20 +47,22 @@ The score is a triage score, not scientific confidence and not proof of novelty.
 ## Action classes
 
 - `REBASE_AGAINST_EXTERNAL_STANDARD`
+- `VERIFY_RFC_STATUS_BEFORE_REBASE`
+- `TRACK_DRAFT_AND_TEST_COMPATIBILITY`
 - `ADD_EXTERNAL_BASELINE_AND_RETEST`
 - `REVIEW_ENGINEERING_READINESS`
 - `UPDATE_CRYPTOGRAPHIC_BASELINE`
 - `REVIEW_FOR_DELTA_AND_BENCHMARK`
 
-A generic occurrence of the word `standard` does not classify a paper as standardization. Standardization requires IETF provenance, RFC context, or explicit standardization terminology.
+The `STANDARDIZATION` label requires an authoritative final NIST FIPS URL. Published IETF RFCs receive `RFC_PUBLICATION` because an RFC can be Informational or Experimental, and the watch does not independently verify its Standards Track status. Titles, abstracts and claimed standardization are insufficient. IETF Internet-Drafts are `STANDARDIZATION_DRAFT`, requiring monitoring and compatibility tests, not immediate rebasing. arXiv PQC/QKD papers remain research unless directly describing an external demonstration. Only explicit authority-sourced migration items receive the `SECURITY_MIGRATION` label.
 
 ## Deduplication
 
-Each source item receives a deterministic SHA-256 digest over canonicalized source, title and URL. Existing issues are scanned in bounded pages for the marker:
+Each source item receives a deterministic SHA-256 digest over its canonical bibliographic URL. The canonicalizer normalizes HTTP/HTTPS, arXiv mirror and version identifiers, DOI host and case, tracking parameters, fragments and query order. Non-tracking query parameters retain identity. Title edits do not generate new papers. Among records sharing a canonical URL, the highest-scoring candidate is kept so an early sparse mirror cannot hide a later informative entry. Existing issues are scanned in bounded pages for the marker:
 
 `<!-- qtn-watch:<digest> -->`
 
-A previously reported item is not emitted again. Deduplication uses the repository Issues API instead of one Search API call per finding, avoiding search-rate-limit amplification.
+Legacy issue URLs are also indexed as canonical digests during the read, so the title-dependent digest migration does not re-publish the eight entries of issue #94. No historical issue is rewritten. A previously reported item is not emitted again. Deduplication uses the repository Issues API instead of one Search API call per finding, avoiding search-rate-limit amplification.
 
 ## Bounded publication
 
@@ -104,3 +106,7 @@ GitHub Actions runs the watch daily and also supports `workflow_dispatch`.
 ## Future extension boundary
 
 QTN Watch v1 intentionally separates discovery from scientific adjudication. URANO/Tesseu may consume a QTN Watch finding as an experiment trigger, but promotion of any QTN state requires independent tests and gates outside this monitor.
+
+## 2026-10-10 baseline review
+
+See [issue #94 contract-delta matrix](QTN_ISSUE94_DELTA_2026-10-10.md) for eight independently held external signals, their Gate/Bridge/Executor/Evidence boundaries and next test designs. This triage fix does not itself revise an execution or cryptographic contract.

@@ -14,9 +14,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from app.qtn_watch import DEFAULT_THRESHOLD, FETCHERS, collect, evaluate, render_markdown
+from app.qtn_watch import DEFAULT_THRESHOLD, FETCHERS, SourceItem, _digest, collect, evaluate, render_markdown
 
 _DIGEST_MARKER = re.compile(r"qtn-watch:([0-9a-f]{64})")
+_URL_MARKER = re.compile(r"(?m)^- URL:\s*(https?://[^\s]+)\s*$")
 
 
 def _github_headers(token: str) -> dict[str, str]:
@@ -44,7 +45,14 @@ def _reported_digests(client: httpx.Client, repo: str, token: str) -> set[str]:
             raise RuntimeError("GitHub issues API returned a non-list payload")
         for row in rows:
             body = row.get("body") or ""
-            reported.update(_DIGEST_MARKER.findall(body))
+            legacy_markers = _DIGEST_MARKER.findall(body)
+            if not legacy_markers:
+                continue
+            reported.update(legacy_markers)
+            # Backfill URL-based identities from existing title-dependent alerts.
+            # Do not republish old findings after changing the digest algorithm.
+            for url in _URL_MARKER.findall(body):
+                reported.add(_digest(SourceItem("legacy", "", url)))
         if len(rows) < 100:
             break
     return reported
@@ -92,7 +100,14 @@ def main() -> int:
     parser.add_argument("--min-sources", type=int, default=int(os.environ.get("QTN_WATCH_MIN_SOURCES", "2")))
     parser.add_argument("--json", action="store_true", dest="json_output")
     parser.add_argument("--github-issues", action="store_true")
+    parser.add_argument("--semantic-review", action="store_true", help="Non-authoritative source version review in JSON mode")
+    parser.add_argument("--revision-ledger", type=str, help="Opt-in persistent SQLite file for version observations; local file must survive across runs")
     args = parser.parse_args()
+
+    if args.semantic_review and (not args.json_output or args.github_issues):
+        parser.error("--semantic-review requires --json and cannot publish --github-issues")
+    if args.revision_ledger and not args.semantic_review:
+        parser.error("--revision-ledger requires --semantic-review")
 
     if not 0.0 <= args.threshold <= 1.0:
         parser.error("--threshold must be between 0 and 1")
@@ -121,13 +136,22 @@ def main() -> int:
     findings = evaluate(items, threshold=args.threshold)
 
     if args.json_output:
+        output_findings = [f.to_dict() for f in findings]
+        if args.semantic_review:
+            from app.qtn_semantic_review import review_findings
+            output_findings = review_findings(output_findings, items)
+        revision_events = None
+        if args.revision_ledger:
+            from app.qtn_revision_ledger import record_observations
+            revision_events = record_observations(args.revision_ledger, items)
         print(
             json.dumps(
                 {
                     "status": "PASS",
                     "collected": len(items),
                     "successful_sources": successful_sources,
-                    "findings": [f.to_dict() for f in findings],
+                    "findings": output_findings,
+                    **({"revision_events": revision_events} if revision_events is not None else {}),
                     "errors": errors,
                 },
                 ensure_ascii=False,
