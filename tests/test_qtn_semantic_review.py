@@ -35,7 +35,9 @@ def test_real_qtn_watch_source_item_finding_integration():
     actual = evaluate([src], threshold=0.0)
     assert len(actual) == 1
     old = actual[0].to_dict()
-    assert old["impact_type"] == "STANDARDIZATION"
+    # #95 changes the upstream impact classifier. Overlay invariants should
+    # not depend on a historically erroneous categorization.
+    assert isinstance(old["impact_type"], str)
     out = review_findings([old], [src])[0]
     assert out["impact_type"] == old["impact_type"]  # not rewritten
     assert out["digest"] == old["digest"]
@@ -131,3 +133,21 @@ def test_overlay_cannot_be_used_as_runtime_approval():
     out = review_findings([finding(src)], [src])[0]
     assert not any(k in out["semantic_review"] for k in ("authorization", "gate_decision", "external_pass"))
     assert out["semantic_review"]["semantic_review_verdict"].startswith("HOLD")
+
+
+def test_qtn_ids_must_belong_to_known_registry():
+    src = Source("arXiv", "Paper", "https://arxiv.org/abs/2610.30645v1")
+    for bad in ("QTN-000", "QTN-999", "QTN-029"):
+        with pytest.raises(ValueError):
+            review_findings([finding(src, ids=(bad,))], [src])
+
+
+def test_cli_review_rejects_implicit_issue_publication():
+    import subprocess
+    import sys
+    result = subprocess.run(
+        [sys.executable, "scripts/run_qtn_watch.py",
+         "--json", "--semantic-review", "--github-issues"],
+        capture_output=True, text=True, check=False)
+    assert result.returncode != 0
+    assert "cannot publish" in result.stderr
