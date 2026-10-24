@@ -100,7 +100,11 @@ def main() -> int:
     parser.add_argument("--min-sources", type=int, default=int(os.environ.get("QTN_WATCH_MIN_SOURCES", "2")))
     parser.add_argument("--json", action="store_true", dest="json_output")
     parser.add_argument("--github-issues", action="store_true")
+    parser.add_argument("--semantic-review", action="store_true", help="Non-authoritative source version review in JSON mode")
     args = parser.parse_args()
+
+    if args.semantic_review and (not args.json_output or args.github_issues):
+        parser.error("--semantic-review requires --json and cannot publish --github-issues")
 
     if not 0.0 <= args.threshold <= 1.0:
         parser.error("--threshold must be between 0 and 1")
@@ -129,13 +133,17 @@ def main() -> int:
     findings = evaluate(items, threshold=args.threshold)
 
     if args.json_output:
+        output_findings = [f.to_dict() for f in findings]
+        if args.semantic_review:
+            from app.qtn_semantic_review import review_findings
+            output_findings = review_findings(output_findings, items)
         print(
             json.dumps(
                 {
                     "status": "PASS",
                     "collected": len(items),
                     "successful_sources": successful_sources,
-                    "findings": [f.to_dict() for f in findings],
+                    "findings": output_findings,
                     "errors": errors,
                 },
                 ensure_ascii=False,
