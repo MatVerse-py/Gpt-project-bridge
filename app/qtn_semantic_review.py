@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from app.qtn_watch import QTN_RULES
 from urllib.parse import urlsplit
 import hashlib
 import json
@@ -74,7 +75,7 @@ def review_findings(findings: list[dict], source_items: list[object]) -> list[di
             raise ValueError("refusing to overwrite existing review")
         ids = finding.get("qtn_ids")
         if not isinstance(ids, (tuple, list)) or not ids or not all(
-            isinstance(value, str) and re.fullmatch(r"QTN-\d{3}", value) for value in ids
+            isinstance(value, str) and value in QTN_RULES for value in ids
         ):
             raise ValueError("invalid QTN relation identifiers")
         source = matches[0]
