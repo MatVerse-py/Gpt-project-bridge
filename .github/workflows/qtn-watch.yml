@@ -6,14 +6,20 @@ on:
       - "app/qtn_watch.py"
       - "app/qtn_semantic_review.py"
       - "app/qtn_source_lineage.py"
+      - "app/qtn_context.py"
+      - "app/qtn_revision_ledger.py"
+      - "app/qtn_evidence_binding.py"
       - "scripts/run_qtn_watch.py"
+      - "scripts/qtn_bind_excerpt.py"
       - "tests/test_qtn_watch.py"
       - "tests/test_qtn_semantic_review.py"
       - "tests/test_qtn_source_lineage.py"
       - "tests/test_qtn_cross_pr_integration.py"
+      - "tests/test_qtn_governed_evidence.py"
       - ".github/workflows/qtn-watch.yml"
       - "docs/QTN_WATCH_V1.md"
       - "docs/QTN_TSC_SEMANTIC_REVIEW_V031.md"
+      - "docs/QTN_GOVERNED_EVIDENCE_V032.md"
       - "docs/QTN_ISSUE94_DELTA_2026-10-10.md"
   workflow_dispatch:
     inputs:
@@ -50,7 +56,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r requirements.txt
 
       - name: Run focused tests
-        run: python -m pytest -q tests/test_qtn_watch.py tests/test_qtn_semantic_review.py tests/test_qtn_source_lineage.py tests/test_qtn_cross_pr_integration.py
+        run: python -m pytest -q tests/test_qtn_watch.py tests/test_qtn_semantic_review.py tests/test_qtn_source_lineage.py tests/test_qtn_cross_pr_integration.py tests/test_qtn_governed_evidence.py
 
       - name: Run collection smoke test
         if: github.event_name == 'pull_request'
