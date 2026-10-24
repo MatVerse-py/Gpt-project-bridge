@@ -13,6 +13,8 @@ from xml.etree import ElementTree
 
 import httpx
 
+from app.qtn_context import candidate_qtn_relations
+
 USER_AGENT = "MatVerse-QTN-Watch/1.0 (+https://github.com/MatVerse-py/Gpt-project-bridge)"
 DEFAULT_THRESHOLD = 0.68
 DEFAULT_TIMEOUT = 20.0
@@ -52,7 +54,7 @@ QTN_RULES: dict[str, tuple[str, ...]] = {
     "QTN-014": ("network optimization", "network optimizer", "routing optimization", "path optimization"),
     "QTN-015": ("quantum memory", "memory lifetime", "memory coherence", "memory node"),
     "QTN-016": ("tomography", "state reconstruction", "quantum state learning"),
-    "QTN-017": ("hybrid quantum-classical", "hybrid quantum classical", "variational", "quantum-classical optimization"),
+    "QTN-017": ("hybrid quantum-classical", "hybrid quantum classical", "variational", "quantum-classical optimization", "parameterized quantum circuit", "parameterised quantum circuit", "parametrized quantum circuit"),
     "QTN-018": ("benchmark", "benchmarking", "performance evaluation", "conformance test"),
     "QTN-019": ("topology", "network graph", "network architecture", "multiplane architecture"),
     "QTN-020": ("compiler", "compilation", "transpiler", "circuit mapping", "circuit optimization"),
@@ -241,9 +243,7 @@ def _within_age(published_at: str | None, *, now: datetime | None = None) -> boo
 
 
 def classify_qtn(item: SourceItem) -> tuple[str, ...]:
-    haystack = f"{item.title} {item.summary} {item.url}".lower()
-    matches = [qtn_id for qtn_id, terms in QTN_RULES.items() if any(term in haystack for term in terms)]
-    return tuple(matches)
+    return candidate_qtn_relations(item.title, item.summary, item.url, QTN_RULES)
 
 
 def _is_rfc_publication(item: SourceItem) -> bool:
