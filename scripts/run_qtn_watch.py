@@ -101,10 +101,13 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", dest="json_output")
     parser.add_argument("--github-issues", action="store_true")
     parser.add_argument("--semantic-review", action="store_true", help="Non-authoritative source version review in JSON mode")
+    parser.add_argument("--revision-ledger", type=str, help="Opt-in persistent SQLite file for version observations; local file must survive across runs")
     args = parser.parse_args()
 
     if args.semantic_review and (not args.json_output or args.github_issues):
         parser.error("--semantic-review requires --json and cannot publish --github-issues")
+    if args.revision_ledger and not args.semantic_review:
+        parser.error("--revision-ledger requires --semantic-review")
 
     if not 0.0 <= args.threshold <= 1.0:
         parser.error("--threshold must be between 0 and 1")
@@ -137,6 +140,10 @@ def main() -> int:
         if args.semantic_review:
             from app.qtn_semantic_review import review_findings
             output_findings = review_findings(output_findings, items)
+        revision_events = None
+        if args.revision_ledger:
+            from app.qtn_revision_ledger import record_observations
+            revision_events = record_observations(args.revision_ledger, items)
         print(
             json.dumps(
                 {
@@ -144,6 +151,7 @@ def main() -> int:
                     "collected": len(items),
                     "successful_sources": successful_sources,
                     "findings": output_findings,
+                    **({"revision_events": revision_events} if revision_events is not None else {}),
                     "errors": errors,
                 },
                 ensure_ascii=False,
