@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from app.qtn_watch import QTN_RULES
+from app.qtn_context import resolve_pqc
 from app.qtn_source_lineage import pointer_identity, version_inventory
 from urllib.parse import urlsplit
 import hashlib
@@ -45,19 +46,7 @@ def document_kind(record: SourceRecord) -> tuple[str, str]:
 
 
 def pqc_expansion(record: SourceRecord) -> str:
-    text = (record.title + " " + record.summary).lower()
-    circuit = any(v in text for v in ("parameterized quantum circuit", "parametrized quantum circuit",
-                                     "parameterised quantum circuit", "variational quantum circuit"))
-    cryptographic = any(v in text for v in ("post-quantum cryptography", "post-quantum cryptographic",
-                                          "ml-kem", "ml-dsa", "slh-dsa", "post-quantum signature"))
-    if circuit and cryptographic:
-        return "CONFLICTING_EXPANSIONS_REVIEW"
-    if circuit:
-        return "PARAMETERIZED_QUANTUM_CIRCUIT"
-    if cryptographic:
-        return "POST_QUANTUM_CRYPTOGRAPHY"
-    return "AMBIGUOUS_PQC" if re.search(r"\bpqc\b", text) else "NOT_PRESENT"
-
+    return resolve_pqc(record.title + " " + record.summary)
 
 def review_findings(findings: list[dict], source_items: list[object]) -> list[dict]:
     """Exact source join, fail closed on ambiguous/missing joins or QTN types."""
