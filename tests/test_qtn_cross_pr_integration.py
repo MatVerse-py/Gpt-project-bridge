@@ -26,9 +26,9 @@ def test_work_level_alert_dedup_keeps_two_observed_revision_identifiers():
 
 def test_pinned_ietf_draft_08_and_09_remain_drafts_not_final_standards():
     rows = [
-        SourceItem("IETF", "PQC draft for constrained cryptography",
+        SourceItem("IETF", "Post-quantum cryptography draft for constrained devices",
                    "https://datatracker.ietf.org/doc/draft-ietf-pquip-pqc-hsm-constrained/08/"),
-        SourceItem("IETF", "PQC draft for constrained cryptography",
+        SourceItem("IETF", "Post-quantum cryptography draft for constrained devices",
                    "https://datatracker.ietf.org/doc/draft-ietf-pquip-pqc-hsm-constrained/09/"),
     ]
     for row in rows:
