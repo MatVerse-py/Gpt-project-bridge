@@ -275,7 +275,7 @@ def _is_standards_draft(item: SourceItem) -> bool:
     return (
         item.source == "IETF"
         and (parsed.hostname or "").lower() == "datatracker.ietf.org"
-        and re.fullmatch(r"/doc/(?:html/)?draft-[^/]+/?", parsed.path.lower()) is not None
+        and re.fullmatch(r"/doc/(?:html/)?draft-[^/]+(?:/\d{2})?/?", parsed.path.lower()) is not None
     )
 
 
