@@ -150,7 +150,8 @@ def version_benchmark() -> dict:
             seen_works.add(work_key)
             integrated.append(record_observations(database, [item])[0]["status"])
     # Separate in-memory version-aware reference, with no persistent state.
-    naive_revision: list[str] = []\n    version_seen: set[str] = set()
+    naive_revision: list[str] = []
+    version_seen: set[str] = set()
     work_seen: set[str] = set()
     for item, _ in seq:
         p = pointer_identity(item.url)
