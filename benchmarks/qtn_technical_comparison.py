@@ -140,7 +140,6 @@ def version_benchmark() -> dict:
     seen_works: set[str] = set()
     seen_versions: set[str] = set()
     baseline: list[str] = []
-    naive_revision: list[str] = []
     integrated: list[str] = []
     seq = version_sequence()
     with tempfile.TemporaryDirectory() as root:
@@ -149,21 +148,9 @@ def version_benchmark() -> dict:
             work_key = _digest(item)
             baseline.append("SEEN_AGAIN" if work_key in seen_works else "NEW_WORK")
             seen_works.add(work_key)
-            ptr = pointer_identity(item.url)
-            vk = ptr["version_id"]
-            naive_revision.append(
-                "HOLD_UNPINNED_OR_UNKNOWN_VERSION" if vk is None
-                else "SEEN_AGAIN" if vk in seen_versions
-                else "NEW_VERSION" if ptr["work_id"] in seen_works  # work already seen
-                else "NEW_WORK"
-            )
-            if vk:
-                seen_versions.add(vk)
             integrated.append(record_observations(database, [item])[0]["status"])
-    # Correct the clearly specified lightweight version-aware comparator with
-    # an independent per-work tracking set; do not rely on the above ordering.
-    naive_revision = []
-    version_seen: set[str] = set()
+    # Separate in-memory version-aware reference, with no persistent state.
+    naive_revision: list[str] = []\n    version_seen: set[str] = set()
     work_seen: set[str] = set()
     for item, _ in seq:
         p = pointer_identity(item.url)
@@ -315,13 +302,32 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--skip-timing", action="store_true")
+    parser.add_argument("--summary-only", action="store_true", help="Print concise metrics; --output still saves full data")
     args = parser.parse_args()
     result = calculate(timing=not args.skip_timing)
     serialized = json.dumps(result, sort_keys=True, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(serialized, encoding="utf-8")
-    print(serialized)
+    if args.summary_only:
+        m = result["semantic"]
+        v = result["version_events"]
+        e = result["evidence_bindings"]
+        brief = {
+            "benchmark_id": result["benchmark_id"],
+            "case_count": result["case_count"],
+            "semantic_baseline": m["baseline_metrics"],
+            "semantic_integrated": m["integrated_metrics"],
+            "work_version_recall": v["baseline_work_new_version_recall"],
+            "memory_version_recall": v["baseline_version_new_version_recall"],
+            "sqlite_version_recall": v["integrated_new_version_recall"],
+            "receipt_metadata_accuracy": e["metadata_metrics"]["accuracy"],
+            "receipt_sha_only_accuracy": e["sha_only_metrics"]["accuracy"],
+            "receipt_integrated_accuracy": e["integrated_metrics"]["accuracy"],
+        }
+        print(json.dumps(brief, ensure_ascii=False, sort_keys=True))
+    else:
+        print(serialized)
     return 0
 
 
