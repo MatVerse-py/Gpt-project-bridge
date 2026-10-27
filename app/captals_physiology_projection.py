@@ -12,7 +12,7 @@ from typing import Any, Mapping
 from .core import Decision
 from .evidence import evidence_receipt
 from .physiology import DurableEventJournal, JournalEvent
-from .physiology_effect_feedback import ClosedLoopCycleResult
+from .physiology_effect_feedback import ClosedLoopCycleResult, SCHEMA_VERSION as FEEDBACK_SCHEMA
 
 SCHEMA = "matverse.captals-physiology-projection.v0"
 REAL_CPU_INSTRUMENT = "time.process_time_ns"
@@ -54,18 +54,41 @@ def _validate_event_receipts(result: ClosedLoopCycleResult, events: Mapping[str,
     if inputs.get("state_root") != result.cycle.state_root:
         raise ValueError("cycle state root mismatch")
     feedback = events.get("EFFECT_FEEDBACK")
+    recovery_gate = events.get("EFFECT_RECOVERY_GATE")
+    if feedback is not None and recovery_gate is not None:
+        raise ValueError("conflicting feedback and recovery gate")
     if result.feedback_receipt_hash is not None:
-        if feedback is None or feedback.event_id != f"{result.cycle.cycle_id}:effect-feedback":
-            raise ValueError("missing effect feedback")
-        data = feedback.payload
-        if not isinstance(data.get("inputs"), dict) or not isinstance(data.get("outputs"), dict):
-            raise ValueError("invalid feedback structure")
-        expected = evidence_receipt("PHYSIOLOGY_EFFECT_FEEDBACK", data["inputs"], data["outputs"])
-        if data.get("receipt") != expected or expected["receipt_hash"] != result.feedback_receipt_hash:
-            raise ValueError("effect feedback receipt mismatch")
-        if data["inputs"].get("cycle_receipt_hash") != result.cycle.receipt_hash:
-            raise ValueError("effect feedback not bound to cycle")
-    elif feedback is not None:
+        if feedback is not None:
+            if feedback.event_id != f"{result.cycle.cycle_id}:effect-feedback":
+                raise ValueError("effect feedback bound to wrong cycle")
+            data = feedback.payload
+            if not isinstance(data.get("inputs"), dict) or not isinstance(data.get("outputs"), dict):
+                raise ValueError("invalid feedback structure")
+            expected = evidence_receipt("PHYSIOLOGY_EFFECT_FEEDBACK", data["inputs"], data["outputs"])
+            if data.get("receipt") != expected or expected["receipt_hash"] != result.feedback_receipt_hash:
+                raise ValueError("effect feedback receipt mismatch")
+            if data["inputs"].get("cycle_receipt_hash") != result.cycle.receipt_hash:
+                raise ValueError("effect feedback not bound to cycle")
+        elif recovery_gate is not None:
+            if (recovery_gate.event_id != f"{result.cycle.cycle_id}:effect-recovery-gate"
+                or result.effective_decision is not Decision.HOLD
+                or not result.recovery_required
+                or not result.recovery_for_cycle_id):
+                raise ValueError("invalid recovery HOLD gate")
+            gate_payload = recovery_gate.payload
+            if gate_payload.get("decision") != "HOLD" or not isinstance(gate_payload.get("reason"), str):
+                raise ValueError("recovery HOLD gate invalid")
+            expected = evidence_receipt(
+                "PHYSIOLOGY_EFFECT_RECOVERY_GATE",
+                {"schema": FEEDBACK_SCHEMA, "cycle_id": result.cycle.cycle_id,
+                 "recovery_for_cycle_id": result.recovery_for_cycle_id},
+                {"decision": "HOLD", "reason": gate_payload["reason"]},
+            )
+            if gate_payload.get("receipt") != expected or expected["receipt_hash"] != result.feedback_receipt_hash:
+                raise ValueError("recovery HOLD receipt mismatch")
+        else:
+            raise ValueError("missing effect feedback or recovery gate")
+    elif feedback is not None or recovery_gate is not None:
         raise ValueError("feedback exists but result does not bind it")
 
 
@@ -130,7 +153,7 @@ def project_cycle(result: ClosedLoopCycleResult, journal: DurableEventJournal) -
     )
     return {
         "event_id": cycle_id,
-        "track_id": "organism:" + cycle_id,
+        "track_id": "cycle:" + cycle_id,
         "source": source,
         "gate_decision": Decision.HOLD.value if decision is None else decision.value,
         "evidence_status": "UNVERIFIED",
