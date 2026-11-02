@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 
 from .auth import Principal, authenticate
+from .securelog_adapter import configure_securelog
 from .institutional_projection import (
     ProjectionUnavailable,
     build_institutional_projection,
@@ -19,6 +20,7 @@ from .model_bridge import assert_transferable_state
 
 
 app = FastAPI(title="MatVerse Institutional Adapter v1", version="1.0.0")
+configure_securelog(app, component="institutional_api")
 app.include_router(runtime_router)
 
 _ALLOWED_INTENT_OPERATIONS = INTENT_OPERATIONS
