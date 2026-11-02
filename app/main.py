@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field, model_validator
 
 from .auth import Principal, require_capability
+from .securelog_adapter import configure_securelog
 from .core import Decision, POState, evaluate_hdb, omega_gate, stable_hash
 from .evidence import evidence_receipt
 from .federation_routing import (
@@ -37,6 +38,7 @@ from .storage import (
 )
 
 app = FastAPI(title="MATVERSE_REAL_v1", version="1.2.0-pass-hardening")
+configure_securelog(app, component="bridge_api")
 SHA256_PATTERN = r"^[0-9a-fA-F]{64}$"
 PARTICIPANT_PATTERN = r"^[A-Za-z0-9._:-]{1,128}$"
 
