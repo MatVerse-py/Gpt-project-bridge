@@ -373,3 +373,35 @@ def test_venice_catalog_keeps_non_slug_ids_and_marks_unknown_types(client):
         assert by_model_id[model_id]["entry_id"].endswith(":snapshot:2026-11-10")
     unknown = {item["model_id"] for item in entries if item["model_type"] == "unknown"}
     assert unknown == {"chroma", "runway-gen4-5", "runway-gen4-5-text", "runway-gen4-turbo"}
+
+
+def test_capability_selector_does_not_pass_with_only_unconfigured_candidates(client, monkeypatch):
+    from app import agent_runtime
+
+    auth_request(client, "admin", "POST", "/model-registry/seed-corpus", {})
+    monkeypatch.setattr(
+        agent_runtime,
+        "agent_catalog",
+        lambda: [
+            {
+                "agent_id": "venice", "provider": "venice", "model": None,
+                "transport": "openai_compatible_chat", "roles": ["research"],
+                "configured": False, "connection_verified": False, "status": "BLOCKED_CONFIGURATION",
+            },
+        ],
+    )
+    response = auth_request(
+        client,
+        "admin",
+        "POST",
+        "/model-registry/select",
+        {
+            "capability": "research",
+            "modality": "text",
+            "require_configured": False,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["decision"] == "HOLD"
+    assert response.json()["reason"] == "no_configured_candidate"
+    assert response.json()["candidates"][0]["selection_state"] == "BLOCKED_CONFIGURATION"
