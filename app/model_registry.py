@@ -20,7 +20,7 @@ _FORBIDDEN_METADATA_KEYS = {
     "privatememory", "systemprompt", "developerprompt",
 }
 _ENTRY_TYPES = {
-    "PROVIDER", "MODEL", "RUNTIME", "GATEWAY", "AGENT_SERVICE", "PLATFORM",
+    "PROVIDER", "MODEL", "RUNTIME", "GATEWAY", "AGENT_SERVICE", "AGENT_ADAPTER", "PLATFORM",
     "TRANSPORT", "CATALOG_SOURCE", "CAPABILITY",
 }
 router = APIRouter(prefix="/model-registry", tags=["model-registry"])
@@ -32,7 +32,7 @@ class RegistryEntryCreate(BaseModel):
     entry_id: str = Field(min_length=3, max_length=256)
     entry_type: Literal[
         "PROVIDER", "MODEL", "RUNTIME", "GATEWAY", "AGENT_SERVICE",
-        "PLATFORM", "TRANSPORT", "CATALOG_SOURCE", "CAPABILITY",
+        "AGENT_ADAPTER", "PLATFORM", "TRANSPORT", "CATALOG_SOURCE", "CAPABILITY",
     ]
     provider_id: str = Field(min_length=1, max_length=128)
     display_name: str = Field(min_length=1, max_length=256)
@@ -532,8 +532,100 @@ def _corpus_seed() -> tuple[list[dict[str, Any]], dict[str, Any]]:
             "enabled": True,
         },
     ]
+    agent_adapters = [
+        {
+            "entry_id": "agent-adapter:gpt", "entry_type": "AGENT_ADAPTER", "provider_id": "openai",
+            "display_name": "GPT / OpenAI Responses agent adapter", "model_id": None, "upstream_family": "openai",
+            "model_type": None, "modalities": ["text", "image"], "capabilities": ["research", "draft", "review"],
+            "adapter_id": "openai.responses", "integration_state": "ADAPTER_IMPLEMENTED_MAIN",
+            "runtime_state": "UNKNOWN", "model_revision": None, "context_window_tokens": None,
+            "max_output_tokens": None, "source_id": "github-main", "source_refs": ["github:app/agent_runtime.py", "github:app/openai_runtime.py"],
+            "notes": "Agent adapter GPT ligado ao broker OpenAI existente; disponibilidade live permanece dependente do ambiente.",
+            "metadata": {"agent_id": "gpt", "transport": "openai_responses"}, "enabled": True,
+        },
+        {
+            "entry_id": "agent-adapter:claude", "entry_type": "AGENT_ADAPTER", "provider_id": "anthropic",
+            "display_name": "Claude / Anthropic Messages agent adapter", "model_id": None, "upstream_family": "anthropic",
+            "model_type": None, "modalities": ["text", "image"], "capabilities": ["research", "code", "draft", "review"],
+            "adapter_id": "agent.anthropic.messages", "integration_state": "ADAPTER_IMPLEMENTED_REVIEW",
+            "runtime_state": "UNKNOWN", "model_revision": None, "context_window_tokens": None,
+            "max_output_tokens": None, "source_id": "github-pr-89-draft", "source_refs": ["github:pull/89", "github:app/agent_runtime.py"],
+            "notes": "Adapter no branch de revisão; testes simulados não comprovam conexão live.",
+            "metadata": {"agent_id": "claude", "transport": "anthropic_messages"}, "enabled": True,
+        },
+        {
+            "entry_id": "agent-adapter:kilo", "entry_type": "AGENT_ADAPTER", "provider_id": "kilo",
+            "display_name": "Kilo Gateway agent adapter", "model_id": None, "upstream_family": "kilo",
+            "model_type": None, "modalities": ["text"], "capabilities": ["code", "review", "redteam"],
+            "adapter_id": "agent.kilo.gateway", "integration_state": "ADAPTER_IMPLEMENTED_REVIEW",
+            "runtime_state": "UNKNOWN", "model_revision": None, "context_window_tokens": None,
+            "max_output_tokens": None, "source_id": "github-pr-89-draft", "source_refs": ["github:pull/89", "github:app/agent_runtime.py"],
+            "notes": "Gateway; a identidade do modelo subjacente é fixada no contrato da sessão.",
+            "metadata": {"agent_id": "kilo", "transport": "kilo_gateway"}, "enabled": True,
+        },
+        {
+            "entry_id": "agent-adapter:venice", "entry_type": "AGENT_ADAPTER", "provider_id": "venice",
+            "display_name": "Venice OpenAI-compatible agent adapter", "model_id": None, "upstream_family": "venice",
+            "model_type": None, "modalities": ["text"], "capabilities": ["research", "code", "draft", "review", "redteam"],
+            "adapter_id": "agent.venice.chat_completions", "integration_state": "ADAPTER_IMPLEMENTED_REVIEW",
+            "runtime_state": "UNKNOWN", "model_revision": None, "context_window_tokens": None,
+            "max_output_tokens": None, "source_id": "github-pr-89-draft", "source_refs": ["github:pull/89", "corpus:Texto colado(20261110-055652).txt"],
+            "notes": "Chat Completions only; adapter code does not imply support for all 392 catalog modalities.",
+            "metadata": {"agent_id": "venice", "transport": "openai_compatible_chat"}, "enabled": True,
+        },
+        {
+            "entry_id": "agent-adapter:manus", "entry_type": "AGENT_ADAPTER", "provider_id": "manus",
+            "display_name": "Manus Tasks agent adapter", "model_id": None, "upstream_family": "manus",
+            "model_type": None, "modalities": ["text"], "capabilities": ["workflow", "research", "curation"],
+            "adapter_id": "agent.manus.tasks_v2", "integration_state": "ADAPTER_IMPLEMENTED_REVIEW",
+            "runtime_state": "UNKNOWN", "model_revision": None, "context_window_tokens": None,
+            "max_output_tokens": None, "source_id": "github-pr-89-draft", "source_refs": ["github:pull/89", "github:app/agent_runtime.py"],
+            "notes": "Serviço assíncrono; perfis lite/standard/max não são IDs de modelos fundacionais.",
+            "metadata": {"agent_id": "manus", "transport": "manus_tasks_v2"}, "enabled": True,
+        },
+        {
+            "entry_id": "agent-adapter:base44", "entry_type": "AGENT_ADAPTER", "provider_id": "base44",
+            "display_name": "Base44 MCP agent adapter", "model_id": None, "upstream_family": "base44",
+            "model_type": None, "modalities": ["text"], "capabilities": ["application", "workflow"],
+            "adapter_id": "agent.base44.mcp", "integration_state": "ADAPTER_IMPLEMENTED_REVIEW",
+            "runtime_state": "UNKNOWN", "model_revision": None, "context_window_tokens": None,
+            "max_output_tokens": None, "source_id": "github-pr-89-draft", "source_refs": ["github:pull/89", "github:app/agent_runtime.py"],
+            "notes": "Plataforma e superfície MCP; não é identidade de modelo fundacional.",
+            "metadata": {"agent_id": "base44", "transport": "base44_mcp"}, "enabled": True,
+        },
+        {
+            "entry_id": "agent-adapter:claude-code", "entry_type": "AGENT_ADAPTER", "provider_id": "anthropic",
+            "display_name": "Claude Code external handoff adapter", "model_id": None, "upstream_family": "anthropic",
+            "model_type": None, "modalities": ["text"], "capabilities": ["code", "review"],
+            "adapter_id": "agent.external_handoff", "integration_state": "EXTERNAL_HANDOFF_REVIEW",
+            "runtime_state": "UNKNOWN", "model_revision": None, "context_window_tokens": None,
+            "max_output_tokens": None, "source_id": "github-pr-89-draft", "source_refs": ["github:pull/89", "github:AGENT_BRIDGE_V1.md"],
+            "notes": "Relay externo autenticado; o Bridge não executa nem autentica o cliente Claude Code.",
+            "metadata": {"agent_id": "claude-code", "transport": "external_handoff"}, "enabled": True,
+        },
+        {
+            "entry_id": "agent-adapter:claude-web", "entry_type": "AGENT_ADAPTER", "provider_id": "anthropic",
+            "display_name": "Claude Web external handoff adapter", "model_id": None, "upstream_family": "anthropic",
+            "model_type": None, "modalities": ["text"], "capabilities": ["research", "draft", "review"],
+            "adapter_id": "agent.external_handoff", "integration_state": "EXTERNAL_HANDOFF_REVIEW",
+            "runtime_state": "UNKNOWN", "model_revision": None, "context_window_tokens": None,
+            "max_output_tokens": None, "source_id": "github-pr-89-draft", "source_refs": ["github:pull/89", "github:AGENT_BRIDGE_V1.md"],
+            "notes": "Relay manual; não é uma conexão contínua com a interface web.",
+            "metadata": {"agent_id": "claude-web", "transport": "external_handoff"}, "enabled": True,
+        },
+        {
+            "entry_id": "agent-adapter:kilo-code", "entry_type": "AGENT_ADAPTER", "provider_id": "kilo",
+            "display_name": "Kilo Code external handoff adapter", "model_id": None, "upstream_family": "kilo",
+            "model_type": None, "modalities": ["text"], "capabilities": ["code", "review", "redteam"],
+            "adapter_id": "agent.external_handoff", "integration_state": "EXTERNAL_HANDOFF_REVIEW",
+            "runtime_state": "UNKNOWN", "model_revision": None, "context_window_tokens": None,
+            "max_output_tokens": None, "source_id": "github-pr-89-draft", "source_refs": ["github:pull/89", "github:AGENT_BRIDGE_V1.md"],
+            "notes": "Relay externo autenticado; não é inferência própria do Bridge.",
+            "metadata": {"agent_id": "kilo-code", "transport": "external_handoff"}, "enabled": True,
+        },
+    ]
     venice_models, reconciliation = _venice_catalog_entries()
-    return base + venice_models, reconciliation
+    return base + agent_adapters + venice_models, reconciliation
 
 
 def seed_corpus_catalog(actor: str) -> dict[str, Any]:
@@ -668,7 +760,7 @@ def model_registry_protocol() -> dict[str, Any]:
     return {
         "protocol_version": PROTOCOL_VERSION,
         "identity": "provider + entry_type + immutable entry_id + optional exact model_id",
-        "separation": ["provider", "model", "runtime", "gateway", "agent_service", "platform", "transport", "capability"],
+        "separation": ["provider", "model", "runtime", "gateway", "agent_service", "agent_adapter", "platform", "transport", "capability"],
         "availability_rule": "catalog presence or adapter code never implies runtime availability",
         "promotion_rule": "runtime availability must come from a runtime probe or execution, not caller-supplied metadata",
         "catalog_rule": "historical and aggregator catalogs remain CATALOG_ONLY until separately bound and tested",
