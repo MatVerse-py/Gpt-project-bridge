@@ -356,7 +356,8 @@ def test_capability_selector_holds_when_live_connection_is_required(client, monk
     )
     assert response.status_code == 200
     assert response.json()["decision"] == "HOLD"
-    assert response.json()["reason"] == "no_candidate_matches_capability_and_constraints"
+    assert response.json()["reason"] == "no_connection_verified_candidate"
+    assert response.json()["unverified_candidates_excluded"] == 1
     assert response.json()["candidates"] == []
 
 
