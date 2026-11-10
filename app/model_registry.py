@@ -199,6 +199,7 @@ def _venice_catalog_entries() -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not isinstance(models, list):
         raise ValueError("Venice catalog snapshot entries are missing")
 
+    snapshot_date = str(snapshot.get("snapshot_date") or "undated")
     entries: list[dict[str, Any]] = []
     for item in models:
         model_id = item.get("model_id")
@@ -218,7 +219,7 @@ def _venice_catalog_entries() -> tuple[list[dict[str, Any]], dict[str, Any]]:
             capabilities.append("multimodal_input")
         entries.append(
             {
-                "entry_id": f"venice:model:{model_id}",
+                "entry_id": f"venice:model:{model_id}:snapshot:{snapshot_date}",
                 "entry_type": "MODEL",
                 "provider_id": "venice",
                 "display_name": item.get("display_name") or model_id,
@@ -233,7 +234,7 @@ def _venice_catalog_entries() -> tuple[list[dict[str, Any]], dict[str, Any]]:
                 "model_revision": None,
                 "context_window_tokens": item.get("context_window_tokens"),
                 "max_output_tokens": None,
-                "source_id": "venice-catalog-2026-11-10",
+                "source_id": f"venice-catalog-{snapshot_date}",
                 "source_refs": [
                     "corpus:API Models - Venice Uncensored AI.mhtml",
                     "corpus:Texto colado(20261110-055652).txt",
@@ -246,6 +247,7 @@ def _venice_catalog_entries() -> tuple[list[dict[str, Any]], dict[str, Any]]:
                     "source_locator": item.get("source_locator"),
                     "context_window_source": item.get("context_window_source"),
                     "catalog_provider": "venice",
+                    "snapshot_date": snapshot_date,
                 },
                 "enabled": True,
             }
