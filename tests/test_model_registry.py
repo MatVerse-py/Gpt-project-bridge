@@ -30,8 +30,8 @@ def test_corpus_seed_is_idempotent_and_preserves_catalog_gap(client):
     assert first.status_code == 200, first.text
     seeded = first.json()
     assert seeded["decision"] == "PASS"
-    assert seeded["entries_total"] == 419
-    assert seeded["entries_inserted"] == 419
+    assert seeded["entries_total"] == 428
+    assert seeded["entries_inserted"] == 428
     assert seeded["venice_catalog"] == {
         "source_claimed_count": 392,
         "extracted_unique_model_ids": 392,
@@ -44,7 +44,7 @@ def test_corpus_seed_is_idempotent_and_preserves_catalog_gap(client):
     assert second.status_code == 200, second.text
     assert second.json()["idempotent"] is True
     assert second.json()["entries_inserted"] == 0
-    assert second.json()["entries_existing"] == 419
+    assert second.json()["entries_existing"] == 428
 
     summary = auth_request(client, "admin", "GET", "/model-registry/summary")
     assert summary.status_code == 200
@@ -83,6 +83,7 @@ def test_models_runtimes_gateways_services_and_platforms_are_distinct(client):
         ("RUNTIME", "runtime:ollama"),
         ("RUNTIME", "runtime:huggingface-transformers"),
         ("TRANSPORT", "transport:claude-web"),
+        ("AGENT_ADAPTER", "agent-adapter:venice"),
     ):
         response = admin_get(
             client, "/model-registry/entries", {"entry_type": entry_type}
@@ -184,3 +185,17 @@ def test_model_registry_protocol_exposes_promotion_boundary(client):
     body = response.json()
     assert body["protocol_version"] == "matverse.model-registry.v1"
     assert "catalog presence or adapter code never implies runtime availability" == body["availability_rule"]
+
+
+def test_registry_agent_adapters_match_runtime_agent_specs(client):
+    from app.agent_runtime import AGENTS
+
+    auth_request(client, "admin", "POST", "/model-registry/seed-corpus", {})
+    response = admin_get(client, "/model-registry/entries", {"entry_type": "AGENT_ADAPTER"})
+    assert response.status_code == 200
+    entries = response.json()["entries"]
+    registered = {item["metadata"]["agent_id"]: item for item in entries}
+    assert set(registered) == set(AGENTS)
+    for agent_id, spec in AGENTS.items():
+        assert registered[agent_id]["provider_id"] == spec.provider
+        assert registered[agent_id]["metadata"]["transport"] == spec.transport
