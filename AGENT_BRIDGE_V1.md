@@ -172,6 +172,7 @@ The registry separates providers, models, local runtimes, gateways, agent servic
 
 - `POST /model-registry/seed-corpus` imports the corpus-derived baseline and Venice snapshot.
 - `GET /model-registry/summary` reports counts and catalog reconciliation.
+- `POST /model-registry/select` returns a capability/modality shortlist using registered adapter identity, configuration state and explicit provider preference; it never invokes a provider.
 - `GET /model-registry/adapter-snapshot` reconciles the runtime `AGENTS` map with registered agent adapters and reports configuration without exposing credentials.
 - `GET /model-registry/runtime-snapshot` runs the existing loopback-only Ollama/llama.cpp discovery and joins exact discovered model IDs to registry entries without promoting stored status.
 - `GET /model-registry/entries` filters by provider, entry type, integration state, runtime state, modality and text query.
