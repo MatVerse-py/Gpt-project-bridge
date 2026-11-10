@@ -172,10 +172,12 @@ The registry separates providers, models, local runtimes, gateways, agent servic
 
 - `POST /model-registry/seed-corpus` imports the corpus-derived baseline and Venice snapshot.
 - `GET /model-registry/summary` reports counts and catalog reconciliation.
+- `GET /model-registry/adapter-snapshot` reconciles the runtime `AGENTS` map with registered agent adapters and reports configuration without exposing credentials.
+- `GET /model-registry/runtime-snapshot` runs the existing loopback-only Ollama/llama.cpp discovery and joins exact discovered model IDs to registry entries without promoting stored status.
 - `GET /model-registry/entries` filters by provider, entry type, integration state, runtime state, modality and text query.
 - `POST /model-registry/entries` registers a new catalog entry without allowing callers to self-promote it to `AVAILABLE` or `LIVE_VERIFIED`.
 
-The Venice snapshot reconciles 392 unique model IDs against the 392 claimed by the source UI. The 29 IDs missed by the plain-text extraction were recovered from the saved MHTML DOM attributes; no IDs were synthesized.
+The registry seed contains 428 typed records: 392 Venice catalog models plus provider, runtime, service, platform, transport and agent-adapter records. The Venice snapshot reconciles all 392 unique model IDs claimed by the source UI. The 29 IDs missed by plain-text extraction were recovered from the saved MHTML DOM attributes; no IDs were synthesized. The saved MHTML provides 139 explicit context-window labels.
 
 ## Consultable archived memory
 
