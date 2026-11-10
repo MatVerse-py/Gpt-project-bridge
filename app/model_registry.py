@@ -847,8 +847,6 @@ def select_model_adapter(
         connection_verified = bool(agent.get("connection_verified", False))
         if req.require_configured and not configured:
             continue
-        if req.require_connection_verified and not connection_verified:
-            continue
         candidates.append(
             {
                 "agent_id": agent_id,
@@ -882,13 +880,24 @@ def select_model_adapter(
             item["agent_id"],
         )
     )
+    unverified_candidates_excluded = 0
+    if req.require_connection_verified:
+        unverified_candidates_excluded = sum(1 for item in candidates if not item["connection_verified"])
+        candidates = [item for item in candidates if item["connection_verified"]]
     candidates = candidates[:req.limit]
     verified = sum(1 for item in candidates if item["connection_verified"])
     configured = sum(1 for item in candidates if item["configured"])
-    decision = "PASS" if candidates else "HOLD"
-    reason = "candidate_configuration_matches" if candidates else "no_candidate_matches_capability_and_constraints"
-    if candidates and req.require_connection_verified and verified == 0:
-        decision, reason = "HOLD", "no_connection_verified_candidate"
+    if not candidates:
+        decision = "HOLD"
+        reason = (
+            "no_connection_verified_candidate"
+            if req.require_connection_verified and unverified_candidates_excluded
+            else "no_candidate_matches_capability_and_constraints"
+        )
+    elif configured == 0:
+        decision, reason = "HOLD", "no_configured_candidate"
+    else:
+        decision, reason = "PASS", "candidate_configuration_matches"
     return {
         "protocol_version": PROTOCOL_VERSION,
         "decision": decision,
@@ -900,6 +909,7 @@ def select_model_adapter(
         "candidates_total": len(candidates),
         "configured_candidates": configured,
         "connection_verified_candidates": verified,
+        "unverified_candidates_excluded": unverified_candidates_excluded,
         "candidates": candidates,
         "read_by": principal.principal_id,
     }
