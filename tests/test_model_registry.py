@@ -1,7 +1,28 @@
 from __future__ import annotations
 
+import hashlib
+import time
+import uuid
+
 from app import storage
-from conftest import auth_request
+from app.auth import sign_request
+from conftest import PRINCIPALS, auth_request
+
+
+def admin_get(client, path: str, params: dict[str, str]):
+    body = b""
+    timestamp = str(int(time.time()))
+    nonce = uuid.uuid4().hex
+    content_hash = hashlib.sha256(body).hexdigest()
+    signature = sign_request(PRINCIPALS["admin"]["secret"], "GET", path, timestamp, nonce, content_hash)
+    headers = {
+        "X-MatVerse-Principal": "admin",
+        "X-MatVerse-Timestamp": timestamp,
+        "X-MatVerse-Nonce": nonce,
+        "X-MatVerse-Content-SHA256": content_hash,
+        "X-MatVerse-Signature": signature,
+    }
+    return client.get(path, params=params, headers=headers)
 
 
 def test_corpus_seed_is_idempotent_and_preserves_catalog_gap(client):
@@ -36,11 +57,10 @@ def test_venice_catalog_entries_are_not_promoted_to_live_models(client):
     seeded = auth_request(client, "admin", "POST", "/model-registry/seed-corpus", {})
     assert seeded.status_code == 200
 
-    response = auth_request(
+    response = admin_get(
         client,
-        "admin",
-        "GET",
-        "/model-registry/entries?provider_id=venice&entry_type=MODEL",
+        "/model-registry/entries",
+        {"provider_id": "venice", "entry_type": "MODEL"},
     )
     assert response.status_code == 200
     entries = response.json()["entries"]
@@ -64,24 +84,23 @@ def test_models_runtimes_gateways_services_and_platforms_are_distinct(client):
         ("RUNTIME", "runtime:huggingface-transformers"),
         ("TRANSPORT", "transport:claude-web"),
     ):
-        response = auth_request(
-            client, "admin", "GET", f"/model-registry/entries?entry_type={entry_type}"
+        response = admin_get(
+            client, "/model-registry/entries", {"entry_type": entry_type}
         )
         assert response.status_code == 200
         assert entry_id in {item["entry_id"] for item in response.json()["entries"]}
 
-    models = auth_request(client, "admin", "GET", "/model-registry/entries?entry_type=MODEL")
+    models = admin_get(client, "/model-registry/entries", {"entry_type": "MODEL"})
     assert models.status_code == 200
     assert "gateway:kilo" not in {item["entry_id"] for item in models.json()["entries"]}
 
 
 def test_cross_runtime_models_keep_exact_revisions_and_scoped_maturity(client):
     auth_request(client, "admin", "POST", "/model-registry/seed-corpus", {})
-    response = auth_request(
+    response = admin_get(
         client,
-        "admin",
-        "GET",
-        "/model-registry/entries?integration_state=RUNTIME_REPRODUCED",
+        "/model-registry/entries",
+        {"integration_state": "RUNTIME_REPRODUCED"},
     )
     assert response.status_code == 200
     entries = {item["model_id"]: item for item in response.json()["entries"]}
@@ -92,11 +111,10 @@ def test_cross_runtime_models_keep_exact_revisions_and_scoped_maturity(client):
 
 def test_negative_pilot_is_retained_without_inventing_full_model_id(client):
     auth_request(client, "admin", "POST", "/model-registry/seed-corpus", {})
-    response = auth_request(
+    response = admin_get(
         client,
-        "admin",
-        "GET",
-        "/model-registry/entries?query=SmolLM2-135M",
+        "/model-registry/entries",
+        {"query": "SmolLM2-135M"},
     )
     assert response.status_code == 200
     item = next(x for x in response.json()["entries"] if x["entry_id"] == "model:huggingface:smollm2-135m-pilot")
