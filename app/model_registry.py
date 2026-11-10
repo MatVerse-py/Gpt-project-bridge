@@ -311,11 +311,11 @@ def _corpus_seed() -> tuple[list[dict[str, Any]], dict[str, Any]]:
             "entry_id": "provider:alibaba", "entry_type": "PROVIDER", "provider_id": "alibaba",
             "display_name": "Alibaba / Qwen", "model_id": None, "upstream_family": "alibaba",
             "model_type": None, "modalities": ["text", "image", "video"], "capabilities": ["local_transformers_candidate"],
-            "adapter_id": "transformers.pytorch", "integration_state": "RUNTIME_REPRODUCED",
+            "adapter_id": "transformers.pytorch", "integration_state": "CATALOG_ONLY",
             "runtime_state": "UNKNOWN", "model_revision": None, "context_window_tokens": None,
-            "max_output_tokens": None, "source_id": "cross-runtime-evidence-pack", "source_refs": [
-                "github:evidence/reproduction-v1/EVIDENCE_PACK.json"
-            ], "notes": "Qwen2.5-0.5B-Instruct reproduzido por Transformers/PyTorch; o registro do fornecedor não afirma API remota.",
+            "max_output_tokens": None, "source_id": "venice-catalog-2026-11-10", "source_refs": [
+                "corpus:Texto colado(20261110-055652).txt"
+            ], "notes": "Família upstream Qwen identificada no catálogo; a reprodução local é registrada separadamente no modelo e no runtime Transformers.",
             "metadata": {}, "enabled": True,
         },
         {
@@ -389,6 +389,17 @@ def _corpus_seed() -> tuple[list[dict[str, Any]], dict[str, Any]]:
                 "github:app/runtime_discovery.py", "github:tests/test_runtime_discovery.py"
             ], "notes": "Descoberta local implementada; digest imutável de modelo é exigido pelo runtime binding.",
             "metadata": {"default_endpoint": "http://127.0.0.1:8080"}, "enabled": True,
+        },
+        {
+            "entry_id": "runtime:huggingface-transformers", "entry_type": "RUNTIME", "provider_id": "huggingface",
+            "display_name": "Hugging Face Transformers / PyTorch", "model_id": None, "upstream_family": "huggingface",
+            "model_type": None, "modalities": ["text"], "capabilities": ["transformers_inference", "pytorch_cpu"],
+            "adapter_id": "transformers.pytorch", "integration_state": "RUNTIME_REPRODUCED",
+            "runtime_state": "UNKNOWN", "model_revision": None, "context_window_tokens": None,
+            "max_output_tokens": None, "source_id": "cross-runtime-evidence-pack", "source_refs": [
+                "github:evidence/reproduction-v1/EVIDENCE_PACK.json"
+            ], "notes": "Runtime Transformers/PyTorch executou Qwen2.5-0.5B-Instruct e SmolLM2-360M-Instruct em runners separados; não é um endpoint always-on.",
+            "metadata": {"execution_scope": "github-actions-cpu-runners", "runtime_availability": "not_probed"}, "enabled": True,
         },
         {
             "entry_id": "gateway:kilo", "entry_type": "GATEWAY", "provider_id": "kilo",
@@ -515,8 +526,8 @@ def _corpus_seed() -> tuple[list[dict[str, Any]], dict[str, Any]]:
             "source_id": "venice-catalog-2026-11-10", "source_refs": [
                 "corpus:API Models - Venice Uncensored AI.mhtml", "corpus:Texto colado(20261110-055652).txt",
                 "github:data/venice_catalog_snapshot_2026-11-10.json"
-            ], "notes": "A interface fonte declara 392 modelos; 363 IDs únicos foram recuperados do texto. 29 permanecem sem reconciliação e não foram inventados.",
-            "metadata": {"source_claimed_count": 392, "extracted_unique_model_ids": 363, "unresolved_count": 29, "reconciliation_status": "PARTIAL_EXTRACTION"},
+            ], "notes": "A interface fonte declara 392 modelos; os 392 IDs únicos foram reconciliados usando o DOM do MHTML salvo. Nenhum ID permanece sem resolução.",
+            "metadata": {"source_claimed_count": 392, "extracted_unique_model_ids": 392, "unresolved_count": 0, "reconciliation_status": "RECONCILED_FROM_SAVED_MHTML"},
             "enabled": True,
         },
     ]
