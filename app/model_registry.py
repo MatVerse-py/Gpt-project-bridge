@@ -26,6 +26,21 @@ _ENTRY_TYPES = {
 router = APIRouter(prefix="/model-registry", tags=["model-registry"])
 
 
+class ModelSelectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    capability: Literal[
+        "research", "code", "draft", "review", "redteam", "workflow",
+        "curation", "application", "metadata",
+    ]
+    modality: Literal["text", "image", "video", "audio"] = "text"
+    provider_preference: list[str] = Field(default_factory=list, max_length=16)
+    require_configured: bool = True
+    require_connection_verified: bool = False
+    allow_external_handoff: bool = False
+    limit: int = Field(default=5, ge=1, le=20)
+
+
 class RegistryEntryCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -791,6 +806,94 @@ def read_model_registry_summary(
     principal: Principal = Depends(require_capability("model-registry:read")),
 ) -> dict[str, Any]:
     return {**registry_summary(), "read_by": principal.principal_id}
+
+
+@router.post("/select")
+def select_model_adapter(
+    req: ModelSelectionRequest,
+    principal: Principal = Depends(require_capability("model-registry:read")),
+) -> dict[str, Any]:
+    from .agent_runtime import agent_catalog
+
+    registered = {
+        item.get("metadata", {}).get("agent_id"): item
+        for item in list_entries(entry_type="AGENT_ADAPTER", limit=500)
+        if item.get("metadata", {}).get("agent_id")
+    }
+    runtime_agents = agent_catalog()
+    candidates = []
+    for agent in runtime_agents:
+        agent_id = agent.get("agent_id")
+        entry = registered.get(agent_id)
+        if entry is None:
+            continue
+        if req.capability not in agent.get("roles", []):
+            continue
+        if req.modality not in entry.get("modalities", []):
+            continue
+        transport = agent.get("transport")
+        if transport == "external_handoff" and not req.allow_external_handoff:
+            continue
+        configured = bool(agent.get("configured", False))
+        connection_verified = bool(agent.get("connection_verified", False))
+        if req.require_configured and not configured:
+            continue
+        if req.require_connection_verified and not connection_verified:
+            continue
+        candidates.append(
+            {
+                "agent_id": agent_id,
+                "provider": agent.get("provider"),
+                "model": agent.get("model"),
+                "transport": transport,
+                "roles": agent.get("roles", []),
+                "configured": configured,
+                "connection_verified": connection_verified,
+                "selection_state": (
+                    "LIVE_VERIFIED" if connection_verified else
+                    "CONFIGURED_UNVERIFIED" if configured else
+                    "BLOCKED_CONFIGURATION"
+                ),
+                "registry_entry_id": entry["entry_id"],
+                "integration_state": entry["integration_state"],
+                "adapter_id": entry.get("adapter_id"),
+            }
+        )
+    preference = {provider: index for index, provider in enumerate(req.provider_preference)}
+    maturity_rank = {
+        "ADAPTER_IMPLEMENTED_MAIN": 0,
+        "ADAPTER_IMPLEMENTED_REVIEW": 1,
+        "EXTERNAL_HANDOFF_REVIEW": 2,
+    }
+    candidates.sort(
+        key=lambda item: (
+            preference.get(item["provider"], len(preference)),
+            maturity_rank.get(item["integration_state"], 9),
+            not item["configured"],
+            item["agent_id"],
+        )
+    )
+    candidates = candidates[:req.limit]
+    verified = sum(1 for item in candidates if item["connection_verified"])
+    configured = sum(1 for item in candidates if item["configured"])
+    decision = "PASS" if candidates else "HOLD"
+    reason = "candidate_configuration_matches" if candidates else "no_candidate_matches_capability_and_constraints"
+    if candidates and req.require_connection_verified and verified == 0:
+        decision, reason = "HOLD", "no_connection_verified_candidate"
+    return {
+        "protocol_version": PROTOCOL_VERSION,
+        "decision": decision,
+        "reason": reason,
+        "executed": False,
+        "selection_policy": "capability and configuration shortlist only; no provider invocation or live availability claim",
+        "capability": req.capability,
+        "modality": req.modality,
+        "candidates_total": len(candidates),
+        "configured_candidates": configured,
+        "connection_verified_candidates": verified,
+        "candidates": candidates,
+        "read_by": principal.principal_id,
+    }
 
 
 @router.get("/adapter-snapshot")
