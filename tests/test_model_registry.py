@@ -36,6 +36,7 @@ def test_corpus_seed_is_idempotent_and_reconciles_venice_catalog(client):
         "source_claimed_count": 392,
         "extracted_unique_model_ids": 392,
         "unresolved_count": 0,
+        "context_labels_extracted": 139,
         "reconciliation_status": "RECONCILED_FROM_SAVED_MHTML",
         "snapshot_date": "2026-11-10",
     }
@@ -209,3 +210,16 @@ def test_registry_modality_filter_matches_structured_modalities_only(client):
     assert entries
     assert all("video" in item["modalities"] for item in entries)
     assert all(item["provider_id"] == "venice" for item in entries)
+
+
+def test_context_windows_come_from_explicit_mhtml_labels(client):
+    auth_request(client, "admin", "POST", "/model-registry/seed-corpus", {})
+    response = admin_get(
+        client,
+        "/model-registry/entries",
+        {"provider_id": "venice", "query": "grok-4-20"},
+    )
+    assert response.status_code == 200
+    item = next(x for x in response.json()["entries"] if x["model_id"] == "grok-4-20")
+    assert item["context_window_tokens"] == 2_000_000
+    assert item["metadata"]["context_window_source"] == "saved_mhtml_context_label"
