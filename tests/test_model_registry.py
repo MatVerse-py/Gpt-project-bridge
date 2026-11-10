@@ -9,13 +9,13 @@ def test_corpus_seed_is_idempotent_and_preserves_catalog_gap(client):
     assert first.status_code == 200, first.text
     seeded = first.json()
     assert seeded["decision"] == "PASS"
-    assert seeded["entries_total"] == 389
-    assert seeded["entries_inserted"] == 389
+    assert seeded["entries_total"] == 419
+    assert seeded["entries_inserted"] == 419
     assert seeded["venice_catalog"] == {
         "source_claimed_count": 392,
-        "extracted_unique_model_ids": 363,
-        "unresolved_count": 29,
-        "reconciliation_status": "PARTIAL_EXTRACTION",
+        "extracted_unique_model_ids": 392,
+        "unresolved_count": 0,
+        "reconciliation_status": "RECONCILED_FROM_SAVED_MHTML",
         "snapshot_date": "2026-11-10",
     }
 
@@ -23,12 +23,12 @@ def test_corpus_seed_is_idempotent_and_preserves_catalog_gap(client):
     assert second.status_code == 200, second.text
     assert second.json()["idempotent"] is True
     assert second.json()["entries_inserted"] == 0
-    assert second.json()["entries_existing"] == 389
+    assert second.json()["entries_existing"] == 419
 
     summary = auth_request(client, "admin", "GET", "/model-registry/summary")
     assert summary.status_code == 200
-    assert summary.json()["entries_total"] == 389
-    assert summary.json()["venice_catalog_reconciliation"]["unresolved_count"] == 29
+    assert summary.json()["entries_total"] == 419
+    assert summary.json()["venice_catalog_reconciliation"]["unresolved_count"] == 0
     assert storage.verify_chain()["ok"] is True
 
 
@@ -44,7 +44,7 @@ def test_venice_catalog_entries_are_not_promoted_to_live_models(client):
     )
     assert response.status_code == 200
     entries = response.json()["entries"]
-    assert len(entries) == 363
+    assert len(entries) == 392
 
     claude = next(item for item in entries if item["model_id"] == "claude-fable-5-2")
     assert claude["integration_state"] == "CATALOG_ONLY"
@@ -61,6 +61,7 @@ def test_models_runtimes_gateways_services_and_platforms_are_distinct(client):
         ("AGENT_SERVICE", "service:manus"),
         ("PLATFORM", "platform:base44"),
         ("RUNTIME", "runtime:ollama"),
+        ("RUNTIME", "runtime:huggingface-transformers"),
         ("TRANSPORT", "transport:claude-web"),
     ):
         response = auth_request(
