@@ -14,11 +14,11 @@
       "catalog_provider": "venice",
       "model_id": "abliteration-abliterated-model-large-flash",
       "display_name": "Abliterated Large Flash",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "abliteration-ai",
+      "model_type": "multimodal",
       "modalities": [
         "text",
-        "multimodal"
+        "image"
       ],
       "description": "Abliterated Large Flash é o modelo multimodal sem restrições da Abliteration AI, baseado no DeepSeek V4.1 Flash e posteriormente abliterado. Tem 552B parâmetros de backbone (8B ativos na entrada, 16B na saída) e janela de contexto de 1M tokens. Processa nativamente imagens e texto, com forte desempenho em raciocínio, codificação e fluxos agentivos, sem filtros de conteúdo.",
       "context_window_tokens": 1000000,
@@ -30,7 +30,7 @@
       "catalog_provider": "venice",
       "model_id": "abliteration-abliterated-model-large-v2",
       "display_name": "Abliterated Large V2",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "abliteration-ai",
       "model_type": "language",
       "modalities": [
         "text"
@@ -45,10 +45,10 @@
       "catalog_provider": "venice",
       "model_id": "ace-step-15",
       "display_name": "ACE-Step 1.5",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "ace-step",
+      "model_type": "audio",
       "modalities": [
-        "text"
+        "audio"
       ],
       "description": "Geracao de musicas com recursos avancados, letras opcionais e controles musicais detalhados.",
       "context_window_tokens": null,
@@ -60,7 +60,7 @@
       "catalog_provider": "venice",
       "model_id": "aion-labs-aion-3-0",
       "display_name": "Aion 3.0",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "aionlabs",
       "model_type": "language",
       "modalities": [
         "text"
@@ -75,7 +75,7 @@
       "catalog_provider": "venice",
       "model_id": "aion-labs-aion-3-0-mini",
       "display_name": "Aion 3.0 Mini",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "aionlabs",
       "model_type": "language",
       "modalities": [
         "text"
@@ -90,7 +90,7 @@
       "catalog_provider": "venice",
       "model_id": "aion-labs-aion-3-5",
       "display_name": "Aion 3.5",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "aionlabs",
       "model_type": "language",
       "modalities": [
         "text"
@@ -105,7 +105,7 @@
       "catalog_provider": "venice",
       "model_id": "aion-labs-aion-3-5-mini",
       "display_name": "Aion 3.5 Mini",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "aionlabs",
       "model_type": "language",
       "modalities": [
         "text"
@@ -120,7 +120,7 @@
       "catalog_provider": "venice",
       "model_id": "chroma",
       "display_name": "Chroma",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "chroma",
       "model_type": "unknown",
       "modalities": [],
       "description": "",
@@ -913,7 +913,7 @@
       "catalog_provider": "venice",
       "model_id": "firered-image-edit",
       "display_name": "FireRed",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "firered",
       "model_type": "image",
       "modalities": [
         "image"
@@ -1881,11 +1881,12 @@
       "catalog_provider": "venice",
       "model_id": "happyhorse-1-0-image-to-video",
       "display_name": "HappyHorse 1.0",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "alibaba-happyhorse",
       "model_type": "video",
       "modalities": [
         "image",
-        "video"
+        "video",
+        "audio"
       ],
       "description": "HappyHorse 1.0's image-to-video variant animates a starting image into a 3- to 15-second clip at up to 1080p, with native audio.",
       "context_window_tokens": null,
@@ -1897,11 +1898,12 @@
       "catalog_provider": "venice",
       "model_id": "happyhorse-1-0-reference-to-video",
       "display_name": "HappyHorse 1.0 Reference",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "alibaba-happyhorse",
       "model_type": "video",
       "modalities": [
         "image",
-        "video"
+        "video",
+        "audio"
       ],
       "description": "HappyHorse 1.0 Reference generates 3- to 15-second clips at up to 1080p from reference images, keeping characters and subjects consistent, with native audio.",
       "context_window_tokens": null,
@@ -1913,11 +1915,12 @@
       "catalog_provider": "venice",
       "model_id": "happyhorse-1-0-text-to-video",
       "display_name": "HappyHorse 1.0",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "alibaba-happyhorse",
       "model_type": "video",
       "modalities": [
         "text",
-        "video"
+        "video",
+        "audio"
       ],
       "description": "HappyHorse 1.0 is Alibaba's video model with native audio. This text-to-video variant generates high-fidelity 3- to 15-second clips at up to 1080p.",
       "context_window_tokens": null,
@@ -1929,10 +1932,11 @@
       "catalog_provider": "venice",
       "model_id": "happyhorse-1-0-video-to-video",
       "display_name": "HappyHorse 1.0 Edit",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "alibaba-happyhorse",
       "model_type": "video",
       "modalities": [
-        "video"
+        "video",
+        "audio"
       ],
       "description": "HappyHorse 1.0 Edit changes an existing video from text instructions, with optional reference images, at up to 1080p with native audio.",
       "context_window_tokens": null,
@@ -1944,11 +1948,12 @@
       "catalog_provider": "venice",
       "model_id": "happyhorse-1-1-image-to-video",
       "display_name": "HappyHorse 1.1",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "alibaba-happyhorse",
       "model_type": "video",
       "modalities": [
         "image",
-        "video"
+        "video",
+        "audio"
       ],
       "description": "HappyHorse 1.1's image-to-video variant animates a starting image into a 3- to 15-second clip at up to 1080p, with native audio and multilingual lip-sync.",
       "context_window_tokens": null,
@@ -1960,11 +1965,12 @@
       "catalog_provider": "venice",
       "model_id": "happyhorse-1-1-reference-to-video",
       "display_name": "HappyHorse 1.1 Reference",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "alibaba-happyhorse",
       "model_type": "video",
       "modalities": [
         "image",
-        "video"
+        "video",
+        "audio"
       ],
       "description": "HappyHorse 1.1 Reference builds 3- to 15-second clips at up to 1080p from reference images, keeping characters consistent, with native audio and multilingual lip-sync.",
       "context_window_tokens": null,
@@ -1976,11 +1982,12 @@
       "catalog_provider": "venice",
       "model_id": "happyhorse-1-1-text-to-video",
       "display_name": "HappyHorse 1.1",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "alibaba-happyhorse",
       "model_type": "video",
       "modalities": [
         "text",
-        "video"
+        "video",
+        "audio"
       ],
       "description": "HappyHorse 1.1 is Alibaba's video model, with synchronized native audio and multilingual lip-sync. This text-to-video variant generates 3- to 15-second clips at up to 1080p.",
       "context_window_tokens": null,
@@ -1992,7 +1999,7 @@
       "catalog_provider": "venice",
       "model_id": "hunyuan-image-v3",
       "display_name": "Hunyuan Image 3.0",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "tencent-hunyuan",
       "model_type": "image",
       "modalities": [
         "image"
@@ -2007,7 +2014,7 @@
       "catalog_provider": "venice",
       "model_id": "hy4-preview",
       "display_name": "Hy4 Preview",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "tencent-hy",
       "model_type": "language",
       "modalities": [
         "text"
@@ -2798,7 +2805,7 @@
       "catalog_provider": "venice",
       "model_id": "longcat-distilled-image-to-video",
       "display_name": "Longcat Distilled",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "meituan-longcat",
       "model_type": "video",
       "modalities": [
         "image",
@@ -2814,7 +2821,7 @@
       "catalog_provider": "venice",
       "model_id": "longcat-distilled-text-to-video",
       "display_name": "Longcat Distilled",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "meituan-longcat",
       "model_type": "video",
       "modalities": [
         "text",
@@ -2830,7 +2837,7 @@
       "catalog_provider": "venice",
       "model_id": "longcat-image-to-video",
       "display_name": "Longcat Full Quality",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "meituan-longcat",
       "model_type": "video",
       "modalities": [
         "image",
@@ -2846,7 +2853,7 @@
       "catalog_provider": "venice",
       "model_id": "longcat-text-to-video",
       "display_name": "Longcat Full Quality",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "meituan-longcat",
       "model_type": "video",
       "modalities": [
         "text",
@@ -2990,10 +2997,10 @@
       "catalog_provider": "venice",
       "model_id": "luma-uni-1",
       "display_name": "Luma Uni-1",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "luma-ai",
+      "model_type": "image",
       "modalities": [
-        "text"
+        "image"
       ],
       "description": "Luma Uni-1 is Luma AI's image model, which grounds prompts in web knowledge for faithful, high-fidelity results. It pairs with Luma Uni-1 Edit for text-guided edits that keep the source structure.",
       "context_window_tokens": null,
@@ -3005,10 +3012,10 @@
       "catalog_provider": "venice",
       "model_id": "luma-uni-1-edit",
       "display_name": "Luma Uni-1",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "luma-ai",
+      "model_type": "image",
       "modalities": [
-        "text"
+        "image"
       ],
       "description": "Luma Uni-1 Edit makes text-guided edits with Luma AI's Uni-1 while preserving the structure of the source image.",
       "context_window_tokens": null,
@@ -3020,10 +3027,10 @@
       "catalog_provider": "venice",
       "model_id": "luma-uni-1-max",
       "display_name": "Luma Uni-1 Max",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "luma-ai",
+      "model_type": "image",
       "modalities": [
-        "text"
+        "image"
       ],
       "description": "Luma Uni-1 Max runs Luma AI's Uni-1 at maximum fidelity, for hero-quality stills with web-grounded prompt adherence. It pairs with Luma Uni-1 Max Edit.",
       "context_window_tokens": null,
@@ -3035,10 +3042,10 @@
       "catalog_provider": "venice",
       "model_id": "luma-uni-1-max-edit",
       "display_name": "Luma Uni-1 Max",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "luma-ai",
+      "model_type": "image",
       "modalities": [
-        "text"
+        "image"
       ],
       "description": "Luma Uni-1 Max Edit makes text-guided edits at maximum fidelity with Luma AI's Uni-1, preserving the structure of the source image.",
       "context_window_tokens": null,
@@ -3050,7 +3057,7 @@
       "catalog_provider": "venice",
       "model_id": "lustify-sdxl",
       "display_name": "Lustify SDXL",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "lustify",
       "model_type": "image",
       "modalities": [
         "image"
@@ -3065,10 +3072,10 @@
       "catalog_provider": "venice",
       "model_id": "lustify-v7",
       "display_name": "Lustify v7",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "lustify",
+      "model_type": "image",
       "modalities": [
-        "text"
+        "image"
       ],
       "description": "",
       "context_window_tokens": null,
@@ -3080,10 +3087,10 @@
       "catalog_provider": "venice",
       "model_id": "lustify-v8",
       "display_name": "Lustify v8",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "lustify",
+      "model_type": "image",
       "modalities": [
-        "text"
+        "image"
       ],
       "description": "",
       "context_window_tokens": null,
@@ -3095,10 +3102,10 @@
       "catalog_provider": "venice",
       "model_id": "lyria-3-pro",
       "display_name": "Lyria 3 Pro",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "google",
+      "model_type": "audio",
       "modalities": [
-        "text"
+        "audio"
       ],
       "description": "O Lyria 3 Pro do Google gera músicas completas e estruturadas de até 3 minutos a partir de um único prompt de texto. Suporta vocais, letras e geração multilíngue em diversos gêneros.",
       "context_window_tokens": null,
@@ -3405,7 +3412,7 @@
       "catalog_provider": "venice",
       "model_id": "mistral-small-3-2-24b-instruct",
       "display_name": "Mistral Small 3.2 24B Instruct",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "mistral",
       "model_type": "language",
       "modalities": [
         "text"
@@ -3420,9 +3427,10 @@
       "catalog_provider": "venice",
       "model_id": "mmaudio-v2-text-to-audio",
       "display_name": "MMAudio V2",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "mmaudio",
       "model_type": "audio",
       "modalities": [
+        "text",
         "audio"
       ],
       "description": "Gere audio sincronizado e efeitos sonoros a partir de prompts de texto com o MMAudio V2.",
@@ -4055,11 +4063,12 @@
       "catalog_provider": "venice",
       "model_id": "ovi-image-to-video",
       "display_name": "Ovi",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "character-ai",
       "model_type": "video",
       "modalities": [
         "image",
-        "video"
+        "video",
+        "audio"
       ],
       "description": "Ovi is Character.AI's open-weight audio-video model, based on Wan, that animates a starting image into a 5-second clip with native audio. It runs fast and is served uncensored.",
       "context_window_tokens": null,
@@ -4071,7 +4080,7 @@
       "catalog_provider": "venice",
       "model_id": "pixverse-c1-image-to-video",
       "display_name": "PixVerse C1",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "pixverse",
       "model_type": "video",
       "modalities": [
         "image",
@@ -4087,7 +4096,7 @@
       "catalog_provider": "venice",
       "model_id": "pixverse-c1-reference-to-video",
       "display_name": "PixVerse C1 R2V",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "pixverse",
       "model_type": "video",
       "modalities": [
         "image",
@@ -4103,7 +4112,7 @@
       "catalog_provider": "venice",
       "model_id": "pixverse-c1-text-to-video",
       "display_name": "PixVerse C1",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "pixverse",
       "model_type": "video",
       "modalities": [
         "text",
@@ -4119,10 +4128,11 @@
       "catalog_provider": "venice",
       "model_id": "pixverse-c1-transition",
       "display_name": "PixVerse C1 Transition",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "pixverse",
+      "model_type": "video",
       "modalities": [
-        "text"
+        "image",
+        "video"
       ],
       "description": "PixVerse C1 Transition creates a seamless cinematic transition between a start image and an end image, as a 3- to 15-second clip at up to 1080p, with optional native audio.",
       "context_window_tokens": null,
@@ -4639,10 +4649,10 @@
       "catalog_provider": "venice",
       "model_id": "recraft-v4",
       "display_name": "Recraft V4",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "recraft",
+      "model_type": "image",
       "modalities": [
-        "text"
+        "image"
       ],
       "description": "Recraft V4 is Recraft's image model, known for high-quality output and precise text rendering. It suits design, branding and marketing work.",
       "context_window_tokens": null,
@@ -4654,10 +4664,10 @@
       "catalog_provider": "venice",
       "model_id": "recraft-v4-pro",
       "display_name": "Recraft V4 Pro",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "recraft",
+      "model_type": "image",
       "modalities": [
-        "text"
+        "image"
       ],
       "description": "Recraft V4 Pro is the premium tier of Recraft V4, adding finer detail to its precise text rendering. It suits design, branding and product imagery where detail matters.",
       "context_window_tokens": null,
@@ -4669,11 +4679,9 @@
       "catalog_provider": "venice",
       "model_id": "runway-gen4-5",
       "display_name": "Runway Gen-4.5",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
-      "modalities": [
-        "text"
-      ],
+      "upstream_family": "runway",
+      "model_type": "unknown",
+      "modalities": [],
       "description": "",
       "context_window_tokens": null,
       "integration_state": "CATALOG_ONLY",
@@ -4684,11 +4692,9 @@
       "catalog_provider": "venice",
       "model_id": "runway-gen4-5-text",
       "display_name": "Runway Gen-4.5",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
-      "modalities": [
-        "text"
-      ],
+      "upstream_family": "runway",
+      "model_type": "unknown",
+      "modalities": [],
       "description": "",
       "context_window_tokens": null,
       "integration_state": "CATALOG_ONLY",
@@ -4699,11 +4705,9 @@
       "catalog_provider": "venice",
       "model_id": "runway-gen4-turbo",
       "display_name": "Runway Gen-4 Turbo",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
-      "modalities": [
-        "text"
-      ],
+      "upstream_family": "runway",
+      "model_type": "unknown",
+      "modalities": [],
       "description": "",
       "context_window_tokens": null,
       "integration_state": "CATALOG_ONLY",
@@ -4714,11 +4718,12 @@
       "catalog_provider": "venice",
       "model_id": "seed-2-1-turbo",
       "display_name": "Seed 2.1 Turbo",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "bytedance-seed",
+      "model_type": "multimodal",
       "modalities": [
         "text",
-        "multimodal"
+        "image",
+        "video"
       ],
       "description": "Seed 2.1 Turbo (Dola-Seed-2.1) é o modelo multimodal de próxima geração da ByteDance para a era de código e agentes, com entrega de código de nível de engenharia, execução de agentes de longo prazo e compreensão aprimorada de GUI e vídeo. Suporta entradas de texto, imagem e vídeo com janela de contexto de 256K.",
       "context_window_tokens": 256000,
@@ -4730,9 +4735,10 @@
       "catalog_provider": "venice",
       "model_id": "seed-audio-1-0",
       "display_name": "Seed Audio 1.0",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "bytedance-seed",
       "model_type": "audio",
       "modalities": [
+        "text",
         "audio"
       ],
       "description": "Gere fala e áudio expressivos multilíngues a partir de um prompt de texto com o BytePlus Seed Audio 1.0 (20 idiomas, controle de duração por timestamp).",
@@ -5042,7 +5048,7 @@
       "catalog_provider": "venice",
       "model_id": "sonilo-v1-1-music",
       "display_name": "Sonilo V1.1 Music",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "sonilo",
       "model_type": "audio",
       "modalities": [
         "audio"
@@ -5057,10 +5063,10 @@
       "catalog_provider": "venice",
       "model_id": "sonilo-v1-1-sound-effects",
       "display_name": "Sonilo V1.1 Sound Effects",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "sonilo",
+      "model_type": "audio",
       "modalities": [
-        "text"
+        "audio"
       ],
       "description": "Gere efeitos sonoros licenciados e seguros para uso comercial com controle preciso de tipo, textura, intensidade e duração.",
       "context_window_tokens": null,
@@ -5072,7 +5078,7 @@
       "catalog_provider": "venice",
       "model_id": "stable-audio-25",
       "display_name": "Stable Audio 2.5",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "stability-ai",
       "model_type": "audio",
       "modalities": [
         "audio"
@@ -5087,10 +5093,10 @@
       "catalog_provider": "venice",
       "model_id": "stt-xai-v1",
       "display_name": "xAI Speech to Text v1",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "xai",
+      "model_type": "audio",
       "modalities": [
-        "text"
+        "audio"
       ],
       "description": "xAI Speech to Text v1 is xAI's speech recognition model, which transcribes recorded audio into text. It accepts a language hint and returns word-level timestamps.",
       "context_window_tokens": null,
@@ -5102,7 +5108,7 @@
       "catalog_provider": "venice",
       "model_id": "topaz-video-upscale",
       "display_name": "Topaz Video Upscale",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "topaz-labs",
       "model_type": "video",
       "modalities": [
         "video"
@@ -5411,7 +5417,7 @@
       "catalog_provider": "venice",
       "model_id": "vidu-q3-image-to-video",
       "display_name": "Vidu Q3",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "vidu",
       "model_type": "video",
       "modalities": [
         "image",
@@ -5427,7 +5433,7 @@
       "catalog_provider": "venice",
       "model_id": "vidu-q3-text-to-video",
       "display_name": "Vidu Q3",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "vidu",
       "model_type": "video",
       "modalities": [
         "text",
@@ -5892,11 +5898,13 @@
       "catalog_provider": "venice",
       "model_id": "xiaomi-mimo-v2-5",
       "display_name": "MiMo-V2.5",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "xiaomi",
+      "model_type": "multimodal",
       "modalities": [
         "text",
-        "multimodal"
+        "image",
+        "video",
+        "audio"
       ],
       "description": "MiMo-V2.5 is Xiaomi's native omnimodal model with strong agentic capabilities, supporting text, image, video, and audio understanding in a unified architecture. Built on a sparse Mixture-of-Experts backbone with 310B total and 15B active parameters, it delivers long-context reasoning up to 1M tokens, function calling, and multimodal perception.",
       "context_window_tokens": null,
@@ -5908,10 +5916,13 @@
       "catalog_provider": "venice",
       "model_id": "xiaomi-mimo-v2-6-flash",
       "display_name": "MiMo-V2.6-Flash",
-      "upstream_family": "other-or-unresolved",
-      "model_type": "language",
+      "upstream_family": "xiaomi",
+      "model_type": "multimodal",
       "modalities": [
-        "text"
+        "text",
+        "image",
+        "video",
+        "audio"
       ],
       "description": "MiMo-V2.6-Flash is Xiaomi's efficiency-balanced omnimodal model: a sparse Mixture-of-Experts with 309B total and 15B activated parameters, natively understanding text, image, video, and audio with a 1M-token context window. Trained with mixed reinforcement learning across coding, general agents, visual, and cybersecurity tasks, it is built for long-horizon coding, tool use, and computer use.",
       "context_window_tokens": 1000000,
@@ -5984,7 +5995,7 @@
       "catalog_provider": "venice",
       "model_id": "z-image-turbo",
       "display_name": "Z-Image Turbo",
-      "upstream_family": "other-or-unresolved",
+      "upstream_family": "alibaba-tongyi",
       "model_type": "image",
       "modalities": [
         "image"
