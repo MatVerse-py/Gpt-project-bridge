@@ -24,7 +24,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 234
+      "source_line": 234,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -39,7 +40,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 366
+      "source_line": 366,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -66,10 +68,11 @@
         "text"
       ],
       "description": "Aion 3.0 is a multi-model roleplaying and storytelling system from AionLabs, built on the GLM family of models. Multiple specialized models collaborate on each response to produce stronger narrative structure and more compelling tension and conflict. It handles mature and darker themes with nuance and supports tool calling for richer interactive fiction.",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1221
+      "source_line": 1221,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -81,10 +84,11 @@
         "text"
       ],
       "description": "Aion 3.0 Mini is a multi-model roleplaying and storytelling system from AionLabs, built on the DeepSeek family of models. Multiple specialized models collaborate on each response to produce stronger narrative structure and more compelling tension and conflict at lower cost. It handles mature and darker themes with nuance and supports tool calling for richer interactive fiction.",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1230
+      "source_line": 1230,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -96,10 +100,11 @@
         "text"
       ],
       "description": "Aion 3.5, the successor to Aion 3.0, is a multi-model roleplaying and storytelling system from AionLabs, built on the GLM family of models, with a longer context window. Multiple specialized models collaborate on each response to produce stronger narrative structure and more compelling tension and conflict. It handles mature and darker themes with nuance and supports tool calling for richer interactive fiction.",
-      "context_window_tokens": null,
+      "context_window_tokens": 262000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 463
+      "source_line": 463,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -111,10 +116,11 @@
         "text"
       ],
       "description": "Aion 3.5 Mini is a multi-model roleplaying and storytelling system from AionLabs, built on the GLM family of models. Multiple specialized models collaborate on each response to produce stronger narrative structure and more compelling tension and conflict at lower cost. It handles mature and darker themes with nuance and supports tool calling for richer interactive fiction.",
-      "context_window_tokens": null,
+      "context_window_tokens": 262000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 472
+      "source_line": 472,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -143,7 +149,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1469
+      "source_line": 1469,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -158,7 +165,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 737
+      "source_line": 737,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -173,7 +181,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 94
+      "source_line": 94,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -188,7 +197,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 337
+      "source_line": 337,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -201,10 +211,11 @@
         "multimodal"
       ],
       "description": "Claude Opus 4.5 is Anthropic's frontier reasoning model optimized for complex software engineering, agentic workflows, and long-horizon computer use. It offers strong multimodal capabilities, competitive performance across real-world coding and reasoning benchmarks, and improved robustness to prompt injection.",
-      "context_window_tokens": null,
+      "context_window_tokens": 198000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2684
+      "source_line": 2684,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -219,7 +230,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2438
+      "source_line": 2438,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -234,7 +246,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1844
+      "source_line": 1844,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -249,7 +262,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1535
+      "source_line": 1535,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -264,7 +278,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1543
+      "source_line": 1543,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -279,7 +294,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1087
+      "source_line": 1087,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -294,7 +310,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 513
+      "source_line": 513,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -309,7 +326,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 447
+      "source_line": 447,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -324,7 +342,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1095
+      "source_line": 1095,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -336,10 +355,11 @@
         "text"
       ],
       "description": "Claude Sonnet 4.6 é a melhor combinação de velocidade e inteligência da Anthropic, oferecendo forte desempenho em codificação, raciocínio e tarefas gerais com excelente velocidade e eficiência de custos.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2392
+      "source_line": 2392,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -354,7 +374,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1314
+      "source_line": 1314,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -369,7 +390,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 455
+      "source_line": 455,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -385,7 +407,8 @@
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": null,
-      "source_locator": "html:p[title=\"deepseek-v3.2\"]"
+      "source_locator": "html:p[title=\"deepseek-v3.2\"]",
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -401,7 +424,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 567
+      "source_line": 567,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -417,7 +441,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 259
+      "source_line": 259,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -433,7 +458,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 226
+      "source_line": 226,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -449,7 +475,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 181
+      "source_line": 181,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -462,10 +489,11 @@
         "multimodal"
       ],
       "description": "DeepSeek V4.1 Flash Uncensored é uma variante sem censura e abliterada do DeepSeek V4.1 Flash, um modelo Mixture-of-Experts multimodal com 552B parâmetros de backbone (8B ativos na entrada, 16B na saída) e janela de contexto de 512K. Processa nativamente imagens e texto, com forte desempenho em raciocínio, codificação e fluxos agentivos, sem filtros de conteúdo.",
-      "context_window_tokens": 512000,
+      "context_window_tokens": 524000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 550
+      "source_line": 550,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -480,7 +508,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1679
+      "source_line": 1679,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -495,7 +524,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1044
+      "source_line": 1044,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -510,7 +540,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 929
+      "source_line": 929,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -525,7 +556,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1655
+      "source_line": 1655,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -540,7 +572,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 856
+      "source_line": 856,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -555,7 +588,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 102
+      "source_line": 102,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -567,10 +601,11 @@
         "text"
       ],
       "description": "DeepSeek V4 Flash executando em um Ambiente de Execução Confiável (TEE). Evidência de atestação de hardware disponível para verificação independente da identidade e configuração do enclave.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1263
+      "source_line": 1263,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -582,10 +617,11 @@
         "text"
       ],
       "description": "Gemma 4 26B A4B Uncensored executando em um Ambiente de Execução Confiável (TEE). Uma variante sem censura do modelo MoE Gemma 4 do Google com 25.2B parâmetros totais / 3.8B ativos, com evidência de atestação de hardware disponível para verificação independente.",
-      "context_window_tokens": null,
+      "context_window_tokens": 64000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1565
+      "source_line": 1565,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -597,10 +633,11 @@
         "text"
       ],
       "description": "GLM 5.2 executando em um Ambiente de Execução Confiável (TEE). Um modelo da Z.AI para tarefas de longo horizonte com raciocínio aprimorado e contexto de engenharia em nível de projeto, com evidência de atestação de hardware disponível para verificação independente.",
-      "context_window_tokens": null,
+      "context_window_tokens": 524000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1429
+      "source_line": 1429,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -613,10 +650,11 @@
         "multimodal"
       ],
       "description": "GLM 5.3 Flash executando em um Ambiente de Execução Confiável (TEE). Um modelo multimodal rápido e de baixo custo com 1M de contexto. Evidência de atestação de hardware disponível para verificação independente da identidade e configuração do enclave.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 661
+      "source_line": 661,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -628,10 +666,11 @@
         "text"
       ],
       "description": "GLM 5.3 executando em um Ambiente de Execução Confiável (TEE). O modelo carro-chefe da Z.ai com 1M de contexto. Evidência de atestação de hardware disponível para verificação independente da identidade e configuração do enclave.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 653
+      "source_line": 653,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -643,10 +682,11 @@
         "text"
       ],
       "description": "GPT OSS 120B executando em um Ambiente de Execução Confiável (TEE). O modelo MoE de pesos abertos de 117B parâmetros da OpenAI com profundidade de raciocínio configurável e uso nativo de ferramentas, com evidência de atestação de hardware disponível para verificação independente.",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2102
+      "source_line": 2102,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -659,10 +699,11 @@
         "multimodal"
       ],
       "description": "Kimi K2.6 executando em um Ambiente de Execução Confiável (TEE). O modelo multimodal da MoonshotAI com 262K de contexto. Evidência de atestação de hardware disponível para verificação independente da identidade e configuração do enclave.",
-      "context_window_tokens": null,
+      "context_window_tokens": 262000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 669
+      "source_line": 669,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -675,10 +716,11 @@
         "multimodal"
       ],
       "description": "Kimi K3 é um modelo de raciocínio multimodal de código aberto com 2.8T parâmetros da Moonshot AI. É adequado para codificação complexa, trabalho de conhecimento e fluxos de trabalho agênticos de longo horizonte.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 575
+      "source_line": 575,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -690,10 +732,11 @@
         "text"
       ],
       "description": "Qwen 2.5 7B Instruct executando em um Ambiente de Execução Confiável (TEE). Um modelo compacto com fortes capacidades de codificação, matemática e multilinguismo suportando 29+ idiomas, com evidência de atestação de hardware disponível para verificação independente.",
-      "context_window_tokens": null,
+      "context_window_tokens": 32000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2110
+      "source_line": 2110,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -705,10 +748,11 @@
         "text"
       ],
       "description": "Qwen 3.6 35B A3B FP8 executando em um Ambiente de Execução Confiável (TEE). Um modelo rápido de mistura de especialistas com ~3B parâmetros ativos por token. Evidência de atestação de hardware disponível para verificação independente da identidade e configuração do enclave.",
-      "context_window_tokens": null,
+      "context_window_tokens": 32000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1619
+      "source_line": 1619,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -721,10 +765,11 @@
         "multimodal"
       ],
       "description": "Qwen 3.8 27B executando em um Ambiente de Execução Confiável (TEE). Um modelo multimodal com 262K de contexto que suporta entrada de texto e imagem. Evidência de atestação de hardware disponível para verificação independente da identidade e configuração do enclave.",
-      "context_window_tokens": null,
+      "context_window_tokens": 262000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 677
+      "source_line": 677,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -737,10 +782,11 @@
         "multimodal"
       ],
       "description": "Qwen3 VL 30B A3B executando em um Ambiente de Execução Confiável (TEE). Um modelo multimodal que unifica geração de texto com compreensão visual de imagens, com evidência de atestação de hardware disponível para verificação independente.",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2118
+      "source_line": 2118,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1104,10 +1150,11 @@
         "multimodal"
       ],
       "description": "O Gemini 3.1 Pro é uma evolução do modelo de ponta do Google com 1M de contexto, avançando o raciocínio multimodal de alta precisão em texto, imagem e código.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2384
+      "source_line": 2384,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1119,10 +1166,11 @@
         "text"
       ],
       "description": "Gemini 3.5 Flash é um modelo de pensamento de alta velocidade e alto valor com 1M de contexto, projetado para fluxos de trabalho agentivos, chat de várias rodadas e assistência de codificação.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1582
+      "source_line": 1582,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1134,10 +1182,11 @@
         "text"
       ],
       "description": "Gemini 3.5 Flash-Lite é o modelo Gemini 3.5 mais rápido e econômico com 1M de contexto, ideal para perguntas do dia a dia, resumos e tarefas leves de codificação.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1165
+      "source_line": 1165,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1149,10 +1198,11 @@
         "text"
       ],
       "description": "Gemini 3.6 Flash, sucessor do Gemini 3.5 Flash, é um modelo de pensamento de alta velocidade e alto valor com 1M de contexto, projetado para fluxos de trabalho agentivos, chat de várias rodadas e assistência de codificação.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1157
+      "source_line": 1157,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1164,10 +1214,11 @@
         "text"
       ],
       "description": "Gemini 3.7 Flash, sucessor do Gemini 3.6 Flash, foi projetado para codificação complexa, fluxos de trabalho agentivos e execução confiável em várias etapas, com 1M de contexto e pensamento ajustável.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 848
+      "source_line": 848,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1179,10 +1230,11 @@
         "text"
       ],
       "description": "Gemini 3.8 Flash, sucessor do Gemini 3.7 Flash, foi projetado para codificação complexa, fluxos de trabalho agentivos e execução confiável em várias etapas, com 1M de contexto e pensamento ajustável.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 715
+      "source_line": 715,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1194,10 +1246,11 @@
         "text"
       ],
       "description": "Gemini 3 Flash Preview é um modelo de pensamento de alta velocidade e alto valor projetado para fluxos de trabalho agentivos, chat de várias rodadas e assistência de codificação.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2640
+      "source_line": 2640,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1209,10 +1262,11 @@
         "text"
       ],
       "description": "O Gemini 4 Argon é o modelo frontier do Google para fluxos de trabalho complexos em engenharia de software, trabalho de conhecimento empresarial e defesa de cibersegurança, com uma janela de contexto unificada de 1M de tokens e pensamento ajustável.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 297
+      "source_line": 297,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1338,7 +1392,8 @@
       "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1873
+      "source_line": 1873,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1351,10 +1406,11 @@
         "multimodal"
       ],
       "description": "Gemma 3 introduces multimodality, supporting vision-language input and text outputs. It handles context windows up to 128k tokens, understands over 140 languages, and offers improved math, reasoning, and chat capabilities, including structured outputs and function calling. Gemma 3 27B is Google's open source model, successor to Gemma 2.",
-      "context_window_tokens": null,
+      "context_window_tokens": 198000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2772
+      "source_line": 2772,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1369,7 +1425,8 @@
       "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1977
+      "source_line": 1977,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1384,7 +1441,8 @@
       "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1962
+      "source_line": 1962,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1580,7 +1638,8 @@
       "context_window_tokens": 2000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2134
+      "source_line": 2134,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1592,10 +1651,11 @@
         "text"
       ],
       "description": "Grok 4.20 Multi-Agent é uma variante do xAI Grok 4.20 projetada para fluxos de trabalho colaborativos baseados em agentes. Múltiplos agentes operam em paralelo para conduzir pesquisa profunda, coordenar o uso de ferramentas e sintetizar informações em tarefas complexas.",
-      "context_window_tokens": null,
+      "context_window_tokens": 2000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2142
+      "source_line": 2142,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1610,7 +1670,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1773
+      "source_line": 1773,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1625,7 +1686,8 @@
       "context_window_tokens": 500000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1255
+      "source_line": 1255,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1641,7 +1703,8 @@
       "context_window_tokens": 500000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 921
+      "source_line": 921,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1657,7 +1720,8 @@
       "context_window_tokens": 500000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 521
+      "source_line": 521,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -1669,10 +1733,11 @@
         "text"
       ],
       "description": "O modelo de codificação rápido da xAI treinado especificamente para codificação agêntica, atualmente em acesso antecipado.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1611
+      "source_line": 1611,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -2023,7 +2088,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 745
+      "source_line": 745,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -2083,7 +2149,8 @@
       "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2537
+      "source_line": 2537,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -2099,7 +2166,8 @@
       "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1758
+      "source_line": 1758,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -2115,7 +2183,8 @@
       "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1445
+      "source_line": 1445,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -2128,10 +2197,11 @@
         "multimodal"
       ],
       "description": "Kimi K3 é um modelo de raciocínio multimodal de código aberto e ultra grande escala da Moonshot AI. É adequado para codificação complexa, trabalho de conhecimento e fluxos de trabalho agênticos de longo horizonte, e é particularmente forte em navegar grandes repositórios, usar ferramentas, depurar e iterar com base em imagens, logs, testes e feedback em tempo de execução.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1133
+      "source_line": 1133,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -2147,7 +2217,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 218
+      "source_line": 218,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -2163,7 +2234,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 243
+      "source_line": 243,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -2176,10 +2248,11 @@
         "multimodal"
       ],
       "description": "Kimi K3 is an ultra-large-scale, open-weight multimodal reasoning model from Moonshot AI. It is suited for complex coding, knowledge work, and long-horizon agentic workflows, and is particularly strong at navigating large repositories, using tools, debugging, and iterating against images, logs, tests, and runtime feedback.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1015
+      "source_line": 1015,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -2783,7 +2856,8 @@
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": null,
-      "source_locator": "html:p[title=\"llama-3.2-3b\"]"
+      "source_locator": "html:p[title=\"llama-3.2-3b\"]",
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -2799,7 +2873,8 @@
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": null,
-      "source_locator": "html:p[title=\"llama-3.3-70b\"]"
+      "source_locator": "html:p[title=\"llama-3.3-70b\"]",
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3313,10 +3388,11 @@
         "text"
       ],
       "description": "MiniMax-M2.5 é um modelo de linguagem otimizado para codificação, fluxos de trabalho agentivos e desenvolvimento de aplicações modernas com capacidades de raciocínio aprimoradas.",
-      "context_window_tokens": null,
+      "context_window_tokens": 198000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2408
+      "source_line": 2408,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3328,10 +3404,11 @@
         "text"
       ],
       "description": "MiniMax-M2.7 é um modelo de linguagem projetado para produtividade autônoma do mundo real com capacidades agentivas avançadas através de colaboração multi-agente.",
-      "context_window_tokens": null,
+      "context_window_tokens": 198000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2094
+      "source_line": 2094,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3346,7 +3423,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 251
+      "source_line": 251,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3358,10 +3436,11 @@
         "text"
       ],
       "description": "MiniMax-M3 preview is a 1.4T-parameter frontier model from MiniMax for coding, agentic workflows, and complex reasoning, served at fp8 with a 512K context window.",
-      "context_window_tokens": 512000,
+      "context_window_tokens": 524000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1453
+      "source_line": 1453,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3418,10 +3497,11 @@
         "text"
       ],
       "description": "Mistral Small 3.2 is a 24B parameter model optimized for efficiency and performance. Ideal for general-purpose tasks with balanced speed and capability.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2602
+      "source_line": 2602,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3482,7 +3562,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 289
+      "source_line": 289,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3497,7 +3578,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 305
+      "source_line": 305,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3630,10 +3712,11 @@
         "multimodal"
       ],
       "description": "NVIDIA Nemotron 3.5 Super VL é um modelo de visão-linguagem multimodal aberto para agentes especializados. Seu design Mixture-of-Experts de 120B parâmetros (12B ativos) compreende texto, imagens, documentos, interfaces gráficas e vídeo, combinando raciocínio, seguimento de instruções e uso de ferramentas para fluxos de trabalho agentivos de longa duração.",
-      "context_window_tokens": null,
+      "context_window_tokens": 262000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 267
+      "source_line": 267,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3645,10 +3728,11 @@
         "text"
       ],
       "description": "NVIDIA Nemotron 3 Nano 30B é um modelo de linguagem compacto e eficiente da NVIDIA, otimizado para inferência rápida enquanto mantém forte desempenho em diversas tarefas.",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2553
+      "source_line": 2553,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3660,10 +3744,11 @@
         "text"
       ],
       "description": "NVIDIA Nemotron 3 Ultra foi desenvolvido para raciocínio de ponta, orquestração, agentes de codificação, pesquisa aprofundada e fluxos de trabalho empresariais complexos. Oferece inferência até 5x mais rápida e custo até 30% menor para cargas de trabalho agênticas.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1484
+      "source_line": 1484,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3695,7 +3780,8 @@
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": null,
-      "source_locator": "html:p[title=\"olafangensan-glm-4.7-flash-heretic\"]"
+      "source_locator": "html:p[title=\"olafangensan-glm-4.7-flash-heretic\"]",
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3708,10 +3794,11 @@
         "multimodal"
       ],
       "description": "Modelo multimodal da OpenAI com capacidades de visão, raciocínio forte e amplo conhecimento. Popular por seu desempenho equilibrado em todas as tarefas. Versão: 2024-11-20.",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2257
+      "source_line": 2257,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3723,10 +3810,11 @@
         "text"
       ],
       "description": "Modelo pequeno e econômico da OpenAI que oferece inteligência de nível GPT-4 por uma fração do custo. Ideal para aplicações de alto volume que exigem raciocínio forte. Versão: 2024-07-18.",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2265
+      "source_line": 2265,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3738,10 +3826,11 @@
         "text"
       ],
       "description": "GPT-5.2 é um modelo de grau fronteira da série GPT-5, oferecendo desempenho agentivo e de contexto longo mais forte em comparação com o GPT-5.1. Ele usa raciocínio adaptativo para alocar computação dinamicamente.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2669
+      "source_line": 2669,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3753,10 +3842,11 @@
         "text"
       ],
       "description": "GPT-5.3 Codex, sucessor do GPT-5.2 Codex, é o modelo de codificação especializado da OpenAI, otimizado para desenvolvimento de software avançado, geração de código e resolução de problemas técnicos. Ele suporta uma janela de contexto maior e saídas mais longas que o GPT-5.2 Codex.",
-      "context_window_tokens": null,
+      "context_window_tokens": 400000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2323
+      "source_line": 2323,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3768,10 +3858,11 @@
         "text"
       ],
       "description": "GPT-5.4, sucessor do GPT-5.2, é um modelo de fronteira da série GPT-5 com uma janela de contexto de mais de 1M, oferecendo desempenho agentivo e de contexto longo aprimorado. Ele usa raciocínio adaptativo para alocar computação dinamicamente.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2178
+      "source_line": 2178,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3783,10 +3874,11 @@
         "text"
       ],
       "description": "GPT-5.4 Mini traz as capacidades principais do GPT-5.4 para um modelo mais rápido e eficiente, otimizado para cargas de trabalho de alto rendimento. Suporta entradas de texto e imagem com forte desempenho em raciocínio, codificação e uso de ferramentas.",
-      "context_window_tokens": null,
+      "context_window_tokens": 400000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2079
+      "source_line": 2079,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3798,10 +3890,11 @@
         "text"
       ],
       "description": "GPT-5.4 Pro se baseia na arquitetura unificada do GPT-5.4 com raciocínio aprimorado para tarefas complexas e de alto risco. Ele oferece janela de contexto de mais de 1M de tokens (922K de entrada, 128K de saída) e suporta entradas de texto e imagem.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2186
+      "source_line": 2186,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3813,10 +3906,11 @@
         "text"
       ],
       "description": "GPT-5.5, sucessor do GPT-5.4, é um modelo de fronteira da série GPT-5 com uma janela de contexto de mais de 1M, oferecendo desempenho agentivo e de contexto longo aprimorado. Ele usa raciocínio adaptativo para alocar computação dinamicamente.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1694
+      "source_line": 1694,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3828,10 +3922,11 @@
         "text"
       ],
       "description": "GPT-5.5 Pro, sucessor do GPT-5.4 Pro, se baseia na arquitetura unificada do GPT-5.5 com raciocínio aprimorado para tarefas complexas e de alto risco. Ele oferece janela de contexto de mais de 1M de tokens (922K de entrada, 128K de saída) e suporta entradas de texto e imagem.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1663
+      "source_line": 1663,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3843,10 +3938,11 @@
         "text"
       ],
       "description": "GPT-5.6 Luna é um modelo rápido e econômico da série GPT-5.6 da OpenAI. É adequado para tarefas de alto volume e sensíveis à latência, como chat, classificação e fluxos de trabalho agênticos leves, oferecendo raciocínio capaz para sua faixa de preço.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1173
+      "source_line": 1173,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3858,10 +3954,11 @@
         "text"
       ],
       "description": "GPT-5.6 Luna Pro é o mesmo modelo subjacente que GPT-5.6 Luna, servido com reasoning.mode definido como pro para respostas de maior qualidade em tarefas complexas.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1181
+      "source_line": 1181,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3873,10 +3970,11 @@
         "text"
       ],
       "description": "GPT-5.6 Sol é o modelo principal da série GPT-5.6 da OpenAI. É adequado para raciocínio complexo, codificação e fluxos de trabalho agênticos, e é particularmente forte em tarefas de linha de comando, codificação em várias etapas e resolução de problemas de longo prazo.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1205
+      "source_line": 1205,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3888,10 +3986,11 @@
         "text"
       ],
       "description": "GPT-5.6 Sol Pro é o mesmo modelo subjacente que GPT-5.6 Sol, servido com reasoning.mode definido como pro para respostas de maior qualidade em tarefas complexas.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1213
+      "source_line": 1213,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3903,10 +4002,11 @@
         "text"
       ],
       "description": "GPT-5.6 Terra é um modelo equilibrado da série GPT-5.6 da OpenAI, posicionado entre o nível principal Sol e o nível econômico Luna. É adequado para codificação, raciocínio e tarefas agênticas do dia a dia em que capacidade e custo precisam ser equilibrados.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1189
+      "source_line": 1189,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3918,10 +4018,11 @@
         "text"
       ],
       "description": "GPT-5.6 Terra Pro é o mesmo modelo subjacente que GPT-5.6 Terra, servido com reasoning.mode definido como pro para respostas de maior qualidade em tarefas complexas.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1197
+      "source_line": 1197,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3933,10 +4034,11 @@
         "text"
       ],
       "description": "GPT-6 Astra é o modelo mais capaz da OpenAI, feito para o trabalho de ponta a ponta mais exigente. É adequado para raciocínio complexo, codificação, uso de computador, pesquisa e criação de documentos, com uma janela de contexto de 1,05M tokens (922K de entrada, 128K de saída) e suporta entradas de texto e imagem.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1100000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 693
+      "source_line": 693,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3948,10 +4050,11 @@
         "text"
       ],
       "description": "GPT-6 Astra com modo de raciocínio pro para tarefas difíceis que se beneficiam de mais trabalho do modelo. Suporta texto e imagens com contexto de 1,05M tokens. O modo pro pode usar mais tokens e levar mais tempo.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1100000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 685
+      "source_line": 685,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3963,10 +4066,11 @@
         "text"
       ],
       "description": "GPT-6 Luna é o modelo GPT-6 mais eficiente da OpenAI para tarefas focadas de alto volume. É adequado para chat, classificação e fluxos de trabalho agênticos leves, com uma janela de contexto de 1,05M tokens (922K de entrada, 128K de saída), entradas de texto e imagem e raciocínio capaz para sua faixa de preço.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1100000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 481
+      "source_line": 481,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3978,10 +4082,11 @@
         "text"
       ],
       "description": "GPT-6 Sol foi feito para codificação complexa e fluxos de trabalho agênticos. É o modelo GPT-6 da OpenAI para coding e agentes, com uma janela de contexto de 1,05M tokens (922K de entrada, 128K de saída), entradas de texto e imagem e esforço de raciocínio de none a max.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1100000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 489
+      "source_line": 489,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -3993,10 +4098,11 @@
         "text"
       ],
       "description": "GPT-6.1 Sol entrega desempenho próximo ao Astra a um custo menor para codificação complexa, uso de computador e trabalho profissional. Tem uma janela de contexto de 1,05M tokens (922K de entrada, 128K de saída), entradas de texto e imagem e esforço de raciocínio de low a max.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1100000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 417
+      "source_line": 417,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4008,10 +4114,11 @@
         "text"
       ],
       "description": "GPT-6.1 Sol Ultrafast é o mesmo modelo servido no modo Ultrafast da OpenAI, até 8x mais rápido. Tem uma janela de contexto de 1,05M tokens (922K de entrada, 128K de saída), entradas de texto e imagem e esforço de raciocínio de low a max.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1100000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 329
+      "source_line": 329,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4023,10 +4130,11 @@
         "text"
       ],
       "description": "GPT-6.1 Terra é um modelo rápido e eficiente para raciocínio visual, uso preciso de computador e escrita clara e natural. Tem uma janela de contexto de 1,05M tokens (922K de entrada, 128K de saída), entradas de texto e imagem e esforço de raciocínio de none a max.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1100000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 189
+      "source_line": 189,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4038,10 +4146,11 @@
         "text"
       ],
       "description": "gpt-oss-120b is an open-weight, 117B-parameter Mixture-of-Experts (MoE) language model from OpenAI designed for high-reasoning, agentic, and general-purpose production use cases. The model supports configurable reasoning depth, full chain-of-thought access, and native tool use, including function calling, browsing, and structured output generation",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2756
+      "source_line": 2756,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4201,10 +4310,11 @@
         "multimodal"
       ],
       "description": "Qwen 3.6 Plus Uncensored é uma variante sem censura do Qwen 3.6 Plus da Alibaba, um modelo de raciocínio com desempenho excepcional em codificação, raciocínio e tarefas de conhecimento geral. Inclui raciocínio misto, chamadas de função e suporte a entrada multimodal.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1953
+      "source_line": 1953,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4217,10 +4327,11 @@
         "multimodal"
       ],
       "description": "Qwen 3.7 Max é o maior modelo da série Qwen 3.7, com raciocínio profundo, chamadas de função, cache de prompts e suporte a entrada multimodal para imagens e vídeo. Destaca-se em programação, tarefas de escritório e produtividade, e fluxos de trabalho autônomos de longa duração.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1574
+      "source_line": 1574,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4233,10 +4344,11 @@
         "multimodal"
       ],
       "description": "Qwen 3.7 Plus, sucessor do Qwen 3.6 Plus, é um modelo de raciocínio da Alibaba com desempenho excepcional em codificação, raciocínio e tarefas de conhecimento geral. Inclui raciocínio misto, chamadas de função e suporte a entrada multimodal.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1513
+      "source_line": 1513,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4251,7 +4363,8 @@
       "context_window_tokens": 262000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 871
+      "source_line": 871,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4263,10 +4376,11 @@
         "text"
       ],
       "description": "Qwen 3.8 27B é um modelo denso nativo de visão-linguagem com 27B de parâmetros. Melhora codificação, trabalho profissional, pesquisa e tarefas agênticas de longo horizonte, com controle flexível de raciocínio e compreensão de imagens e vídeo. Suporta uma janela de contexto nativa de 262K tokens.",
-      "context_window_tokens": null,
+      "context_window_tokens": 262000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 839
+      "source_line": 839,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4282,7 +4396,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 559
+      "source_line": 559,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4297,7 +4412,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1103
+      "source_line": 1103,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4519,10 +4635,11 @@
         "text"
       ],
       "description": "Answers directly, without a reasoning step. Built for in-depth research and handling long, complex documents. Ideal for technical work and high-precision tasks.",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2830
+      "source_line": 2830,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4534,10 +4651,11 @@
         "text"
       ],
       "description": "Reasons step by step before it answers. Built for in-depth research and handling long, complex documents. Ideal for technical work and high-precision tasks.",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2822
+      "source_line": 2822,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4549,10 +4667,11 @@
         "text"
       ],
       "description": "Qwen 3.5 35B A3B é um modelo MoE altamente eficiente com 35B de parâmetros totais e apenas 3B de parâmetros ativos. Supera o Qwen3-235B-A22B maior sendo 6,7 vezes menor, destacando-se em raciocínio, codificação e tarefas de conhecimento geral.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2315
+      "source_line": 2315,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4564,10 +4683,11 @@
         "text"
       ],
       "description": "Qwen 3.5 é um modelo de raciocínio da Alibaba com arquitetura Mixture-of-Experts de 397B de parâmetros com 17B de parâmetros ativos. Destaca-se em raciocínio complexo, codificação e tarefas de conhecimento geral.",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2400
+      "source_line": 2400,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4579,10 +4699,11 @@
         "text"
       ],
       "description": "Qwen 3.6 27B é um modelo denso nativo de linguagem e visão que se baseia na versão 3.5-27B, com melhorias importantes em capacidades de codificação agêntica e habilidades aprimoradas de raciocínio e inferência em STEM. Na modalidade de visão, demonstra avanços significativos em inteligência espacial, localização e detecção de objetos, enquanto compreensão de vídeo, OCR de documentos e capacidades de agente visual continuam melhorando de forma constante.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1671
+      "source_line": 1671,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4597,7 +4718,8 @@
       "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1125
+      "source_line": 1125,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4609,10 +4731,11 @@
         "text"
       ],
       "description": "Variante Turbo do Qwen3 Coder 480B, otimizada para inferência mais rápida em tarefas de código.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2545
+      "source_line": 2545,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4624,10 +4747,11 @@
         "text"
       ],
       "description": "Optimized for speed and efficiency.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2838
+      "source_line": 2838,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4640,10 +4764,11 @@
         "multimodal"
       ],
       "description": "Modelo de visão-linguagem Qwen3-VL 235B com arquitetura MoE. O maior modelo da série Qwen3-VL, com percepção visual superior, OCR e raciocínio multimodal.",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2594
+      "source_line": 2594,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -4729,7 +4854,8 @@
       "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1329
+      "source_line": 1329,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -5325,10 +5451,11 @@
         "text"
       ],
       "description": "Venice Uncensored 1.2 foi projetado para máxima liberdade criativa e interação autêntica. Construído para exploração livre, interpretação de papéis e diálogos sem filtros com capacidades aprimoradas em relação à versão 1.1.",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2021
+      "source_line": 2021,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -5340,10 +5467,11 @@
         "text"
       ],
       "description": "Otimizado para cenários de roleplay criativos com máxima liberdade. Projetado para narrativas imersivas, interações de personagens e escrita criativa livre.",
-      "context_window_tokens": null,
+      "context_window_tokens": 128000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2375
+      "source_line": 2375,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -5907,10 +6035,11 @@
         "audio"
       ],
       "description": "MiMo-V2.5 is Xiaomi's native omnimodal model with strong agentic capabilities, supporting text, image, video, and audio understanding in a unified architecture. Built on a sparse Mixture-of-Experts backbone with 310B total and 15B active parameters, it delivers long-context reasoning up to 1M tokens, function calling, and multimodal perception.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1461
+      "source_line": 1461,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -5928,7 +6057,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 439
+      "source_line": 439,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -5943,7 +6073,8 @@
       "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 831
+      "source_line": 831,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -5955,10 +6086,11 @@
         "text"
       ],
       "description": "GLM-5.3 Flash é um modelo de raciocínio projetado para programação, trabalho agentivo sustentado e cargas de produção. É adequado para engenharia de software de longo horizonte, raciocínio complexo e fluxos de trabalho que combinam texto com contexto visual.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 823
+      "source_line": 823,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -5970,10 +6102,11 @@
         "text"
       ],
       "description": "GLM-5 Turbo é um modelo de inferência rápida da Z.ai ajustado para forte desempenho em ambientes agênticos e fluxos de trabalho de código em produção.",
-      "context_window_tokens": null,
+      "context_window_tokens": 200000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2126
+      "source_line": 2126,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -5986,10 +6119,11 @@
         "multimodal"
       ],
       "description": "GLM-5V-Turbo é o primeiro modelo fundacional de agente multimodal nativo da Z.ai, projetado para codificação baseada em visão e tarefas agentivas com entradas de imagem e texto.",
-      "context_window_tokens": null,
+      "context_window_tokens": 200000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2013
+      "source_line": 2013,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -6020,7 +6154,8 @@
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": null,
-      "source_locator": "html:p[title=\"zai-org-glm-4.6\"]"
+      "source_locator": "html:p[title=\"zai-org-glm-4.6\"]",
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -6036,7 +6171,8 @@
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": null,
-      "source_locator": "html:p[title=\"zai-org-glm-4.7\"]"
+      "source_locator": "html:p[title=\"zai-org-glm-4.7\"]",
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -6048,10 +6184,11 @@
         "text"
       ],
       "description": "O GLM-5, sucessor do GLM-4.7, é um modelo de linguagem desenvolvido pela Z.ai, com capacidades de raciocínio significativamente aprimoradas, melhor seguimento de instruções e suporte para múltiplos idiomas. Ele suporta janelas de contexto amplas para processamento de textos extensos e análises detalhadas.",
-      "context_window_tokens": null,
+      "context_window_tokens": 198000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 2430
+      "source_line": 2430,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -6063,10 +6200,11 @@
         "text"
       ],
       "description": "GLM-5.1, the successor to GLM-5, is a large language model developed by Z.ai, featuring significantly enhanced reasoning capabilities, improved instruction following, and support for multiple languages. Supports large context windows for processing extensive text and detailed analysis with fast inference speed.",
-      "context_window_tokens": null,
+      "context_window_tokens": 200000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1945
+      "source_line": 1945,
+      "context_window_source": "saved_mhtml_context_label"
     },
     {
       "catalog_provider": "venice",
@@ -6078,11 +6216,14 @@
         "text"
       ],
       "description": "GLM-5.2, the successor to GLM-5.1, is a large language model developed by Z.ai, featuring significantly enhanced reasoning capabilities, improved instruction following, and support for multiple languages. Supports a longer context window than GLM-5.1 for processing extensive text and detailed analysis with fast inference speed.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
-      "source_line": 1437
+      "source_line": 1437,
+      "context_window_source": "saved_mhtml_context_label"
     }
   ],
-  "source_html_locator": "Saved MHTML DOM: p[title] model identifier and adjacent model card"
+  "source_html_locator": "Saved MHTML DOM: p[title] model identifier and adjacent model card",
+  "context_labels_extracted": 139,
+  "context_label_source": "MHTML span[title='Janela de contexto']"
 }
