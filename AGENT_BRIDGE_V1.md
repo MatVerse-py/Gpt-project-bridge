@@ -14,6 +14,7 @@ constitutional authority or bypasses the existing admission process.
 | `gpt` | Existing OpenAI Responses broker | `OPENAI_MODEL` | `OPENAI_API_KEY` |
 | `claude` | Anthropic Messages, `/v1/messages` | `ANTHROPIC_MODEL` | `ANTHROPIC_API_KEY` |
 | `kilo` | Kilo Gateway chat completions | `KILO_MODEL` | `KILO_API_KEY`, or explicit anonymous `:free` mode |
+| `venice` | OpenAI-compatible Chat Completions at the pinned Venice base URL | `VENICE_MODEL` | `VENICE_API_KEY` |
 | `manus` | Manus tasks API v2 | `MANUS_AGENT_PROFILE` | `MANUS_API_KEY` |
 | `base44` | Base44 MCP at `https://app.base44.com/mcp` | Fixed `BASE44_APP_ID` | Existing OAuth `BASE44_ACCESS_TOKEN` |
 | `claude-code` | External handoff and authenticated reply | `CLAUDE_CODE_MODEL` | Client's own authorized session |
@@ -26,6 +27,8 @@ and `max` are service profiles, not disclosed model weights. Base44 is an
 application platform. Its enrollment uses `platform:base44` as a surface label,
 not a claim about an underlying LLM. Cognitive roles such as Cassandra and
 constitutional functions remain separate from provider identities.
+
+Venice uses the corpus-provided base URL `https://api.venice.ai/api/v1`; the adapter does not accept a caller-controlled endpoint. It invokes only the chat-completions surface and requires an explicit model ID. The 363 catalog IDs recovered from the supplied Venice snapshot are registered as `CATALOG_ONLY`; image, video and audio entries are not made executable by the chat adapter. The source UI claims 392 models, leaving 29 IDs unresolved in the text extraction.
 
 The suggested publication-role catalog also retains `minimax` and `local`.
 Suggested roles are neither provider adapters nor runtime SkillRegistry admission.
@@ -162,6 +165,17 @@ This server explicitly negotiates the legacy MCP 2025-11-25 lifecycle (also
 2026-07-28 stateless core or a public remote MCP/OAuth endpoint. Cloud Claude web
 therefore uses the external handoff transport rather than a claimed continuous
 MCP connection. The outbound Base44 client likewise negotiates a legacy version.
+
+## Canonical model registry
+
+The registry separates providers, models, local runtimes, gateways, agent services, platforms, external transports and capability descriptors. It is immutable by `entry_id`: re-registering an identical entry is idempotent, while changing the identity payload is a conflict. Catalog membership never implies runtime availability.
+
+- `POST /model-registry/seed-corpus` imports the corpus-derived baseline and Venice snapshot.
+- `GET /model-registry/summary` reports counts and catalog reconciliation.
+- `GET /model-registry/entries` filters by provider, entry type, integration state, runtime state, modality and text query.
+- `POST /model-registry/entries` registers a new catalog entry without allowing callers to self-promote it to `AVAILABLE` or `LIVE_VERIFIED`.
+
+The Venice snapshot currently reconciles 363 extracted unique IDs against 392 claimed by the source UI. The 29 unresolved entries remain explicitly unresolved; no IDs are synthesized.
 
 ## Consultable archived memory
 
