@@ -168,7 +168,7 @@ MCP connection. The outbound Base44 client likewise negotiates a legacy version.
 
 ## Canonical model registry
 
-The registry separates providers, models, local runtimes, gateways, agent services, platforms, external transports and capability descriptors. It is immutable by `entry_id`: re-registering an identical entry is idempotent, while changing the identity payload is a conflict. Catalog membership never implies runtime availability.
+The registry separates providers, models, local runtimes, gateways, agent services, agent adapters, platforms, external transports and capability descriptors. It is immutable by `entry_id`: re-registering an identical entry is idempotent, while changing the identity payload is a conflict. Catalog membership never implies runtime availability.
 
 - `POST /model-registry/seed-corpus` imports the corpus-derived baseline and Venice snapshot.
 - `GET /model-registry/summary` reports counts and catalog reconciliation.
