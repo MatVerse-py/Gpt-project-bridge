@@ -793,6 +793,89 @@ def read_model_registry_summary(
     return {**registry_summary(), "read_by": principal.principal_id}
 
 
+@router.get("/adapter-snapshot")
+def read_model_registry_adapter_snapshot(
+    principal: Principal = Depends(require_capability("model-registry:read")),
+) -> dict[str, Any]:
+    from .agent_runtime import agent_catalog
+
+    registered = {
+        item.get("metadata", {}).get("agent_id"): item
+        for item in list_entries(entry_type="AGENT_ADAPTER", limit=500)
+        if item.get("metadata", {}).get("agent_id")
+    }
+    agents = agent_catalog()
+    aligned = []
+    for agent in agents:
+        entry = registered.get(agent["agent_id"])
+        aligned.append(
+            {
+                "agent_id": agent["agent_id"],
+                "provider": agent.get("provider"),
+                "model": agent.get("model"),
+                "transport": agent.get("transport"),
+                "roles": agent.get("roles", []),
+                "configured": bool(agent.get("configured", False)),
+                "connection_verified": bool(agent.get("connection_verified", False)),
+                "status": agent.get("status", "UNKNOWN"),
+                "registry_entry_id": entry.get("entry_id") if entry else None,
+                "registry_integration_state": entry.get("integration_state") if entry else None,
+                "alignment": "MATCHED" if entry else "MISSING_REGISTRY_ENTRY",
+            }
+        )
+    return {
+        "protocol_version": PROTOCOL_VERSION,
+        "adapters_total": len(aligned),
+        "configured_total": sum(1 for item in aligned if item["configured"]),
+        "connection_verified_total": sum(1 for item in aligned if item["connection_verified"]),
+        "registry_mismatch_total": sum(1 for item in aligned if item["alignment"] != "MATCHED"),
+        "adapters": aligned,
+        "read_by": principal.principal_id,
+    }
+
+
+@router.get("/runtime-snapshot")
+def read_model_registry_runtime_snapshot(
+    principal: Principal = Depends(require_capability("model-registry:read")),
+) -> dict[str, Any]:
+    from .runtime_discovery import discover_runtime_capabilities
+
+    snapshot = discover_runtime_capabilities()
+    registered = {
+        item.get("model_id"): item
+        for item in list_entries(entry_type="MODEL", limit=500)
+        if item.get("model_id")
+    }
+    discovered = []
+    for runtime in snapshot.get("capabilities", []):
+        for model in runtime.get("models", []):
+            model_id = model.get("name")
+            if not isinstance(model_id, str) or not model_id:
+                continue
+            entry = registered.get(model_id)
+            discovered.append(
+                {
+                    "runtime_id": runtime.get("runtime_id"),
+                    "runtime_state": runtime.get("state", "UNKNOWN"),
+                    "model_id": model_id,
+                    "digest": model.get("digest"),
+                    "size": model.get("size"),
+                    "registry_entry_id": entry.get("entry_id") if entry else None,
+                    "registry_match": entry is not None,
+                }
+            )
+    return {
+        "protocol_version": PROTOCOL_VERSION,
+        "discovery_report_hash": snapshot.get("report_hash"),
+        "selector": snapshot.get("selector"),
+        "policy": snapshot.get("policy"),
+        "runtimes": snapshot.get("capabilities", []),
+        "discovered_model_count": len(discovered),
+        "models": discovered,
+        "read_by": principal.principal_id,
+    }
+
+
 @router.get("/entries")
 def read_model_registry_entries(
     provider_id: str | None = None,
