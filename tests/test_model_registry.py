@@ -48,7 +48,7 @@ def test_corpus_seed_is_idempotent_and_preserves_catalog_gap(client):
 
     summary = auth_request(client, "admin", "GET", "/model-registry/summary")
     assert summary.status_code == 200
-    assert summary.json()["entries_total"] == 419
+    assert summary.json()["entries_total"] == 428
     assert summary.json()["venice_catalog_reconciliation"]["unresolved_count"] == 0
     assert storage.verify_chain()["ok"] is True
 
