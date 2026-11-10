@@ -223,3 +223,57 @@ def test_context_windows_come_from_explicit_mhtml_labels(client):
     item = next(x for x in response.json()["entries"] if x["model_id"] == "grok-4-20")
     assert item["context_window_tokens"] == 2_000_000
     assert item["metadata"]["context_window_source"] == "saved_mhtml_context_label"
+
+
+def test_adapter_snapshot_reconciles_registry_and_runtime_configuration(client):
+    auth_request(client, "admin", "POST", "/model-registry/seed-corpus", {})
+    response = auth_request(client, "admin", "GET", "/model-registry/adapter-snapshot")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["adapters_total"] == 9
+    assert body["registry_mismatch_total"] == 0
+    assert body["connection_verified_total"] == 0
+    assert {item["agent_id"] for item in body["adapters"]} == {
+        "gpt", "claude", "kilo", "venice", "manus", "base44", "claude-code", "claude-web", "kilo-code"
+    }
+    assert all(item["alignment"] == "MATCHED" for item in body["adapters"])
+
+
+def test_runtime_snapshot_joins_local_discovery_without_promoting_registry_state(client, monkeypatch):
+    from app import runtime_discovery
+
+    auth_request(client, "admin", "POST", "/model-registry/seed-corpus", {})
+    fake_snapshot = {
+        "protocol_version": "matverse.runtime-discovery.v1",
+        "report_hash": "a" * 64,
+        "selector": {"decision": "PASS", "runtime_id": "ollama", "reason": "api_ready"},
+        "policy": {"discovery_only": True, "auto_install": False, "remote_endpoints_allowed": False},
+        "capabilities": [
+            {
+                "runtime_id": "ollama",
+                "state": "AVAILABLE",
+                "models": [{"name": "Qwen/Qwen2.5-0.5B-Instruct", "digest": "sha256:local-qwen", "size": 123}],
+            },
+            {
+                "runtime_id": "llama_cpp",
+                "state": "ABSENT",
+                "models": [],
+            },
+        ],
+    }
+    monkeypatch.setattr(runtime_discovery, "discover_runtime_capabilities", lambda: fake_snapshot)
+    response = auth_request(client, "admin", "GET", "/model-registry/runtime-snapshot")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["discovered_model_count"] == 1
+    discovered = body["models"][0]
+    assert discovered["registry_match"] is True
+    assert discovered["registry_entry_id"] == "model:huggingface:qwen2.5-0.5b-instruct"
+    assert discovered["runtime_state"] == "AVAILABLE"
+
+    registry_entry = admin_get(
+        client,
+        "/model-registry/entries",
+        {"query": "Qwen/Qwen2.5-0.5B-Instruct"},
+    ).json()["entries"][0]
+    assert registry_entry["runtime_state"] == "UNKNOWN"
