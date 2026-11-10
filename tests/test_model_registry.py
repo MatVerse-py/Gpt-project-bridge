@@ -277,3 +277,84 @@ def test_runtime_snapshot_joins_local_discovery_without_promoting_registry_state
         {"query": "Qwen/Qwen2.5-0.5B-Instruct"},
     ).json()["entries"][0]
     assert registry_entry["runtime_state"] == "UNKNOWN"
+
+
+def test_capability_selector_uses_registered_adapters_and_provider_preference(client, monkeypatch):
+    from app import agent_runtime
+
+    auth_request(client, "admin", "POST", "/model-registry/seed-corpus", {})
+    monkeypatch.setattr(
+        agent_runtime,
+        "agent_catalog",
+        lambda: [
+            {
+                "agent_id": "gpt", "provider": "openai", "model": "gpt-6-astra",
+                "transport": "openai_responses", "roles": ["research"],
+                "configured": True, "connection_verified": False, "status": "CONFIGURED_UNVERIFIED",
+            },
+            {
+                "agent_id": "venice", "provider": "venice", "model": "venice-uncensored",
+                "transport": "openai_compatible_chat", "roles": ["research"],
+                "configured": True, "connection_verified": False, "status": "CONFIGURED_UNVERIFIED",
+            },
+            {
+                "agent_id": "claude-web", "provider": "anthropic", "model": "claude",
+                "transport": "external_handoff", "roles": ["research"],
+                "configured": True, "connection_verified": False, "status": "CONFIGURED_UNVERIFIED",
+            },
+        ],
+    )
+    response = auth_request(
+        client,
+        "admin",
+        "POST",
+        "/model-registry/select",
+        {
+            "capability": "research",
+            "modality": "text",
+            "provider_preference": ["venice", "openai"],
+            "require_configured": True,
+            "allow_external_handoff": False,
+            "limit": 5,
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["decision"] == "PASS"
+    assert body["executed"] is False
+    assert [item["agent_id"] for item in body["candidates"]] == ["venice", "gpt"]
+    assert all(item["connection_verified"] is False for item in body["candidates"])
+    assert all(item["selection_state"] == "CONFIGURED_UNVERIFIED" for item in body["candidates"])
+
+
+def test_capability_selector_holds_when_live_connection_is_required(client, monkeypatch):
+    from app import agent_runtime
+
+    auth_request(client, "admin", "POST", "/model-registry/seed-corpus", {})
+    monkeypatch.setattr(
+        agent_runtime,
+        "agent_catalog",
+        lambda: [
+            {
+                "agent_id": "venice", "provider": "venice", "model": "venice-uncensored",
+                "transport": "openai_compatible_chat", "roles": ["research"],
+                "configured": True, "connection_verified": False, "status": "CONFIGURED_UNVERIFIED",
+            },
+        ],
+    )
+    response = auth_request(
+        client,
+        "admin",
+        "POST",
+        "/model-registry/select",
+        {
+            "capability": "research",
+            "modality": "text",
+            "require_configured": True,
+            "require_connection_verified": True,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["decision"] == "HOLD"
+    assert response.json()["reason"] == "no_candidate_matches_capability_and_constraints"
+    assert response.json()["candidates"] == []
