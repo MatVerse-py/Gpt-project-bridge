@@ -436,6 +436,13 @@ def canonical_matverse_capabilities() -> tuple[Capability, ...]:
             roles=(Role.WORKFLOW, Role.RESEARCH, Role.CURATION),
         ),
         Capability(
+            capability_id="venice",
+            provider="venice",
+            model="configured-venice-model",
+            principal="llm:venice",
+            roles=(Role.RESEARCH, Role.CODE, Role.DRAFT, Role.REVIEW, Role.REDTEAM),
+        ),
+        Capability(
             capability_id="minimax",
             provider="minimax",
             model="configured-minimax-model",
