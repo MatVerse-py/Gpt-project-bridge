@@ -17,6 +17,7 @@ from .secret_plane import EnvironmentSecretVault, KeyAuthority, SecretDescriptor
 
 PROTOCOL = "matverse.agent-bridge.v1"
 MCP_VERSION = "2025-11-25"  # Explicit legacy compatibility, negotiated with Base44.
+VENICE_BASE_URL = "https://api.venice.ai/api/v1"
 
 
 class AgentConfigurationError(RuntimeError):
@@ -46,6 +47,7 @@ AGENTS = {
         AgentSpec("gpt", "openai", "openai_responses", "OPENAI_MODEL", "OPENAI_API_KEY", ("research", "draft", "review")),
         AgentSpec("claude", "anthropic", "anthropic_messages", "ANTHROPIC_MODEL", "ANTHROPIC_API_KEY", ("research", "code", "draft", "review")),
         AgentSpec("kilo", "kilo", "kilo_gateway", "KILO_MODEL", "KILO_API_KEY", ("code", "review", "redteam")),
+        AgentSpec("venice", "venice", "openai_compatible_chat", "VENICE_MODEL", "VENICE_API_KEY", ("research", "code", "draft", "review", "redteam")),
         AgentSpec("manus", "manus", "manus_tasks_v2", "MANUS_AGENT_PROFILE", "MANUS_API_KEY", ("workflow", "research", "curation"), "lite"),
         AgentSpec("base44", "base44", "base44_mcp", "", "BASE44_ACCESS_TOKEN", ("application", "workflow"), "platform:base44"),
         AgentSpec("claude-code", "anthropic", "external_handoff", "CLAUDE_CODE_MODEL", None, ("code", "review")),
@@ -233,6 +235,11 @@ class AgentBroker:
             url = "https://api.kilo.ai/api/gateway/chat/completions"
             if key is not None:
                 headers["Authorization"] = f"Bearer {key}"
+            body = {"model": s.model, "max_tokens": s.max_tokens, "stream": False,
+                    "messages": [{"role": "user", "content": text}]}
+        elif s.spec.agent_id == "venice":
+            url = f"{VENICE_BASE_URL}/chat/completions"
+            headers["Authorization"] = f"Bearer {key}"
             body = {"model": s.model, "max_tokens": s.max_tokens, "stream": False,
                     "messages": [{"role": "user", "content": text}]}
         elif s.spec.agent_id == "manus":
