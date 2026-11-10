@@ -25,7 +25,7 @@ def admin_get(client, path: str, params: dict[str, str]):
     return client.get(path, params=params, headers=headers)
 
 
-def test_corpus_seed_is_idempotent_and_preserves_catalog_gap(client):
+def test_corpus_seed_is_idempotent_and_reconciles_venice_catalog(client):
     first = auth_request(client, "admin", "POST", "/model-registry/seed-corpus", {})
     assert first.status_code == 200, first.text
     seeded = first.json()
