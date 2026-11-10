@@ -263,6 +263,8 @@ def _venice_catalog_entries() -> tuple[list[dict[str, Any]], dict[str, Any]]:
 
 
 def _corpus_seed() -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    venice_models, reconciliation = _venice_catalog_entries()
+    snapshot_date = str(reconciliation.get("snapshot_date") or "undated")
     base = [
         {
             "entry_id": "provider:openai", "entry_type": "PROVIDER", "provider_id": "openai",
@@ -538,16 +540,22 @@ def _corpus_seed() -> tuple[list[dict[str, Any]], dict[str, Any]]:
             "metadata": {"identity_completeness": "INCOMPLETE"}, "enabled": True,
         },
         {
-            "entry_id": "catalog-source:venice:2026-11-10", "entry_type": "CATALOG_SOURCE", "provider_id": "venice",
+            "entry_id": f"catalog-source:venice:{snapshot_date}", "entry_type": "CATALOG_SOURCE", "provider_id": "venice",
             "display_name": "Venice API catalog snapshot — partial extraction", "model_id": None,
             "upstream_family": "venice", "model_type": None, "modalities": [], "capabilities": [],
             "adapter_id": None, "integration_state": "CATALOG_ONLY", "runtime_state": "UNKNOWN",
             "model_revision": None, "context_window_tokens": None, "max_output_tokens": None,
-            "source_id": "venice-catalog-2026-11-10", "source_refs": [
+            "source_id": f"venice-catalog-{snapshot_date}", "source_refs": [
                 "corpus:API Models - Venice Uncensored AI.mhtml", "corpus:Texto colado(20261110-055652).txt",
                 "github:data/venice_catalog_snapshot_2026-11-10.json"
             ], "notes": "A interface fonte declara 392 modelos; os 392 IDs únicos foram reconciliados usando o DOM do MHTML salvo. Nenhum ID permanece sem resolução.",
-            "metadata": {"source_claimed_count": 392, "extracted_unique_model_ids": 392, "unresolved_count": 0, "context_labels_extracted": 139, "reconciliation_status": "RECONCILED_FROM_SAVED_MHTML"},
+            "metadata": {
+                "source_claimed_count": reconciliation.get("source_claimed_count"),
+                "extracted_unique_model_ids": reconciliation.get("extracted_unique_model_ids"),
+                "unresolved_count": reconciliation.get("unresolved_count"),
+                "context_labels_extracted": reconciliation.get("context_labels_extracted"),
+                "reconciliation_status": reconciliation.get("reconciliation_status"),
+            },
             "enabled": True,
         },
     ]
@@ -643,7 +651,6 @@ def _corpus_seed() -> tuple[list[dict[str, Any]], dict[str, Any]]:
             "metadata": {"agent_id": "kilo-code", "transport": "external_handoff"}, "enabled": True,
         },
     ]
-    venice_models, reconciliation = _venice_catalog_entries()
     return base + agent_adapters + venice_models, reconciliation
 
 
@@ -766,7 +773,7 @@ def registry_summary() -> dict[str, Any]:
             ).fetchall()
             return {str(row[column] or "UNKNOWN"): int(row["n"]) for row in rows}
         source = conn.execute(
-            "SELECT entry_json FROM model_registry_entries WHERE entry_id='catalog-source:venice:2026-11-10'"
+            "SELECT entry_json FROM model_registry_entries WHERE entry_type='CATALOG_SOURCE' AND provider_id='venice' ORDER BY entry_id DESC LIMIT 1"
         ).fetchone()
         reconciliation = json.loads(source["entry_json"])["metadata"] if source else None
         total = conn.execute("SELECT COUNT(*) AS n FROM model_registry_entries WHERE enabled=1").fetchone()["n"]
