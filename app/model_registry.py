@@ -541,7 +541,7 @@ def _corpus_seed() -> tuple[list[dict[str, Any]], dict[str, Any]]:
         },
         {
             "entry_id": f"catalog-source:venice:{snapshot_date}", "entry_type": "CATALOG_SOURCE", "provider_id": "venice",
-            "display_name": "Venice API catalog snapshot — partial extraction", "model_id": None,
+            "display_name": "Venice API catalog snapshot — reconciled MHTML", "model_id": None,
             "upstream_family": "venice", "model_type": None, "modalities": [], "capabilities": [],
             "adapter_id": None, "integration_state": "CATALOG_ONLY", "runtime_state": "UNKNOWN",
             "model_revision": None, "context_window_tokens": None, "max_output_tokens": None,
