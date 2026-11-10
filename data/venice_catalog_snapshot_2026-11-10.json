@@ -8,7 +8,7 @@
   "extracted_unique_model_ids": 363,
   "unresolved_count": 29,
   "reconciliation_status": "PARTIAL_EXTRACTION",
-  "extraction_rule": "Unique lowercase hyphenated model-id lines found after the 'Todos os modelos de API' heading. Context length is retained only when the description explicitly ties a number to tokens or context. No availability or adapter readiness is inferred.",
+  "extraction_rule": "Unique lowercase hyphenated model-id lines found after the 'Todos os modelos de API' heading. Context length is recorded only when explicitly associated with context/window, never from output-token or image-resolution numbers. No availability or adapter readiness is inferred.",
   "entries": [
     {
       "catalog_provider": "venice",
@@ -20,7 +20,7 @@
         "text"
       ],
       "description": "Claude Fable 5.2 aprimora o Claude Fable 5.1 em todos os aspectos, com os maiores ganhos em codificação agêntica, fluxos de trabalho agênticos de longa duração e trabalho de conhecimento, como refatorações de código longas, desenvolvimento front-end e tarefas de finanças e análise. Possui uma janela de contexto de 1M de tokens, 128K tokens de saída máxima, pensamento adaptativo sempre ativo e fortes capacidades multimodais, e tende a ser mais conciso em seus planos e resumos.",
-      "context_window_tokens": 128000,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 94
@@ -219,7 +219,7 @@
         "text"
       ],
       "description": "GPT-6.1 Terra é um modelo rápido e eficiente para raciocínio visual, uso preciso de computador e escrita clara e natural. Tem uma janela de contexto de 1,05M tokens (922K de entrada, 128K de saída), entradas de texto e imagem e esforço de raciocínio de none a max.",
-      "context_window_tokens": 5000000,
+      "context_window_tokens": null,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 189
@@ -283,7 +283,7 @@
         "multimodal"
       ],
       "description": "Kimi K3.1 Pro é o principal modelo de raciocínio multimodal da Moonshot AI e o sucessor pós-treinado do Kimi K3, com uma janela de contexto de 1M de tokens. Foi criado para programação de longo horizonte, fluxos de trabalho agênticos, pesquisa financeira e modelagem 3D por meio de código CAD.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 218
@@ -425,7 +425,7 @@
         "text"
       ],
       "description": "Muse Spark Open é um modelo de raciocínio de pesos abertos da Meta para fluxos de coding e agentes. Ele suporta chamadas de ferramentas e compreensão nativa de imagens em um único checkpoint, com arquitetura sparse Mixture-of-Experts de 816B parâmetros totais / 42B ativos e janela de contexto de 1M de tokens.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 289
@@ -455,7 +455,7 @@
         "text"
       ],
       "description": "Muse Wonder é um modelo de raciocínio de fronteira da Meta para tarefas agenticas pessoais e profissionais complexas. Aceita texto, imagens, vídeo, áudio e documentos PDF e retorna texto, com uma janela de contexto de 1M de tokens. O modelo planeja, delega a subagentes, chama ferramentas em paralelo e se recupera de erros para que o trabalho de longo horizonte seja concluído sem direção passo a passo.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 305
@@ -500,7 +500,7 @@
         "text"
       ],
       "description": "GPT-6.1 Sol Ultrafast é o mesmo modelo servido no modo Ultrafast da OpenAI, até 8x mais rápido. Tem uma janela de contexto de 1,05M tokens (922K de entrada, 128K de saída), entradas de texto e imagem e esforço de raciocínio de low a max.",
-      "context_window_tokens": 5000000,
+      "context_window_tokens": null,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 329
@@ -515,7 +515,7 @@
         "text"
       ],
       "description": "Claude Haiku 5.5 foi feito para trabalho de alto volume e sensível à latência, como classificação, roteamento, extração e tarefas de subagentes. Possui janela de contexto de 1M de tokens, 128K tokens de saída máxima, pensamento adaptativo e forte compreensão de documentos e visão.",
-      "context_window_tokens": 128000,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 337
@@ -575,7 +575,7 @@
         "text"
       ],
       "description": "Abliterated Large V2 é o modelo de raciocínio sem restrições da Abliteration AI, baseado no GLM-5.3 e posteriormente abliterado e ajustado. Somente texto com contexto de 1M, para cargas de raciocínio e avaliação mais exigentes. Sempre raciocina; a profundidade pode ser definida como low, high ou max.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 366
@@ -682,7 +682,7 @@
         "text"
       ],
       "description": "GPT-6.1 Sol entrega desempenho próximo ao Astra a um custo menor para codificação complexa, uso de computador e trabalho profissional. Tem uma janela de contexto de 1,05M tokens (922K de entrada, 128K de saída), entradas de texto e imagem e esforço de raciocínio de low a max.",
-      "context_window_tokens": 5000000,
+      "context_window_tokens": null,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 417
@@ -742,7 +742,7 @@
         "text"
       ],
       "description": "Claude Opus 5.5 Fast oferece o mesmo modelo com geração de saída mais rápida, janela de contexto de 1M de tokens, até 128K tokens de saída, raciocínio adaptativo, visão e chamadas de ferramentas.",
-      "context_window_tokens": 128000,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 447
@@ -757,7 +757,7 @@
         "text"
       ],
       "description": "Claude Sonnet 5.5 é um avanço em relação ao Sonnet 5. Destaca-se em tarefas cotidianas bem definidas, como criar funcionalidades, corrigir bugs e produzir documentos, slides e planilhas polidos. O Sonnet 5.5 também se comunica com mais clareza que o Sonnet 5. Possui janela de contexto de 1M de tokens, 128K tokens de saída máxima, pensamento adaptativo e forte compreensão de documentos e visão.",
-      "context_window_tokens": 128000,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 455
@@ -802,7 +802,7 @@
         "text"
       ],
       "description": "GPT-6 Luna é o modelo GPT-6 mais eficiente da OpenAI para tarefas focadas de alto volume. É adequado para chat, classificação e fluxos de trabalho agênticos leves, com uma janela de contexto de 1,05M tokens (922K de entrada, 128K de saída), entradas de texto e imagem e raciocínio capaz para sua faixa de preço.",
-      "context_window_tokens": 5000000,
+      "context_window_tokens": null,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 481
@@ -817,7 +817,7 @@
         "text"
       ],
       "description": "GPT-6 Sol foi feito para codificação complexa e fluxos de trabalho agênticos. É o modelo GPT-6 da OpenAI para coding e agentes, com uma janela de contexto de 1,05M tokens (922K de entrada, 128K de saída), entradas de texto e imagem e esforço de raciocínio de none a max.",
-      "context_window_tokens": 5000000,
+      "context_window_tokens": null,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 489
@@ -862,7 +862,7 @@
         "text"
       ],
       "description": "Claude Opus 5.5 é um avanço em relação ao Opus 5, com os maiores ganhos em codificação agentiva, tarefas agentivas de longa duração e trabalho de conhecimento. Também é um colaborador melhor em trabalho de longa duração, com janela de contexto de 1M de tokens, 128K tokens de saída máxima, pensamento adaptativo e fortes capacidades multimodais.",
-      "context_window_tokens": 128000,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 513
@@ -939,7 +939,7 @@
         "multimodal"
       ],
       "description": "DeepSeek V4.1 Flash Uncensored é uma variante sem censura e abliterada do DeepSeek V4.1 Flash, um modelo Mixture-of-Experts multimodal com 552B parâmetros de backbone (8B ativos na entrada, 16B na saída) e janela de contexto de 512K. Processa nativamente imagens e texto, com forte desempenho em raciocínio, codificação e fluxos agentivos, sem filtros de conteúdo.",
-      "context_window_tokens": null,
+      "context_window_tokens": 512000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 550
@@ -955,7 +955,7 @@
         "multimodal"
       ],
       "description": "Qwen 3.8 Flash é um modelo multimodal da família Qwen, combinando forte raciocínio e geração com velocidade notável. Ele oferece suporte nativo a uma janela de contexto de 1 milhão de tokens, permitindo processar documentos longos, bases de código inteiras e conversas complexas em uma única passagem. Destaca-se em assistência de programação, fluxos de trabalho agênticos e compreensão visual, aceita entradas de texto, imagem e vídeo, e seu modo de raciocínio pode ser ativado ou desativado a cada solicitação.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 559
@@ -1221,7 +1221,7 @@
         "text"
       ],
       "description": "GPT-6 Astra com modo de raciocínio pro para tarefas difíceis que se beneficiam de mais trabalho do modelo. Suporta texto e imagens com contexto de 1,05M tokens. O modo pro pode usar mais tokens e levar mais tempo.",
-      "context_window_tokens": 5000000,
+      "context_window_tokens": null,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 685
@@ -1236,7 +1236,7 @@
         "text"
       ],
       "description": "GPT-6 Astra é o modelo mais capaz da OpenAI, feito para o trabalho de ponta a ponta mais exigente. É adequado para raciocínio complexo, codificação, uso de computador, pesquisa e criação de documentos, com uma janela de contexto de 1,05M tokens (922K de entrada, 128K de saída) e suporta entradas de texto e imagem.",
-      "context_window_tokens": 5000000,
+      "context_window_tokens": null,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 693
@@ -1328,7 +1328,7 @@
         "text"
       ],
       "description": "Claude Fable 5.1 aprimora o Claude Fable 5 em todos os aspectos, com os maiores ganhos em codificação agêntica, fluxos de trabalho agênticos de longa duração e trabalho de conhecimento, como refatorações de código longas, desenvolvimento front-end e tarefas de finanças e análise. Possui uma janela de contexto de 1M de tokens, 128K tokens de saída máxima, pensamento adaptativo sempre ativo e fortes capacidades multimodais, e tende a ser mais conciso em seus planos e resumos.",
-      "context_window_tokens": 128000,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 737
@@ -1532,7 +1532,7 @@
         "text"
       ],
       "description": "O GLM-5.3 é um modelo de raciocínio em larga escala da Z.ai, feito para engenharia de software complexa e tarefas de agentes de longo horizonte. Ele oferece entrada e saída de texto com uma janela de contexto de 1M de tokens e melhora o GLM-5.2 em programação e no equilíbrio entre desempenho e eficiência de tokens.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 831
@@ -1547,7 +1547,7 @@
         "text"
       ],
       "description": "Qwen 3.8 27B é um modelo denso nativo de visão-linguagem com 27B de parâmetros. Melhora codificação, trabalho profissional, pesquisa e tarefas agênticas de longo horizonte, com controle flexível de raciocínio e compreensão de imagens e vídeo. Suporta uma janela de contexto nativa de 262K tokens.",
-      "context_window_tokens": 262000,
+      "context_window_tokens": null,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 839
@@ -2093,7 +2093,7 @@
         "text"
       ],
       "description": "Claude Opus 5, sucessor do Opus 4.8, oferece ganhos importantes em codificação agentiva, trabalho profissional de conhecimento e raciocínio de longo prazo, com janela de contexto de 1M de tokens, 128K tokens de saída máxima, pensamento adaptativo e fortes capacidades multimodais.",
-      "context_window_tokens": 128000,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1087
@@ -2108,7 +2108,7 @@
         "text"
       ],
       "description": "Claude Opus 5 (Fast) é uma variante otimizada para velocidade do Claude Opus 5, com a mesma janela de contexto de 1M de tokens e forte desempenho em codificação agentiva, trabalho profissional de conhecimento e raciocínio de longo prazo — com menor latência.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1095
@@ -2123,7 +2123,7 @@
         "text"
       ],
       "description": "Qwen 3.8 Max é o modelo principal MoE da Alibaba com 2,4 trilhões de parâmetros, com grandes avanços em relação ao Qwen 3.7 Max em engenharia de software e fluxos de trabalho de produtividade de escritório, além de forte desempenho em tarefas multiagente de longo horizonte. Aceita entradas de texto e de visão-linguagem (imagens e vídeo), opera somente em modo de raciocínio e suporta uma janela de contexto de 1 milhão de tokens.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1103
@@ -2168,7 +2168,7 @@
         "text"
       ],
       "description": "Qwen 3.6 35B A3B is a fast mixture-of-experts model with 35B total parameters and ~3B active per token. Strong at agentic coding, STEM reasoning, and tool use, with a native 256K context window.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1125
@@ -2532,7 +2532,7 @@
         "text"
       ],
       "description": "Claude Sonnet 5 sucede o Sonnet 4.6, melhorando-o substancialmente em codificação e trabalho agentivo e atingindo qualidade próxima do Opus em muitas tarefas. Possui uma janela de contexto de 1M de tokens, pensamento adaptativo e forte compreensão de documentos e visão.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1314
@@ -2563,7 +2563,7 @@
         "multimodal"
       ],
       "description": "Seed 2.1 Turbo (Dola-Seed-2.1) é o modelo multimodal de próxima geração da ByteDance para a era de código e agentes, com entrega de código de nível de engenharia, execução de agentes de longo prazo e compreensão aprimorada de GUI e vídeo. Suporta entradas de texto, imagem e vídeo com janela de contexto de 256K.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1329
@@ -2829,7 +2829,7 @@
         "image"
       ],
       "description": "Kimi K2.7 Code is Moonshot AI's coding-focused agentic model built on Kimi K2.6, with 1T total parameters and 32B active parameters. It always operates in thinking mode, supports text and image input, and targets long-horizon software engineering, agentic task decomposition, and multi-turn coding workflows with 256K context.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1445
@@ -2844,7 +2844,7 @@
         "text"
       ],
       "description": "MiniMax-M3 preview is a 1.4T-parameter frontier model from MiniMax for coding, agentic workflows, and complex reasoning, served at fp8 with a 512K context window.",
-      "context_window_tokens": null,
+      "context_window_tokens": 512000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1453
@@ -2860,7 +2860,7 @@
         "multimodal"
       ],
       "description": "MiMo-V2.5 is Xiaomi's native omnimodal model with strong agentic capabilities, supporting text, image, video, and audio understanding in a unified architecture. Built on a sparse Mixture-of-Experts backbone with 310B total and 15B active parameters, it delivers long-context reasoning up to 1M tokens, function calling, and multimodal perception.",
-      "context_window_tokens": 1000000,
+      "context_window_tokens": null,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1461
@@ -2875,7 +2875,7 @@
         "text"
       ],
       "description": "Claude Fable 5 é um modelo da Anthropic projetado para raciocínio exigente e trabalho agentivo de longo prazo. Possui uma janela de contexto de 1M de tokens, 128K tokens de saída máxima, pensamento adaptativo sempre ativo e fortes capacidades multimodais.",
-      "context_window_tokens": 128000,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1469
@@ -3014,7 +3014,7 @@
         "text"
       ],
       "description": "Claude Opus 4.8 é o sucessor do Opus 4.7 na família Opus da Anthropic. Ele suporta trabalho agentivo de longo prazo, codificação complexa em várias etapas e tarefas orientadas por memória, onde a coerência ao longo de sessões prolongadas é importante. Possui uma janela de contexto de 1M de tokens, 128K tokens de saída máxima, pensamento adaptativo e fortes capacidades multimodais.",
-      "context_window_tokens": 128000,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1535
@@ -3029,7 +3029,7 @@
         "text"
       ],
       "description": "Claude Opus 4.8 (Fast) é uma variante otimizada para velocidade do Claude Opus 4.8, com a mesma janela de contexto de 1M de tokens e forte desempenho em trabalho agentivo de longo prazo e codificação complexa — com menor latência.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1543
@@ -3625,7 +3625,7 @@
         "text"
       ],
       "description": "Claude Opus 4.7 é um modelo da Anthropic para raciocínio complexo e codificação agentiva. Possui uma janela de contexto de 1M de tokens, 128K tokens de saída máxima, pensamento adaptativo e fortes capacidades multimodais.",
-      "context_window_tokens": 128000,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1844
@@ -3687,7 +3687,7 @@
         "text"
       ],
       "description": "Gemma 4 Uncensored is an uncensored variant of Google Gemma 4 26B, a Mixture-of-Experts model with 26B total parameters and only 4B active per token. Fine-tuned for uncensored chat without content filtering, it supports 256K context, coding, and general-purpose conversation.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1873
@@ -3887,7 +3887,7 @@
         "text"
       ],
       "description": "Gemma 4 31B é um modelo denso do Google DeepMind com 31B parâmetros, oferecendo desempenho de raciocínio de nível fronteira. Ele lida com entrada de texto, imagem e vídeo, suporta contexto de 256K, chamadas de função e modos de pensamento configuráveis.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1962
@@ -3917,7 +3917,7 @@
         "text"
       ],
       "description": "Gemma 4 26B A4B é um modelo Mixture-of-Experts do Google DeepMind com 26B parâmetros totais e apenas 4B ativos por token, oferecendo inferência rápida com alta qualidade. Ele lida com entrada de texto, imagem e vídeo, suporta contexto de 256K, chamadas de função e raciocínio com modos de pensamento configuráveis.",
-      "context_window_tokens": null,
+      "context_window_tokens": 256000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 1977
@@ -4897,7 +4897,7 @@
         "text"
       ],
       "description": "Claude Opus 4.6 é um modelo de raciocínio da Anthropic baseado no Opus 4.5 com desempenho aprimorado em engenharia de software complexa, fluxos de trabalho agentivos e tarefas de longo prazo. Possui uma janela de contexto de 1M de tokens, capacidades multimodais melhoradas e maior robustez contra injeção de prompts.",
-      "context_window_tokens": null,
+      "context_window_tokens": 1000000,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 2438
@@ -5454,7 +5454,7 @@
         "multimodal"
       ],
       "description": "Gemma 3 introduces multimodality, supporting vision-language input and text outputs. It handles context windows up to 128k tokens, understands over 140 languages, and offers improved math, reasoning, and chat capabilities, including structured outputs and function calling. Gemma 3 27B is Google's open source model, successor to Gemma 2.",
-      "context_window_tokens": 128000,
+      "context_window_tokens": null,
       "integration_state": "CATALOG_ONLY",
       "connection_verified": false,
       "source_line": 2772
