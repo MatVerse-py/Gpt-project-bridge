@@ -228,6 +228,7 @@ def _venice_catalog_entries() -> tuple[list[dict[str, Any]], dict[str, Any]]:
                 "metadata": {
                     "description": item.get("description", ""),
                     "source_line": item.get("source_line"),
+                    "source_locator": item.get("source_locator"),
                     "catalog_provider": "venice",
                 },
                 "enabled": True,
