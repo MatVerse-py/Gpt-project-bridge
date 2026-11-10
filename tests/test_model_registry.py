@@ -358,3 +358,17 @@ def test_capability_selector_holds_when_live_connection_is_required(client, monk
     assert response.json()["decision"] == "HOLD"
     assert response.json()["reason"] == "no_candidate_matches_capability_and_constraints"
     assert response.json()["candidates"] == []
+
+
+def test_venice_catalog_keeps_non_slug_ids_and_marks_unknown_types(client):
+    auth_request(client, "admin", "POST", "/model-registry/seed-corpus", {})
+    response = admin_get(client, "/model-registry/entries", {"provider_id": "venice", "entry_type": "MODEL"})
+    assert response.status_code == 200
+    entries = response.json()["entries"]
+    by_model_id = {item["model_id"]: item for item in entries}
+    assert len(by_model_id) == 392
+    for model_id in ("openai/whisper-large-v3", "deepseek-v3.2", "wai-Illustrious", "chroma"):
+        assert model_id in by_model_id
+        assert by_model_id[model_id]["entry_id"].endswith(":snapshot:2026-11-10")
+    unknown = {item["model_id"] for item in entries if item["model_type"] == "unknown"}
+    assert unknown == {"chroma", "runway-gen4-5", "runway-gen4-5-text", "runway-gen4-turbo"}
