@@ -229,6 +229,7 @@ def _venice_catalog_entries() -> tuple[list[dict[str, Any]], dict[str, Any]]:
                     "description": item.get("description", ""),
                     "source_line": item.get("source_line"),
                     "source_locator": item.get("source_locator"),
+                    "context_window_source": item.get("context_window_source"),
                     "catalog_provider": "venice",
                 },
                 "enabled": True,
@@ -238,6 +239,7 @@ def _venice_catalog_entries() -> tuple[list[dict[str, Any]], dict[str, Any]]:
         "source_claimed_count": snapshot.get("source_claimed_count"),
         "extracted_unique_model_ids": snapshot.get("extracted_unique_model_ids"),
         "unresolved_count": snapshot.get("unresolved_count"),
+        "context_labels_extracted": snapshot.get("context_labels_extracted"),
         "reconciliation_status": snapshot.get("reconciliation_status"),
         "snapshot_date": snapshot.get("snapshot_date"),
     }
@@ -528,7 +530,7 @@ def _corpus_seed() -> tuple[list[dict[str, Any]], dict[str, Any]]:
                 "corpus:API Models - Venice Uncensored AI.mhtml", "corpus:Texto colado(20261110-055652).txt",
                 "github:data/venice_catalog_snapshot_2026-11-10.json"
             ], "notes": "A interface fonte declara 392 modelos; os 392 IDs únicos foram reconciliados usando o DOM do MHTML salvo. Nenhum ID permanece sem resolução.",
-            "metadata": {"source_claimed_count": 392, "extracted_unique_model_ids": 392, "unresolved_count": 0, "reconciliation_status": "RECONCILED_FROM_SAVED_MHTML"},
+            "metadata": {"source_claimed_count": 392, "extracted_unique_model_ids": 392, "unresolved_count": 0, "context_labels_extracted": 139, "reconciliation_status": "RECONCILED_FROM_SAVED_MHTML"},
             "enabled": True,
         },
     ]
