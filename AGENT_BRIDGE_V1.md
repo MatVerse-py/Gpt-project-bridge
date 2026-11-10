@@ -28,7 +28,7 @@ application platform. Its enrollment uses `platform:base44` as a surface label,
 not a claim about an underlying LLM. Cognitive roles such as Cassandra and
 constitutional functions remain separate from provider identities.
 
-Venice uses the corpus-provided base URL `https://api.venice.ai/api/v1`; the adapter does not accept a caller-controlled endpoint. It invokes only the chat-completions surface and requires an explicit model ID. The 363 catalog IDs recovered from the supplied Venice snapshot are registered as `CATALOG_ONLY`; image, video and audio entries are not made executable by the chat adapter. The source UI claims 392 models, leaving 29 IDs unresolved in the text extraction.
+Venice uses the corpus-provided base URL `https://api.venice.ai/api/v1`; the adapter does not accept a caller-controlled endpoint. It invokes only the chat-completions surface and requires an explicit model ID. All 392 catalog IDs recovered from the supplied Venice MHTML snapshot are registered as `CATALOG_ONLY`; image, video and audio entries are not made executable by the chat adapter. The source UI claims 392 models; the saved MHTML DOM yields 392 unique IDs, while the companion text extraction alone exposed only 363.
 
 The suggested publication-role catalog also retains `minimax` and `local`.
 Suggested roles are neither provider adapters nor runtime SkillRegistry admission.
@@ -175,7 +175,7 @@ The registry separates providers, models, local runtimes, gateways, agent servic
 - `GET /model-registry/entries` filters by provider, entry type, integration state, runtime state, modality and text query.
 - `POST /model-registry/entries` registers a new catalog entry without allowing callers to self-promote it to `AVAILABLE` or `LIVE_VERIFIED`.
 
-The Venice snapshot currently reconciles 363 extracted unique IDs against 392 claimed by the source UI. The 29 unresolved entries remain explicitly unresolved; no IDs are synthesized.
+The Venice snapshot reconciles 392 unique model IDs against the 392 claimed by the source UI. The 29 IDs missed by the plain-text extraction were recovered from the saved MHTML DOM attributes; no IDs were synthesized.
 
 ## Consultable archived memory
 
