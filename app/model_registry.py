@@ -696,6 +696,7 @@ def list_entries(
     integration_state: str | None = None,
     runtime_state: str | None = None,
     model_type: str | None = None,
+    modality: str | None = None,
     query: str | None = None,
     limit: int = 500,
 ) -> list[dict[str, Any]]:
@@ -714,6 +715,9 @@ def list_entries(
             if value:
                 clauses.append(f"{column}=?")
                 params.append(value)
+        if modality:
+            clauses.append("LOWER(entry_json) LIKE ?")
+            params.append(f'%"{modality.lower()}"%')
         if query:
             clauses.append("(LOWER(entry_id) LIKE ? OR LOWER(entry_json) LIKE ?)")
             needle = f"%{query.lower()}%"
@@ -721,9 +725,14 @@ def list_entries(
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
         rows = conn.execute(
             f"SELECT * FROM model_registry_entries{where} ORDER BY provider_id, entry_type, entry_id LIMIT ?",
-            (*params, max(1, min(limit, 500))),
+            (*params, 5000),
         ).fetchall()
-        return [_row_to_entry(row) for row in rows]
+        entries = [_row_to_entry(row) for row in rows]
+        if modality:
+            entries = [entry for entry in entries if modality.lower() in {
+                str(value).lower() for value in entry.get("modalities", [])
+            }]
+        return entries[:max(1, min(limit, 500))]
     finally:
         conn.close()
 
@@ -789,6 +798,7 @@ def read_model_registry_entries(
     integration_state: str | None = None,
     runtime_state: str | None = None,
     model_type: str | None = None,
+    modality: str | None = Query(default=None, max_length=32),
     query: str | None = Query(default=None, max_length=256),
     limit: int = Query(default=500, ge=1, le=500),
     principal: Principal = Depends(require_capability("model-registry:read")),
@@ -803,6 +813,7 @@ def read_model_registry_entries(
             integration_state=integration_state,
             runtime_state=runtime_state,
             model_type=model_type,
+            modality=modality,
             query=query,
             limit=limit,
         ),
