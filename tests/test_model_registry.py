@@ -199,3 +199,13 @@ def test_registry_agent_adapters_match_runtime_agent_specs(client):
     for agent_id, spec in AGENTS.items():
         assert registered[agent_id]["provider_id"] == spec.provider
         assert registered[agent_id]["metadata"]["transport"] == spec.transport
+
+
+def test_registry_modality_filter_matches_structured_modalities_only(client):
+    auth_request(client, "admin", "POST", "/model-registry/seed-corpus", {})
+    response = admin_get(client, "/model-registry/entries", {"provider_id": "venice", "modality": "video"})
+    assert response.status_code == 200
+    entries = response.json()["entries"]
+    assert entries
+    assert all("video" in item["modalities"] for item in entries)
+    assert all(item["provider_id"] == "venice" for item in entries)
