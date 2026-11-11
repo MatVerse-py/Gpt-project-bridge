@@ -209,7 +209,7 @@ def ingress(req: Ingress, principal: Principal = Depends(require_capability("bri
     if retain_raw_payload:
         event["payload"] = req.payload
     receipt = append_event(event, decision.value)
-    return {"request_id": req.request_id, "decision": decision.value, "reason": reason, "po_state": po_state.value, "executed": decision is Decision.PASS, "quarantined": decision is not Decision.PASS, "payload_hash": payload_hash, "payload_retained": retain_raw_payload, "receipt": receipt}
+    return {"request_id": req.request_id, "decision": decision.value, "reason": reason, "po_state": po_state.value, "executed": False, "quarantined": decision is not Decision.PASS, "payload_hash": payload_hash, "payload_retained": retain_raw_payload, "receipt": receipt}
 
 
 @app.get("/ledger")
