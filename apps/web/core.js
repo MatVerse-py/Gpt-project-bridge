@@ -353,8 +353,8 @@
       if (agent.agent_id === 'base44') throw new Error('Base44 exige um envelope de ferramenta MCP estruturado; não aceita esta tarefa genérica.');
       const task = $('#core-task').value.trim();
       if (!task) throw new Error('Descreva a tarefa.');
-      const sourceHash = $('#core-source-hash').value.trim();
-      if (sourceHash && !/^[a-fA-F0-9]{64}$/.test(sourceHash)) throw new Error('O SHA-256 da fonte deve conter 64 caracteres hexadecimais.');
+      const sourceText = $('#core-source-text').value;
+      const sourceHash = sourceText ? await sha256Hex(sourceText) : '';
 
       const hashes = await createFrozenContracts(task);
       const session = await coreRequest('/model-bridge/sessions', {
