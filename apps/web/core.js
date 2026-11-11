@@ -428,6 +428,9 @@
         outputCard('Handoff', handoff),
         outputCard('Despacho', invoked),
       );
+      if (invoked.status === 'WAITING_EXTERNAL' && state.activeJob.job_id) {
+        renderExternalReply(invoked.dispatch_payload || invoked.result?.dispatch_payload || '');
+      }
       if (state.activeJob.job_id) {
         const poll = document.createElement('button');
         poll.type = 'button';
