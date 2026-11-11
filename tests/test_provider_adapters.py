@@ -213,3 +213,16 @@ def test_new_agent_catalog_entries_never_claim_live_connection(monkeypatch):
     for agent_id in ("grok", "huggingface", "ollama", "llama-cpp"):
         assert rows[agent_id]["connection_verified"] is False
         assert rows[agent_id]["status"] == "BLOCKED_CONFIGURATION"
+
+
+def test_grok_web_is_manual_handoff_not_a_live_browser_connection(monkeypatch):
+    monkeypatch.delenv("GROK_WEB_MODEL", raising=False)
+    settings = AgentSettings.from_env("grok-web")
+    assert settings.spec.transport == "external_handoff"
+    assert settings.model == "grok-web-manual"
+    broker = AgentBroker(settings, actor="operator")
+    result = broker.invoke(PAYLOAD)
+    assert result["status"] == "WAITING_EXTERNAL"
+    assert result["prompt"]
+    assert "Return one observable result." in result["prompt"]
+    assert "connection_verified" not in result or result.get("connection_verified") is False
