@@ -1,0 +1,122 @@
+name: Capability Bridge full-stack integration
+
+on:
+  push:
+    branches: [integration/cognitive-relay-fullstack-v1]
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "apps/**"
+      - "data/**"
+      - "tests/**"
+      - "requirements.txt"
+      - "Dockerfile.core"
+      - "docker-compose*.yml"
+      - ".github/workflows/integration-fullstack.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install core dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Compile core and tests
+        run: python -m compileall -q app tests
+      - name: Run core test suite
+        run: python -m pytest -q
+
+  projectvault-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install ProjectVault test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "apps/api[test]"
+      - name: Run ProjectVault test suite
+        working-directory: apps/api
+        run: python -m pytest -q
+
+  web-syntax:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate JavaScript syntax
+        run: |
+          node --check apps/web/app.js
+          node --check apps/web/core.js
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare isolated test environment
+        run: cp .env.example .env
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Build and start all services
+        run: docker compose up --build -d
+      - name: Verify frontend, ProjectVault and core API
+        run: |
+          for i in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then break; fi
+            sleep 3
+          done
+          curl --fail --silent http://127.0.0.1:3000/ | grep -q "Capability Bridge"
+          curl --fail --silent http://127.0.0.1:3000/core-api/health
+          curl --fail --silent http://127.0.0.1:3000/bridge-api/health
+          python - <<'PY'
+          import hashlib, hmac, json, time, urllib.request, uuid
+          principal = "operator"
+          secret = "REPLACE_WITH_64_HEX_RANDOM_BYTES"
+          path = "/agents"
+          timestamp = str(int(time.time()))
+          nonce = uuid.uuid4().hex
+          body_hash = hashlib.sha256(b"").hexdigest()
+          canonical = "\n".join(["GET", path, timestamp, nonce, body_hash])
+          signature = hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
+          request = urllib.request.Request(
+              "http://127.0.0.1:3000/core-api/agents",
+              headers={
+                  "X-MatVerse-Principal": principal,
+                  "X-MatVerse-Timestamp": timestamp,
+                  "X-MatVerse-Nonce": nonce,
+                  "X-MatVerse-Content-SHA256": body_hash,
+                  "X-MatVerse-Signature": signature,
+              },
+              method="GET",
+          )
+          with urllib.request.urlopen(request, timeout=10) as response:
+              data = json.loads(response.read().decode("utf-8"))
+          assert len(data["agents"]) >= 13, data
+          print("signed HMAC route passed; agent catalog entries:", len(data["agents"]))
+          PY
+      - name: Collect service status on failure
+        if: failure()
+        run: docker compose ps && docker compose logs --tail=200
+      - name: Stop services
+        if: always()
+        run: docker compose down -v

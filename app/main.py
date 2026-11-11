@@ -37,6 +37,13 @@ from .storage import (
 )
 
 app = FastAPI(title="MATVERSE_REAL_v1", version="1.2.0-pass-hardening")
+from .agent_router import router as agent_router
+app.include_router(agent_router)
+from .model_registry import router as model_registry_router
+app.include_router(model_registry_router)
+
+from .memory_router import router as memory_router
+app.include_router(memory_router)
 SHA256_PATTERN = r"^[0-9a-fA-F]{64}$"
 PARTICIPANT_PATTERN = r"^[A-Za-z0-9._:-]{1,128}$"
 
@@ -202,7 +209,7 @@ def ingress(req: Ingress, principal: Principal = Depends(require_capability("bri
     if retain_raw_payload:
         event["payload"] = req.payload
     receipt = append_event(event, decision.value)
-    return {"request_id": req.request_id, "decision": decision.value, "reason": reason, "po_state": po_state.value, "executed": decision is Decision.PASS, "quarantined": decision is not Decision.PASS, "payload_hash": payload_hash, "payload_retained": retain_raw_payload, "receipt": receipt}
+    return {"request_id": req.request_id, "decision": decision.value, "reason": reason, "po_state": po_state.value, "executed": False, "quarantined": decision is not Decision.PASS, "payload_hash": payload_hash, "payload_retained": retain_raw_payload, "receipt": receipt}
 
 
 @app.get("/ledger")

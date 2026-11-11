@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Sovereign knowledge vault for your projects">
+  <title>GPT Project Bridge</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+  <script src="/core.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">GPT Project Bridge<small>Owner-controlled vault</small></div>
+      <nav id="nav" class="nav">
+        <a href="#dashboard" data-route="dashboard">Dashboard</a>
+        <a href="#projects" data-route="projects">Projects</a>
+        <a href="#search" data-route="search">Search</a>
+        <a href="#ingest" data-route="ingest">Ingest</a>
+        <a href="#bridge" data-route="bridge">GPT Bridge</a>
+        <a href="#capability-bridge" data-route="capability-bridge">Capability Bridge</a>
+        <a href="#settings" data-route="settings">Settings</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <div id="flash" class="flash" hidden></div>
+      <section id="dashboard" class="page">
+        <div class="eyebrow">Dashboard</div>
+        <h1>ProjectVault</h1>
+        <p>Sovereign knowledge vault for your projects</p>
+        <div class="grid stats">
+          <div class="card"><div class="stat-label">Projects</div><div id="stat-projects" class="stat-value">0</div></div>
+          <div class="card"><div class="stat-label">Conversations</div><div id="stat-conversations" class="stat-value">0</div></div>
+          <div class="card"><div class="stat-label">Messages</div><div id="stat-messages" class="stat-value">0</div></div>
+          <div class="card"><div class="stat-label">Files</div><div id="stat-files" class="stat-value">0</div></div>
+        </div>
+        <div id="empty-state" class="notice" hidden>The vault is healthy and empty. Import the official ChatGPT export to populate the dashboard.</div>
+        <h2>Quick Actions</h2>
+        <div class="grid actions">
+          <a class="card action" href="#ingest"><strong>Ingest ChatGPT Export</strong><span>Import the official ZIP with explicit provenance.</span></a>
+          <a class="card action" href="#ingest"><strong>Ingest Manus Backup</strong><span>Preserve a `.manustask` container with a SHA-256 receipt.</span></a>
+          <a class="card action" href="#projects"><strong>View Projects</strong><span>Inspect confirmed projects and UNASSIGNED.</span></a>
+          <a class="card action" href="#search"><strong>Search Vault</strong><span>Search globally, then open a preserved source.</span></a>
+        </div>
+      </section>
+
+      <section id="projects" class="page" hidden>
+        <div class="eyebrow">Registry</div><h1>Projects</h1>
+        <p>Only explicit export metadata or owner-confirmed mappings create project membership.</p>
+        <div class="table-wrap"><table><thead><tr><th>Project</th><th>ID</th><th>Basis</th><th>Documents</th></tr></thead><tbody id="projects-body"></tbody></table></div>
+      </section>
+
+      <section id="search" class="page" hidden>
+        <div class="eyebrow">Global retrieval</div><h1>Search Vault</h1>
+        <form id="search-form" class="row">
+          <label class="field"><span>Search terms</span><input id="search-q" required placeholder="architecture, Kalman, blockchain…"></label>
+          <label class="field"><span>Project ID (optional)</span><input id="search-project"></label>
+          <button class="button" type="submit">Search</button>
+        </form>
+        <p id="search-summary"></p><div id="search-results" class="result-list"></div>
+      </section>
+
+      <section id="ingest" class="page" hidden>
+        <div class="eyebrow">Controlled import</div><h1>Ingest</h1>
+        <p>The bridge never infers project membership from names or themes. Unknown content stays UNASSIGNED.</p>
+        <div class="grid two">
+          <article class="card"><h2>ChatGPT Export</h2>
+            <form id="export-form" class="form">
+              <label class="field"><span>Official export ZIP</span><input name="export" type="file" accept=".zip,application/zip" required></label>
+              <label class="field"><span>Owner map JSON (optional)</span><input name="owner_map" type="file" accept=".json,application/json"></label>
+              <button class="button" type="submit">Ingest ChatGPT Export</button>
+            </form>
+          </article>
+          <article class="card"><h2>Project Files</h2>
+            <form id="files-form" class="form">
+              <label class="field"><span>Files ZIP</span><input name="archive" type="file" accept=".zip,application/zip" required></label>
+              <label class="field"><span>Confirmed project ID</span><input name="project_id" required></label>
+              <label class="field"><span>Confirmed project name</span><input name="project_name" required></label>
+              <button class="button" type="submit">Ingest Project Files</button>
+            </form>
+          </article>
+          <article class="card"><h2>Manus Task Backup</h2>
+            <p>Indexes supported files from a `.manustask` ZIP container. It does not restore data to Manus or infer project membership.</p>
+            <form id="manus-form" class="form">
+              <label class="field"><span>Completed `.manustask` backup</span><input name="backup" type="file" accept=".manustask,application/zip" required></label>
+              <label class="field"><span>Project ID (only if the entire archive belongs to one project)</span><input name="project_id"></label>
+              <label class="field"><span>Project name (paired with ID)</span><input name="project_name"></label>
+              <button class="button" type="submit">Ingest Manus Backup</button>
+            </form>
+          </article>
+        </div>
+        <h2 class="section-title">Recent Ingestions</h2>
+        <div class="table-wrap"><table><thead><tr><th>Source</th><th>Imported</th><th>Assigned</th><th>Unassigned</th><th>Completed</th></tr></thead><tbody id="ingestions-body"></tbody></table></div>
+      </section>
+
+      <section id="bridge" class="page" hidden>
+        <div class="eyebrow">MCP access layer</div><h1>GPT Bridge</h1>
+        <p>Read-only access for ChatGPT and authorized agents. Search first, then fetch only selected sources.</p>
+        <div class="grid actions">
+          <article class="card"><h2>Endpoint</h2><div id="mcp-endpoint" class="code"></div><p id="bridge-health"></p></article>
+          <article class="card"><h2>Tools</h2><div class="code">search({ query })\nfetch({ id })\nlist_projects({})\nlist_ingestions({ limit? })\nlist_unassigned({ limit? })</div></article>
+          <article class="card"><h2>Policy</h2><p>Explicit attribution only. UNASSIGNED is preserved. MCP tools are read-only and auditable.</p></article>
+        </div>
+      </section>
+
+      <section id="capability-bridge" class="page" hidden>
+        <div class="eyebrow">Cognitive Relay · Agent Mesh</div>
+        <h1>Capability Bridge</h1>
+        <p>Orquestração sobre o Bridge existente: descoberta, seleção, sessão contratual, handoff e despacho explícito. Catálogo não significa conexão ativa.</p>
+
+        <div class="grid two">
+          <article class="card">
+            <h2>Sessão local do operador</h2>
+            <p>Use um principal HMAC provisionado no backend. O segredo fica somente na memória desta página, não é salvo no navegador e esta interface aceita autenticação apenas em localhost.</p>
+            <form id="core-auth-form" class="form">
+              <label class="field"><span>Principal</span><input id="core-principal" autocomplete="username" value="operator" required></label>
+              <label class="field"><span>Segredo HMAC</span><input id="core-secret" type="password" autocomplete="current-password" required></label>
+              <div class="row">
+                <button class="button" type="submit">Conectar</button>
+                <button id="core-disconnect" class="button secondary" type="button">Desconectar</button>
+              </div>
+            </form>
+            <p id="core-auth-status" class="status-line">Desconectado.</p>
+          </article>
+          <article class="card">
+            <h2>Saúde do runtime</h2>
+            <div id="core-health" class="code">Aguardando consulta…</div>
+            <button id="core-refresh" class="button" type="button">Atualizar estado</button>
+          </article>
+        </div>
+
+        <article class="card section-card">
+          <h2>Catálogo de agentes e runtimes</h2>
+          <p>Estados separados: configuração, conexão verificada e maturidade do adaptador.</p>
+          <button id="core-seed-registry" class="button" type="button">Importar catálogo canônico</button>
+          <div id="core-agent-catalog" class="provider-grid"></div>
+        </article>
+
+        <div class="grid two">
+          <article class="card">
+            <h2>Selecionar capacidade</h2>
+            <form id="core-select-form" class="form">
+              <label class="field"><span>Capacidade</span>
+                <select id="core-capability">
+                  <option value="research">Pesquisa</option>
+                  <option value="code">Engenharia de código</option>
+                  <option value="draft">Redação</option>
+                  <option value="review">Revisão</option>
+                  <option value="redteam">Red team</option>
+                  <option value="workflow">Workflow / execução</option>
+                  <option value="curation">Curadoria</option>
+                  <option value="application">Aplicações</option>
+                  <option value="metadata">Metadados</option>
+                </select>
+              </label>
+              <label class="field"><span>Modalidade</span>
+                <select id="core-modality"><option value="text">Texto</option><option value="image">Imagem</option><option value="video">Vídeo</option><option value="audio">Áudio</option></select>
+              </label>
+              <label class="field"><span>Preferência de provedores (ordem)</span>
+                <input id="core-preference" value="local,openai,xai,huggingface,venice,anthropic,kilo,manus">
+              </label>
+              <label class="check-line"><input id="core-require-configured" type="checkbox" checked> Exigir configuração presente</label>
+              <label class="check-line"><input id="core-require-verified" type="checkbox"> Exigir conexão live já verificada</label>
+              <label class="check-line"><input id="core-allow-external" type="checkbox"> Permitir handoff externo/manual</label>
+              <button class="button" type="submit">Calcular shortlist</button>
+            </form>
+            <div id="core-selection" class="result-list"></div>
+          </article>
+
+          <article class="card">
+            <h2>Despachar tarefa pelo Cognitive Relay</h2>
+            <p>O fluxo cria os cinco artefatos contratuais, uma sessão, um handoff e só então solicita a execução do agente selecionado.</p>
+            <form id="core-dispatch-form" class="form">
+              <label class="field"><span>Agente selecionado</span><select id="core-target-agent" required><option value="">Faça primeiro a shortlist</option></select></label>
+              <label class="field"><span>Objetivo da tarefa</span><textarea id="core-task" rows="5" required placeholder="Descreva a tarefa, o resultado esperado e as restrições."></textarea></label>
+              <label class="field"><span>URL da aba / fonte (opcional)</span><input id="core-source-url" type="url" placeholder="https://…"></label>
+              <label class="field"><span>ID da aba (opcional)</span><input id="core-source-tab" placeholder="ID fornecido pelo Browser Observer"></label>
+              <label class="field"><span>Texto do snapshot (opcional; hash calculado localmente e texto não enviado)</span><textarea id="core-source-text" rows="3" placeholder="Cole o trecho público da aba para calcular seu SHA-256 local."></textarea></label>
+              <button class="button" type="submit">Criar sessão e despachar</button>
+            </form>
+            <div id="core-job" class="result-list"></div>
+            <div id="core-external-reply" class="result-list"></div>
+          </article>
+        </div>
+
+        <div class="grid two">
+          <article class="card">
+            <h2>Ledger e Replay</h2>
+            <div class="row">
+              <button id="core-read-ledger" class="button" type="button">Ler ledger</button>
+              <button id="core-read-replay" class="button secondary" type="button">Reexecutar replay</button>
+            </div>
+            <pre id="core-ledger-output" class="code">Nenhuma consulta realizada.</pre>
+          </article>
+          <article class="card">
+            <h2>Busca de memória</h2>
+            <form id="core-memory-form" class="form">
+              <label class="field"><span>Consulta</span><input id="core-memory-query" required placeholder="Cognitive Relay, MNB, Bridge…"></label>
+              <label class="check-line"><input id="core-memory-text" type="checkbox"> Incluir trechos de texto (requer memory:content)</label>
+              <button class="button" type="submit">Pesquisar memória</button>
+            </form>
+            <pre id="core-memory-output" class="code">Memória não consultada.</pre>
+          </article>
+        </div>
+        <p class="small-note">Limites explícitos: Grok Web e esta API xAI são interfaces distintas; Browser Observer nesta integração é captura/observação, não controle automático da aba; o painel não transfere credenciais do ChatGPT, GitHub ou Hugging Face para o runtime.</p>
+      </section>
+
+      <section id="settings" class="page" hidden>
+        <div class="eyebrow">Runtime</div><h1>Settings</h1>
+        <div class="grid actions">
+          <article class="card"><h2>API</h2><p id="api-status">Checking…</p></article>
+          <article class="card"><h2>Storage</h2><p>SQLite FTS5 and mounted local volume. Single-node write deployment.</p></article>
+          <article class="card"><h2>Privacy</h2><p>No external telemetry by default. The API token is injected by the web proxy and never sent to browser JavaScript.</p></article>
+        </div>
+        <h2 class="section-title">Current counters</h2><pre id="settings-stats" class="code"></pre>
+      </section>
+
+      <dialog id="document-dialog">
+        <button id="dialog-close" class="dialog-close" aria-label="Close">×</button>
+        <h2 id="document-title"></h2>
+        <pre id="document-body" class="document"></pre>
+        <h3>Provenance</h3><pre id="document-metadata" class="code"></pre>
+      </dialog>
+    </main>
+  </div>
+</body>
+</html>
