@@ -51,6 +51,7 @@ AGENTS = {
         AgentSpec("kilo", "kilo", "kilo_gateway", "KILO_MODEL", "KILO_API_KEY", ("code", "review", "redteam")),
         AgentSpec("venice", "venice", "openai_compatible_chat", "VENICE_MODEL", "VENICE_API_KEY", ("research", "code", "draft", "review", "redteam")),
         AgentSpec("grok", "xai", "xai_responses", "XAI_MODEL", "XAI_API_KEY", ("research", "code", "draft", "review", "redteam")),
+        AgentSpec("grok-web", "xai", "external_handoff", "GROK_WEB_MODEL", None, ("research", "code", "draft", "review", "redteam"), default_model="grok-web-manual"),
         AgentSpec("huggingface", "huggingface", "hf_chat_completions", "HF_MODEL", "HF_TOKEN", ("research", "code", "draft", "review", "redteam")),
         AgentSpec("ollama", "local", "ollama_chat", "OLLAMA_MODEL", None, ("research", "code", "draft", "review", "redteam")),
         AgentSpec("llama-cpp", "local", "llama_cpp_chat", "LLAMA_CPP_MODEL", None, ("research", "code", "draft", "review", "redteam")),
