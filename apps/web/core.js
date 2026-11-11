@@ -48,7 +48,7 @@
     const timestamp = String(Math.floor(Date.now() / 1000));
     const nonce = randomNonce();
     const contentHash = await sha256Hex(bodyText);
-    const canonical = [method.toUpperCase(), path, timestamp, nonce, contentHash].join('\\n');
+    const canonical = [method.toUpperCase(), path, timestamp, nonce, contentHash].join('\n');
     const key = await crypto.subtle.importKey(
       'raw',
       new TextEncoder().encode(state.secret),
