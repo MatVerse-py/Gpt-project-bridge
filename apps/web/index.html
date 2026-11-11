@@ -176,7 +176,7 @@
               <label class="field"><span>Objetivo da tarefa</span><textarea id="core-task" rows="5" required placeholder="Descreva a tarefa, o resultado esperado e as restrições."></textarea></label>
               <label class="field"><span>URL da aba / fonte (opcional)</span><input id="core-source-url" type="url" placeholder="https://…"></label>
               <label class="field"><span>ID da aba (opcional)</span><input id="core-source-tab" placeholder="ID fornecido pelo Browser Observer"></label>
-              <label class="field"><span>SHA-256 do snapshot (opcional)</span><input id="core-source-hash" pattern="[a-fA-F0-9]{64}" placeholder="64 caracteres hexadecimais"></label>
+              <label class="field"><span>Texto do snapshot (opcional; hash calculado localmente e texto não enviado)</span><textarea id="core-source-text" rows="3" placeholder="Cole o trecho público da aba para calcular seu SHA-256 local."></textarea></label>
               <button class="button" type="submit">Criar sessão e despachar</button>
             </form>
             <div id="core-job" class="result-list"></div>
