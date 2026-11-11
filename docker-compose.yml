@@ -63,6 +63,7 @@ services:
       KILO_ALLOW_ANONYMOUS: ${KILO_ALLOW_ANONYMOUS:-false}
       VENICE_MODEL: ${VENICE_MODEL:-}
       VENICE_API_KEY: ${VENICE_API_KEY:-}
+      GROK_WEB_MODEL: ${GROK_WEB_MODEL:-grok-web-manual}
       XAI_MODEL: ${XAI_MODEL:-}
       XAI_API_KEY: ${XAI_API_KEY:-}
       HF_MODEL: ${HF_MODEL:-}
