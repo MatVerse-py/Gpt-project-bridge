@@ -40,6 +40,7 @@ Orquestrar capacidades heterogêneas através do GPT-Project-Bridge existente se
 ## Provedores
 
 - xAI: Responses API; enviar store=false; consumir apenas texto público do assistant.
+- Grok Web: usar grok-web como handoff externo; copiar o prompt para a aba autenticada e registrar manualmente a resposta. Não alegar automação da aba.
 - Hugging Face: Inference Providers Chat Completions; token precisa de permissão específica e chamada pode ser cobrada.
 - Ollama: /api/chat local; endpoint loopback ou host-gateway explicitamente permitido.
 - llama.cpp: OpenAI-compatible chat local; endpoint loopback ou host-gateway explicitamente permitido.
