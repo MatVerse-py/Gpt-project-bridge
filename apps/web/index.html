@@ -7,6 +7,7 @@
   <title>GPT Project Bridge</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" defer></script>
+  <script src="/core.js" defer></script>
 </head>
 <body>
   <div class="shell">
@@ -18,6 +19,7 @@
         <a href="#search" data-route="search">Search</a>
         <a href="#ingest" data-route="ingest">Ingest</a>
         <a href="#bridge" data-route="bridge">GPT Bridge</a>
+        <a href="#capability-bridge" data-route="capability-bridge">Capability Bridge</a>
         <a href="#settings" data-route="settings">Settings</a>
       </nav>
     </aside>
@@ -100,6 +102,106 @@
           <article class="card"><h2>Tools</h2><div class="code">search({ query })\nfetch({ id })\nlist_projects({})\nlist_ingestions({ limit? })\nlist_unassigned({ limit? })</div></article>
           <article class="card"><h2>Policy</h2><p>Explicit attribution only. UNASSIGNED is preserved. MCP tools are read-only and auditable.</p></article>
         </div>
+      </section>
+
+      <section id="capability-bridge" class="page" hidden>
+        <div class="eyebrow">Cognitive Relay · Agent Mesh</div>
+        <h1>Capability Bridge</h1>
+        <p>Orquestração sobre o Bridge existente: descoberta, seleção, sessão contratual, handoff e despacho explícito. Catálogo não significa conexão ativa.</p>
+
+        <div class="grid two">
+          <article class="card">
+            <h2>Sessão local do operador</h2>
+            <p>Use um principal HMAC provisionado no backend. O segredo fica somente na memória desta página, não é salvo no navegador e esta interface aceita autenticação apenas em localhost.</p>
+            <form id="core-auth-form" class="form">
+              <label class="field"><span>Principal</span><input id="core-principal" autocomplete="username" value="operator" required></label>
+              <label class="field"><span>Segredo HMAC</span><input id="core-secret" type="password" autocomplete="current-password" required></label>
+              <div class="row">
+                <button class="button" type="submit">Conectar</button>
+                <button id="core-disconnect" class="button secondary" type="button">Desconectar</button>
+              </div>
+            </form>
+            <p id="core-auth-status" class="status-line">Desconectado.</p>
+          </article>
+          <article class="card">
+            <h2>Saúde do runtime</h2>
+            <div id="core-health" class="code">Aguardando consulta…</div>
+            <button id="core-refresh" class="button" type="button">Atualizar estado</button>
+          </article>
+        </div>
+
+        <article class="card section-card">
+          <h2>Catálogo de agentes e runtimes</h2>
+          <p>Estados separados: configuração, conexão verificada e maturidade do adaptador.</p>
+          <div id="core-agent-catalog" class="provider-grid"></div>
+        </article>
+
+        <div class="grid two">
+          <article class="card">
+            <h2>Selecionar capacidade</h2>
+            <form id="core-select-form" class="form">
+              <label class="field"><span>Capacidade</span>
+                <select id="core-capability">
+                  <option value="research">Pesquisa</option>
+                  <option value="code">Engenharia de código</option>
+                  <option value="draft">Redação</option>
+                  <option value="review">Revisão</option>
+                  <option value="redteam">Red team</option>
+                  <option value="workflow">Workflow / execução</option>
+                  <option value="curation">Curadoria</option>
+                  <option value="application">Aplicações</option>
+                  <option value="metadata">Metadados</option>
+                </select>
+              </label>
+              <label class="field"><span>Modalidade</span>
+                <select id="core-modality"><option value="text">Texto</option><option value="image">Imagem</option><option value="video">Vídeo</option><option value="audio">Áudio</option></select>
+              </label>
+              <label class="field"><span>Preferência de provedores (ordem)</span>
+                <input id="core-preference" value="local,openai,xai,huggingface,venice,anthropic,kilo,manus">
+              </label>
+              <label class="check-line"><input id="core-require-configured" type="checkbox" checked> Exigir configuração presente</label>
+              <label class="check-line"><input id="core-require-verified" type="checkbox"> Exigir conexão live já verificada</label>
+              <label class="check-line"><input id="core-allow-external" type="checkbox"> Permitir handoff externo/manual</label>
+              <button class="button" type="submit">Calcular shortlist</button>
+            </form>
+            <div id="core-selection" class="result-list"></div>
+          </article>
+
+          <article class="card">
+            <h2>Despachar tarefa pelo Cognitive Relay</h2>
+            <p>O fluxo cria os cinco artefatos contratuais, uma sessão, um handoff e só então solicita a execução do agente selecionado.</p>
+            <form id="core-dispatch-form" class="form">
+              <label class="field"><span>Agente selecionado</span><select id="core-target-agent" required><option value="">Faça primeiro a shortlist</option></select></label>
+              <label class="field"><span>Objetivo da tarefa</span><textarea id="core-task" rows="5" required placeholder="Descreva a tarefa, o resultado esperado e as restrições."></textarea></label>
+              <label class="field"><span>URL da aba / fonte (opcional)</span><input id="core-source-url" type="url" placeholder="https://…"></label>
+              <label class="field"><span>ID da aba (opcional)</span><input id="core-source-tab" placeholder="ID fornecido pelo Browser Observer"></label>
+              <label class="field"><span>SHA-256 do snapshot (opcional)</span><input id="core-source-hash" pattern="[a-fA-F0-9]{64}" placeholder="64 caracteres hexadecimais"></label>
+              <button class="button" type="submit">Criar sessão e despachar</button>
+            </form>
+            <div id="core-job" class="result-list"></div>
+          </article>
+        </div>
+
+        <div class="grid two">
+          <article class="card">
+            <h2>Ledger e Replay</h2>
+            <div class="row">
+              <button id="core-read-ledger" class="button" type="button">Ler ledger</button>
+              <button id="core-read-replay" class="button secondary" type="button">Reexecutar replay</button>
+            </div>
+            <pre id="core-ledger-output" class="code">Nenhuma consulta realizada.</pre>
+          </article>
+          <article class="card">
+            <h2>Busca de memória</h2>
+            <form id="core-memory-form" class="form">
+              <label class="field"><span>Consulta</span><input id="core-memory-query" required placeholder="Cognitive Relay, MNB, Bridge…"></label>
+              <label class="check-line"><input id="core-memory-text" type="checkbox"> Incluir trechos de texto (requer memory:content)</label>
+              <button class="button" type="submit">Pesquisar memória</button>
+            </form>
+            <pre id="core-memory-output" class="code">Memória não consultada.</pre>
+          </article>
+        </div>
+        <p class="small-note">Limites explícitos: Grok Web e esta API xAI são interfaces distintas; Browser Observer nesta integração é captura/observação, não controle automático da aba; o painel não transfere credenciais do ChatGPT, GitHub ou Hugging Face para o runtime.</p>
       </section>
 
       <section id="settings" class="page" hidden>
