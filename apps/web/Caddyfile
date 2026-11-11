@@ -9,6 +9,11 @@
     }
   }
 
+  # Strip only the UI prefix; the browser signs the canonical backend path.
+  handle_path /core-api/* {
+    reverse_proxy core-api:8000
+  }
+
   try_files {path} /index.html
   file_server
 
