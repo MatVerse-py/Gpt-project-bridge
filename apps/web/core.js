@@ -446,6 +446,51 @@
     }
   }
 
+  function renderExternalReply(prompt) {
+    const host = $('#core-external-reply');
+    if (!host) return;
+    host.replaceChildren();
+    host.appendChild(outputCard('Prompt para executar na aba externa', prompt || 'O provedor não retornou um prompt público.'));
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'button secondary';
+    copy.textContent = 'Copiar prompt';
+    copy.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(String(prompt || '')); notify('Prompt copiado. Cole manualmente na aba externa.'); }
+      catch { notify('Clipboard indisponível; copie o texto do bloco acima.', true); }
+    });
+    const form = document.createElement('form');
+    form.className = 'form';
+    const label = document.createElement('label');
+    label.className = 'field';
+    const caption = document.createElement('span');
+    caption.textContent = 'Resposta pública retornada pelo agente externo';
+    const textarea = document.createElement('textarea');
+    textarea.rows = 5;
+    textarea.required = true;
+    textarea.placeholder = 'Cole somente a resposta pública. Não inclua credenciais nem raciocínio privado.';
+    label.append(caption, textarea);
+    const submit = document.createElement('button');
+    submit.type = 'submit';
+    submit.className = 'button';
+    submit.textContent = 'Registrar resposta no job';
+    form.append(label, submit);
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try {
+        if (!state.activeJob?.job_id) throw new Error('Nenhum job externo ativo.');
+        const reply = textarea.value.trim();
+        const result = await coreRequest(
+          `/agents/${encodeURIComponent(state.activeJob.agent_id)}/jobs/${encodeURIComponent(state.activeJob.job_id)}/complete`,
+          { method: 'POST', body: { payload: { kind: 'agent_reply', public_summary: reply.slice(0, 1000), state: { reply } } } },
+        );
+        host.appendChild(outputCard('Resposta externa registrada', result));
+        notify('Resposta externa reconciliada no job.');
+      } catch (error) { notify(error.message, true); }
+    });
+    host.append(copy, form);
+  }
+
   async function pollActiveJob() {
     if (!state.activeJob?.job_id) return;
     try {
