@@ -226,3 +226,10 @@ def test_grok_web_is_manual_handoff_not_a_live_browser_connection(monkeypatch):
     assert result["prompt"]
     assert "Return one observable result." in result["prompt"]
     assert "connection_verified" not in result or result.get("connection_verified") is False
+
+
+def test_grok_web_catalog_is_configured_as_manual_but_never_live(monkeypatch):
+    monkeypatch.delenv("GROK_WEB_MODEL", raising=False)
+    row = next(item for item in agent_catalog() if item["agent_id"] == "grok-web")
+    assert row["configured"] is True
+    assert row["connection_verified"] is False
