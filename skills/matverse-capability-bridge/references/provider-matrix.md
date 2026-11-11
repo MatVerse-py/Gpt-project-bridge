@@ -7,6 +7,7 @@
 | kilo | Kilo Gateway | KILO_MODEL / KILO_API_KEY | depende do modelo | anônimo só para :free e opt-in |
 | venice | Venice Chat Completions | VENICE_MODEL / VENICE_API_KEY | por plano | base URL fixa |
 | grok | xAI Responses | XAI_MODEL / XAI_API_KEY | API | store=false; não é Grok Web |
+| grok-web | handoff externo manual | GROK_WEB_MODEL | plano Grok do usuário | gera prompt copiável; usuário executa na aba e devolve resposta |
 | huggingface | HF Inference Providers | HF_MODEL / HF_TOKEN | pay-as-you-go | token precisa de permissão |
 | ollama | localhost:11434/api/chat | OLLAMA_MODEL / OLLAMA_URL | sem custo por chamada | modelo precisa estar instalado |
 | llama-cpp | localhost:8080/v1/chat/completions | LLAMA_CPP_MODEL / LLAMA_CPP_URL | sem custo por chamada | servidor/modelo precisam estar ativos |
