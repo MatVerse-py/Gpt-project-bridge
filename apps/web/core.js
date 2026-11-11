@@ -163,7 +163,7 @@
       const title = document.createElement('strong');
       title.textContent = `${candidate.agent_id} — ${candidate.provider}`;
       const meta = document.createElement('p');
-      meta.textContent = `Modelo: ${candidate.model || 'não configurado'} · ${candidate.status || 'estado não informado'} · conexão: ${candidate.connection_verified ? 'verificada' : 'não verificada'}`;
+      meta.textContent = `Modelo: ${candidate.model || 'não configurado'} · ${candidate.selection_state || candidate.status || 'estado não informado'} · conexão: ${candidate.connection_verified ? 'verificada' : 'não verificada'}`;
       card.append(title, meta);
       host.appendChild(card);
     }
