@@ -6,6 +6,11 @@
     reverse_proxy api:8787
   }
 
+  @core path /core-api/*
+  handle_path @core {
+    reverse_proxy core-api:8000
+  }
+
   handle {
     reverse_proxy web:3000
   }
