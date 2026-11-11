@@ -16,6 +16,7 @@ constitutional authority or bypasses the existing admission process.
 | `kilo` | Kilo Gateway chat completions | `KILO_MODEL` | `KILO_API_KEY`, or explicit anonymous `:free` mode |
 | `venice` | OpenAI-compatible Chat Completions at the pinned Venice base URL | `VENICE_MODEL` | `VENICE_API_KEY` |
 | `grok` | xAI Responses API, `store=false` | `XAI_MODEL` | `XAI_API_KEY` |
+| `grok-web` | Grok Web manual external handoff | `GROK_WEB_MODEL` | none; user submits response manually |
 | `huggingface` | Hugging Face Inference Providers Chat Completions | `HF_MODEL` | `HF_TOKEN` |
 | `ollama` | Local Ollama `/api/chat`, loopback-only | `OLLAMA_MODEL` | none |
 | `llama-cpp` | Local OpenAI-compatible `/v1/chat/completions`, loopback-only | `LLAMA_CPP_MODEL` | none |
