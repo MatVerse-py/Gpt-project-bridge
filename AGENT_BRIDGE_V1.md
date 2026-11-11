@@ -15,6 +15,10 @@ constitutional authority or bypasses the existing admission process.
 | `claude` | Anthropic Messages, `/v1/messages` | `ANTHROPIC_MODEL` | `ANTHROPIC_API_KEY` |
 | `kilo` | Kilo Gateway chat completions | `KILO_MODEL` | `KILO_API_KEY`, or explicit anonymous `:free` mode |
 | `venice` | OpenAI-compatible Chat Completions at the pinned Venice base URL | `VENICE_MODEL` | `VENICE_API_KEY` |
+| `grok` | xAI Responses API, `store=false` | `XAI_MODEL` | `XAI_API_KEY` |
+| `huggingface` | Hugging Face Inference Providers Chat Completions | `HF_MODEL` | `HF_TOKEN` |
+| `ollama` | Local Ollama `/api/chat`, loopback-only | `OLLAMA_MODEL` | none |
+| `llama-cpp` | Local OpenAI-compatible `/v1/chat/completions`, loopback-only | `LLAMA_CPP_MODEL` | none |
 | `manus` | Manus tasks API v2 | `MANUS_AGENT_PROFILE` | `MANUS_API_KEY` |
 | `base44` | Base44 MCP at `https://app.base44.com/mcp` | Fixed `BASE44_APP_ID` | Existing OAuth `BASE44_ACCESS_TOKEN` |
 | `claude-code` | External handoff and authenticated reply | `CLAUDE_CODE_MODEL` | Client's own authorized session |
@@ -127,6 +131,32 @@ For external clients, return `{"payload":{"kind":"agent_reply",
 `POST /agents/<agent-id>/jobs/<job-id>/complete` through the enrolled responding
 principal. This relay does not run or authenticate Claude Code, Kilo Code or the
 Claude website on its own. A browser relay is an explicit manual transport.
+
+## xAI, Hugging Face and local inference
+
+- `grok` calls the official xAI Responses endpoint at `https://api.x.ai/v1/responses`. The adapter sets `store=false`, sends a configured model ID and extracts only assistant `output_text`; reasoning items are not returned to the caller.
+- `huggingface` calls `https://router.huggingface.co/v1/chat/completions`. It requires an explicit `HF_MODEL` and a token permitted to call Inference Providers. This route is pay-as-you-go and is not the same as downloading a model from the Hub or running Transformers locally.
+- `ollama` and `llama-cpp` are local inference transports. They accept only plain HTTP loopback origins by default. Docker deployments may opt into the exact `host.docker.internal` host-gateway with `MATVERSE_ALLOW_HOST_DOCKER_INTERNAL=true`; arbitrary remote endpoints are rejected.
+- A configured model, provider catalog entry or adapter implementation does not establish a live connection. The registry keeps `connection_verified=false` until an actual probe/invocation is observed.
+- Grok Web browser sessions, ChatGPT connector credentials and Hugging Face connector credentials are not transferred into this runtime. Each provider needs its own authorized secret in the local Secret Plane.
+
+## Cognitive Relay web console
+
+The full-stack local console is served by the ProjectVault web container at `http://127.0.0.1:3000/#capability-bridge`. It composes existing APIs rather than creating another gate or model registry:
+
+```text
+Capability selection
+  -> five immutable contract artifacts
+  -> Model Bridge session
+  -> observable handoff
+  -> Agent Bridge invocation
+  -> job/poll result
+  -> Ledger / Replay / optional memory search
+```
+
+The browser signs requests with WebCrypto using a provisioned HMAC principal. The secret remains in page memory only, is never stored in localStorage/sessionStorage, and the console refuses authentication when the host is not localhost. This is a local operator console, not a remote authentication design. Remote operation requires an OIDC/BFF flow that keeps signing material server-side.
+
+ProjectVault is a separate read-only corpus service and database. Its REST/MCP surface is not the same as the core Agent Bridge stdio MCP surface. Do not point `MATVERSE_MEMORY_DB` at the ProjectVault database: their schemas are different. The browser observer supplies tab metadata/snapshots; it does not control or type into a user's Grok/Manus tab.
 
 ## Claude Code and Kilo Code: stdio MCP
 
