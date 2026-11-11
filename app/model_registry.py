@@ -681,6 +681,16 @@ def _corpus_seed() -> tuple[list[dict[str, Any]], dict[str, Any]]:
             "metadata": {"agent_id": "grok", "transport": "xai_responses"}, "enabled": True,
         },
         {
+            "entry_id": "agent-adapter:grok-web", "entry_type": "AGENT_ADAPTER", "provider_id": "xai",
+            "display_name": "Grok Web manual handoff", "model_id": None, "upstream_family": "xai-web",
+            "model_type": None, "modalities": ["text"], "capabilities": ["research", "code", "draft", "review", "redteam"],
+            "adapter_id": "agent.xai.web_handoff", "integration_state": "EXTERNAL_HANDOFF_REVIEW",
+            "runtime_state": "UNKNOWN", "model_revision": None, "context_window_tokens": None,
+            "max_output_tokens": None, "source_id": "github-integration-branch", "source_refs": ["github:app/agent_runtime.py", "browser:current-grok-tab"],
+            "notes": "Gera handoff copiável para Grok Web; não controla a aba, não reutiliza sessão web e requer resposta externa manual.",
+            "metadata": {"agent_id": "grok-web", "transport": "external_handoff"}, "enabled": True,
+        },
+        {
             "entry_id": "agent-adapter:huggingface", "entry_type": "AGENT_ADAPTER", "provider_id": "huggingface",
             "display_name": "Hugging Face Inference Providers agent adapter", "model_id": None, "upstream_family": "huggingface",
             "model_type": None, "modalities": ["text"], "capabilities": ["research", "code", "draft", "review", "redteam"],
