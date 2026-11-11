@@ -51,6 +51,7 @@ O console compõe APIs existentes. Ele não cria um gate alternativo nem promove
 | kilo | gateway de modelos | Kilo chat completions | reutilizado |
 | venice | agregador/model provider | OpenAI-compatible chat | reutilizado |
 | grok | modelo xAI | Responses API, store=false | adicionado; CI pendente |
+| grok-web | interface web xAI | handoff manual copiável | adicionado; não controla a aba |
 | huggingface | Inference Providers | OpenAI-compatible chat completions | adicionado; CI pendente |
 | ollama | runtime local | /api/chat | adicionado; loopback-only |
 | llama-cpp | runtime local | /v1/chat/completions | adicionado; loopback-only |
