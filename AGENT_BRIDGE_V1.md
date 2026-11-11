@@ -1,6 +1,6 @@
 # Model-neutral Agent Bridge v1
 
-The Bridge can dispatch an observable handoff to Claude, Kilo, Manus or Base44,
+The Bridge can dispatch an observable handoff to OpenAI, Claude, Kilo, Venice, xAI, Hugging Face Inference Providers, local Ollama/llama.cpp, Manus or Base44,
 return the public result to the sender and acknowledge the input in one local
 transaction. All agents use the existing model-neutral session contract,
 authenticated principals, capability checks and institutional state store.
@@ -208,7 +208,7 @@ The registry separates providers, models, local runtimes, gateways, agent servic
 - `GET /model-registry/entries` filters by provider, entry type, integration state, runtime state, modality and text query.
 - `POST /model-registry/entries` registers a new catalog entry without allowing callers to self-promote it to `AVAILABLE` or `LIVE_VERIFIED`.
 
-The registry seed contains 428 typed records: 392 Venice catalog models plus provider, runtime, service, platform, transport and agent-adapter records. The Venice snapshot reconciles all 392 unique model IDs claimed by the source UI. The 29 IDs missed by plain-text extraction were recovered from the saved MHTML DOM attributes; no IDs were synthesized. The saved MHTML provides 139 explicit context-window labels.
+The registry seed contains 434 typed records in this integration branch: 392 Venice catalog models plus provider, runtime, service, platform, transport and agent-adapter records. The Venice snapshot reconciles all 392 unique model IDs claimed by the source UI. The 29 IDs missed by plain-text extraction were recovered from the saved MHTML DOM attributes; no IDs were synthesized. The saved MHTML provides 139 explicit context-window labels.
 
 ## Consultable archived memory
 
