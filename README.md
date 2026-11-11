@@ -4,7 +4,7 @@ Core bridge, federation, evidence and publication runtimes.
 
 ## Model-neutral agent integration
 
-OpenAI, Claude, Kilo, Venice, xAI/Grok, Hugging Face Inference Providers, Ollama, llama.cpp, Manus and Base44 now have adapters or existing transports over the existing
+OpenAI, Claude, Kilo, Venice, xAI/Grok API and Grok Web manual handoff, Hugging Face Inference Providers, Ollama, llama.cpp, Manus and Base44 now have adapters or existing transports over the existing
 frozen model-bridge sessions, HMAC principals, Secret Plane and transactional
 handoffs. Claude Code and Kilo Code can use the bounded stdio MCP surface.
 Archived memory is exposed through a separate read-only, capability-scoped
