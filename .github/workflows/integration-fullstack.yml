@@ -88,6 +88,32 @@ jobs:
           curl --fail --silent http://127.0.0.1:3000/ | grep -q "Capability Bridge"
           curl --fail --silent http://127.0.0.1:3000/core-api/health
           curl --fail --silent http://127.0.0.1:3000/bridge-api/health
+          python - <<'PY'
+          import hashlib, hmac, json, time, urllib.request, uuid
+          principal = "operator"
+          secret = "REPLACE_WITH_64_HEX_RANDOM_BYTES"
+          path = "/agents"
+          timestamp = str(int(time.time()))
+          nonce = uuid.uuid4().hex
+          body_hash = hashlib.sha256(b"").hexdigest()
+          canonical = "\\n".join(["GET", path, timestamp, nonce, body_hash])
+          signature = hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
+          request = urllib.request.Request(
+              "http://127.0.0.1:3000/core-api/agents",
+              headers={
+                  "X-MatVerse-Principal": principal,
+                  "X-MatVerse-Timestamp": timestamp,
+                  "X-MatVerse-Nonce": nonce,
+                  "X-MatVerse-Content-SHA256": body_hash,
+                  "X-MatVerse-Signature": signature,
+              },
+              method="GET",
+          )
+          with urllib.request.urlopen(request, timeout=10) as response:
+              data = json.loads(response.read().decode("utf-8"))
+          assert len(data["agents"]) >= 13, data
+          print("signed HMAC route passed; agent catalog entries:", len(data["agents"]))
+          PY
       - name: Collect service status on failure
         if: failure()
         run: docker compose ps && docker compose logs --tail=200
