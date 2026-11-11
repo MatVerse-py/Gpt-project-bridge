@@ -7,7 +7,9 @@ import os
 import re
 import time
 from dataclasses import dataclass, replace
+from ipaddress import ip_address
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -48,6 +50,10 @@ AGENTS = {
         AgentSpec("claude", "anthropic", "anthropic_messages", "ANTHROPIC_MODEL", "ANTHROPIC_API_KEY", ("research", "code", "draft", "review")),
         AgentSpec("kilo", "kilo", "kilo_gateway", "KILO_MODEL", "KILO_API_KEY", ("code", "review", "redteam")),
         AgentSpec("venice", "venice", "openai_compatible_chat", "VENICE_MODEL", "VENICE_API_KEY", ("research", "code", "draft", "review", "redteam")),
+        AgentSpec("grok", "xai", "xai_responses", "XAI_MODEL", "XAI_API_KEY", ("research", "code", "draft", "review", "redteam")),
+        AgentSpec("huggingface", "huggingface", "hf_chat_completions", "HF_MODEL", "HF_TOKEN", ("research", "code", "draft", "review", "redteam")),
+        AgentSpec("ollama", "local", "ollama_chat", "OLLAMA_MODEL", None, ("research", "code", "draft", "review", "redteam")),
+        AgentSpec("llama-cpp", "local", "llama_cpp_chat", "LLAMA_CPP_MODEL", None, ("research", "code", "draft", "review", "redteam")),
         AgentSpec("manus", "manus", "manus_tasks_v2", "MANUS_AGENT_PROFILE", "MANUS_API_KEY", ("workflow", "research", "curation"), "lite"),
         AgentSpec("base44", "base44", "base44_mcp", "", "BASE44_ACCESS_TOKEN", ("application", "workflow"), "platform:base44"),
         AgentSpec("claude-code", "anthropic", "external_handoff", "CLAUDE_CODE_MODEL", None, ("code", "review")),
@@ -89,7 +95,9 @@ class AgentSettings:
         if not math.isfinite(timeout) or not 1 <= timeout <= 120 or not 1 <= max_tokens <= 8192:
             raise AgentConfigurationError("agent resource limits are out of bounds")
         anonymous = agent_id == "kilo" and os.environ.get("KILO_ALLOW_ANONYMOUS", "").lower() == "true"
-        if anonymous and not model.endswith(":free"):
+        if agent_id in {"ollama", "llama-cpp"}:
+            anonymous = True
+        if anonymous and agent_id == "kilo" and not model.endswith(":free"):
             raise AgentConfigurationError("anonymous Kilo access requires an explicit :free model")
         app_id = os.environ.get("BASE44_APP_ID", "").strip() if agent_id == "base44" else ""
         if agent_id == "base44" and not re.fullmatch(r"[a-fA-F0-9]{24}", app_id):
@@ -119,6 +127,25 @@ def agent_catalog() -> list[dict[str, Any]]:
                          "roles": list(spec.roles), "configured": False, "connection_verified": False,
                          "status": "BLOCKED_CONFIGURATION"})
     return rows
+
+
+def _local_endpoint(env_name: str, default: str, path: str) -> str:
+    raw = os.environ.get(env_name, default).strip()
+    parsed = urlparse(raw)
+    if parsed.scheme != "http" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in {"", "/"}:
+        raise AgentConfigurationError(f"{env_name} must be a plain loopback HTTP origin")
+    host = parsed.hostname
+    if host != "localhost":
+        try:
+            if not ip_address(host).is_loopback:
+                raise AgentConfigurationError(f"{env_name} must resolve to loopback")
+        except ValueError:
+            raise AgentConfigurationError(f"{env_name} must resolve to loopback") from None
+    port = parsed.port or (11434 if env_name == "OLLAMA_URL" else 8080)
+    if not 1 <= port <= 65535:
+        raise AgentConfigurationError(f"{env_name} has an invalid port")
+    netloc = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+    return f"http://{netloc}{path}"
 
 
 def validate_payload(payload: dict[str, Any]) -> str:
@@ -242,6 +269,23 @@ class AgentBroker:
             headers["Authorization"] = f"Bearer {key}"
             body = {"model": s.model, "max_tokens": s.max_tokens, "stream": False,
                     "messages": [{"role": "user", "content": text}]}
+        elif s.spec.agent_id == "grok":
+            url = "https://api.x.ai/v1/responses"
+            headers["Authorization"] = f"Bearer {key}"
+            body = {"model": s.model, "input": text, "store": False, "max_output_tokens": s.max_tokens}
+        elif s.spec.agent_id == "huggingface":
+            url = "https://router.huggingface.co/v1/chat/completions"
+            headers["Authorization"] = f"Bearer {key}"
+            body = {"model": s.model, "max_tokens": s.max_tokens, "stream": False,
+                    "messages": [{"role": "user", "content": text}]}
+        elif s.spec.agent_id == "ollama":
+            url = _local_endpoint("OLLAMA_URL", "http://127.0.0.1:11434", "/api/chat")
+            body = {"model": s.model, "stream": False, "messages": [{"role": "user", "content": text}],
+                    "options": {"num_predict": s.max_tokens}}
+        elif s.spec.agent_id == "llama-cpp":
+            url = _local_endpoint("LLAMA_CPP_URL", "http://127.0.0.1:8080", "/v1/chat/completions")
+            body = {"model": s.model, "max_tokens": s.max_tokens, "stream": False,
+                    "messages": [{"role": "user", "content": text}]}
         elif s.spec.agent_id == "manus":
             url = "https://api.manus.ai/v2/task.create"
             headers["x-manus-api-key"] = key
@@ -259,11 +303,32 @@ class AgentBroker:
             return {"status": "RUNNING", "task_id": data["task_id"], "model": f"profile:{s.model}",
                     "requested_model": s.model, "provider_request_id": data.get("request_id")}
         try:
+            response_id = data.get("id")
+            usage = data.get("usage", {})
             if s.spec.agent_id == "claude":
                 output = "\n".join(x["text"] for x in data["content"] if isinstance(x, dict)
                                    and x.get("type") == "text" and isinstance(x.get("text"), str))
                 stop = data.get("stop_reason")
                 complete = stop == "end_turn"
+            elif s.spec.agent_id == "grok":
+                output_parts = []
+                for item in data.get("output", []):
+                    if not isinstance(item, dict) or item.get("type") != "message" or item.get("role") != "assistant":
+                        continue
+                    for part in item.get("content", []):
+                        if isinstance(part, dict) and part.get("type") == "output_text" and isinstance(part.get("text"), str):
+                            output_parts.append(part["text"])
+                output = "\n".join(output_parts)
+                stop = data.get("status")
+                complete = stop == "completed"
+            elif s.spec.agent_id == "ollama":
+                message = data.get("message")
+                if not isinstance(message, dict):
+                    raise ValueError
+                output = message.get("content")
+                stop = "stop" if data.get("done") is True else "incomplete"
+                complete = data.get("done") is True
+                usage = {"prompt_tokens": data.get("prompt_eval_count"), "completion_tokens": data.get("eval_count")}
             else:
                 choice = data["choices"][0]
                 output = choice["message"]["content"]
@@ -275,8 +340,8 @@ class AgentBroker:
             raise AgentProviderError("provider_missing_public_output") from None
         return {"status": "COMPLETE" if complete else "PARTIAL", "output_text": output,
                 "model": data.get("model", s.model), "requested_model": s.model,
-                "response_id": data.get("id"), "provider_request_id": request_id,
-                "stop_reason": stop, "usage": data.get("usage", {})}
+                "response_id": response_id, "provider_request_id": request_id,
+                "stop_reason": stop, "usage": usage}
 
     def poll_manus(self, task_id: str) -> dict[str, Any]:
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", task_id):
