@@ -135,7 +135,7 @@ def _local_endpoint(env_name: str, default: str, path: str) -> str:
     if parsed.scheme != "http" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in {"", "/"}:
         raise AgentConfigurationError(f"{env_name} must be a plain loopback HTTP origin")
     host = parsed.hostname
-    if host != "localhost":
+    if host != "localhost" and not (host == "host.docker.internal" and os.environ.get("MATVERSE_ALLOW_HOST_DOCKER_INTERNAL", "").lower() == "true"):
         try:
             if not ip_address(host).is_loopback:
                 raise AgentConfigurationError(f"{env_name} must resolve to loopback")
