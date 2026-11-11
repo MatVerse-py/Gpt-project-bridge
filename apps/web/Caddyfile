@@ -1,0 +1,22 @@
+:3000 {
+  encode zstd gzip
+  root * /srv
+
+  handle_path /bridge-api/* {
+    reverse_proxy api:8787 {
+      header_up Authorization "Bearer {$GPB_API_TOKEN}"
+      header_up -Origin
+    }
+  }
+
+  try_files {path} /index.html
+  file_server
+
+  header {
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    Referrer-Policy no-referrer
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+  }
+}

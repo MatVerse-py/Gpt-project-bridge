@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Sovereign knowledge vault for your projects">
+  <title>GPT Project Bridge</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">GPT Project Bridge<small>Owner-controlled vault</small></div>
+      <nav id="nav" class="nav">
+        <a href="#dashboard" data-route="dashboard">Dashboard</a>
+        <a href="#projects" data-route="projects">Projects</a>
+        <a href="#search" data-route="search">Search</a>
+        <a href="#ingest" data-route="ingest">Ingest</a>
+        <a href="#bridge" data-route="bridge">GPT Bridge</a>
+        <a href="#settings" data-route="settings">Settings</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <div id="flash" class="flash" hidden></div>
+      <section id="dashboard" class="page">
+        <div class="eyebrow">Dashboard</div>
+        <h1>ProjectVault</h1>
+        <p>Sovereign knowledge vault for your projects</p>
+        <div class="grid stats">
+          <div class="card"><div class="stat-label">Projects</div><div id="stat-projects" class="stat-value">0</div></div>
+          <div class="card"><div class="stat-label">Conversations</div><div id="stat-conversations" class="stat-value">0</div></div>
+          <div class="card"><div class="stat-label">Messages</div><div id="stat-messages" class="stat-value">0</div></div>
+          <div class="card"><div class="stat-label">Files</div><div id="stat-files" class="stat-value">0</div></div>
+        </div>
+        <div id="empty-state" class="notice" hidden>The vault is healthy and empty. Import the official ChatGPT export to populate the dashboard.</div>
+        <h2>Quick Actions</h2>
+        <div class="grid actions">
+          <a class="card action" href="#ingest"><strong>Ingest ChatGPT Export</strong><span>Import the official ZIP with explicit provenance.</span></a>
+          <a class="card action" href="#ingest"><strong>Ingest Manus Backup</strong><span>Preserve a `.manustask` container with a SHA-256 receipt.</span></a>
+          <a class="card action" href="#projects"><strong>View Projects</strong><span>Inspect confirmed projects and UNASSIGNED.</span></a>
+          <a class="card action" href="#search"><strong>Search Vault</strong><span>Search globally, then open a preserved source.</span></a>
+        </div>
+      </section>
+
+      <section id="projects" class="page" hidden>
+        <div class="eyebrow">Registry</div><h1>Projects</h1>
+        <p>Only explicit export metadata or owner-confirmed mappings create project membership.</p>
+        <div class="table-wrap"><table><thead><tr><th>Project</th><th>ID</th><th>Basis</th><th>Documents</th></tr></thead><tbody id="projects-body"></tbody></table></div>
+      </section>
+
+      <section id="search" class="page" hidden>
+        <div class="eyebrow">Global retrieval</div><h1>Search Vault</h1>
+        <form id="search-form" class="row">
+          <label class="field"><span>Search terms</span><input id="search-q" required placeholder="architecture, Kalman, blockchain…"></label>
+          <label class="field"><span>Project ID (optional)</span><input id="search-project"></label>
+          <button class="button" type="submit">Search</button>
+        </form>
+        <p id="search-summary"></p><div id="search-results" class="result-list"></div>
+      </section>
+
+      <section id="ingest" class="page" hidden>
+        <div class="eyebrow">Controlled import</div><h1>Ingest</h1>
+        <p>The bridge never infers project membership from names or themes. Unknown content stays UNASSIGNED.</p>
+        <div class="grid two">
+          <article class="card"><h2>ChatGPT Export</h2>
+            <form id="export-form" class="form">
+              <label class="field"><span>Official export ZIP</span><input name="export" type="file" accept=".zip,application/zip" required></label>
+              <label class="field"><span>Owner map JSON (optional)</span><input name="owner_map" type="file" accept=".json,application/json"></label>
+              <button class="button" type="submit">Ingest ChatGPT Export</button>
+            </form>
+          </article>
+          <article class="card"><h2>Project Files</h2>
+            <form id="files-form" class="form">
+              <label class="field"><span>Files ZIP</span><input name="archive" type="file" accept=".zip,application/zip" required></label>
+              <label class="field"><span>Confirmed project ID</span><input name="project_id" required></label>
+              <label class="field"><span>Confirmed project name</span><input name="project_name" required></label>
+              <button class="button" type="submit">Ingest Project Files</button>
+            </form>
+          </article>
+          <article class="card"><h2>Manus Task Backup</h2>
+            <p>Indexes supported files from a `.manustask` ZIP container. It does not restore data to Manus or infer project membership.</p>
+            <form id="manus-form" class="form">
+              <label class="field"><span>Completed `.manustask` backup</span><input name="backup" type="file" accept=".manustask,application/zip" required></label>
+              <label class="field"><span>Project ID (only if the entire archive belongs to one project)</span><input name="project_id"></label>
+              <label class="field"><span>Project name (paired with ID)</span><input name="project_name"></label>
+              <button class="button" type="submit">Ingest Manus Backup</button>
+            </form>
+          </article>
+        </div>
+        <h2 class="section-title">Recent Ingestions</h2>
+        <div class="table-wrap"><table><thead><tr><th>Source</th><th>Imported</th><th>Assigned</th><th>Unassigned</th><th>Completed</th></tr></thead><tbody id="ingestions-body"></tbody></table></div>
+      </section>
+
+      <section id="bridge" class="page" hidden>
+        <div class="eyebrow">MCP access layer</div><h1>GPT Bridge</h1>
+        <p>Read-only access for ChatGPT and authorized agents. Search first, then fetch only selected sources.</p>
+        <div class="grid actions">
+          <article class="card"><h2>Endpoint</h2><div id="mcp-endpoint" class="code"></div><p id="bridge-health"></p></article>
+          <article class="card"><h2>Tools</h2><div class="code">search({ query })\nfetch({ id })\nlist_projects({})\nlist_ingestions({ limit? })\nlist_unassigned({ limit? })</div></article>
+          <article class="card"><h2>Policy</h2><p>Explicit attribution only. UNASSIGNED is preserved. MCP tools are read-only and auditable.</p></article>
+        </div>
+      </section>
+
+      <section id="settings" class="page" hidden>
+        <div class="eyebrow">Runtime</div><h1>Settings</h1>
+        <div class="grid actions">
+          <article class="card"><h2>API</h2><p id="api-status">Checking…</p></article>
+          <article class="card"><h2>Storage</h2><p>SQLite FTS5 and mounted local volume. Single-node write deployment.</p></article>
+          <article class="card"><h2>Privacy</h2><p>No external telemetry by default. The API token is injected by the web proxy and never sent to browser JavaScript.</p></article>
+        </div>
+        <h2 class="section-title">Current counters</h2><pre id="settings-stats" class="code"></pre>
+      </section>
+
+      <dialog id="document-dialog">
+        <button id="dialog-close" class="dialog-close" aria-label="Close">×</button>
+        <h2 id="document-title"></h2>
+        <pre id="document-body" class="document"></pre>
+        <h3>Provenance</h3><pre id="document-metadata" class="code"></pre>
+      </dialog>
+    </main>
+  </div>
+</body>
+</html>
