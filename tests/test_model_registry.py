@@ -30,8 +30,8 @@ def test_corpus_seed_is_idempotent_and_reconciles_venice_catalog(client):
     assert first.status_code == 200, first.text
     seeded = first.json()
     assert seeded["decision"] == "PASS"
-    assert seeded["entries_total"] == 428
-    assert seeded["entries_inserted"] == 428
+    assert seeded["entries_total"] == 434
+    assert seeded["entries_inserted"] == 434
     assert seeded["venice_catalog"] == {
         "source_claimed_count": 392,
         "extracted_unique_model_ids": 392,
@@ -45,11 +45,11 @@ def test_corpus_seed_is_idempotent_and_reconciles_venice_catalog(client):
     assert second.status_code == 200, second.text
     assert second.json()["idempotent"] is True
     assert second.json()["entries_inserted"] == 0
-    assert second.json()["entries_existing"] == 428
+    assert second.json()["entries_existing"] == 434
 
     summary = auth_request(client, "admin", "GET", "/model-registry/summary")
     assert summary.status_code == 200
-    assert summary.json()["entries_total"] == 428
+    assert summary.json()["entries_total"] == 434
     assert summary.json()["venice_catalog_reconciliation"]["unresolved_count"] == 0
     assert storage.verify_chain()["ok"] is True
 
@@ -230,11 +230,11 @@ def test_adapter_snapshot_reconciles_registry_and_runtime_configuration(client):
     response = auth_request(client, "admin", "GET", "/model-registry/adapter-snapshot")
     assert response.status_code == 200
     body = response.json()
-    assert body["adapters_total"] == 9
+    assert body["adapters_total"] == 13
     assert body["registry_mismatch_total"] == 0
     assert body["connection_verified_total"] == 0
     assert {item["agent_id"] for item in body["adapters"]} == {
-        "gpt", "claude", "kilo", "venice", "manus", "base44", "claude-code", "claude-web", "kilo-code"
+        "gpt", "claude", "kilo", "venice", "manus", "base44", "claude-code", "claude-web", "kilo-code", "grok", "huggingface", "ollama", "llama-cpp"
     }
     assert all(item["alignment"] == "MATCHED" for item in body["adapters"])
 
