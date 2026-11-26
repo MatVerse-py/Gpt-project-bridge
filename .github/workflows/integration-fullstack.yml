@@ -86,9 +86,9 @@ jobs:
             sleep 3
           done
           curl --fail --silent http://127.0.0.1:3000/ | grep -q "Capability Bridge"
-          curl --fail --silent http://127.0.0.1:3000/core-api/health
-          curl --fail --silent http://127.0.0.1:3000/bridge-api/health
-          curl --fail --silent http://127.0.0.1:3000/bridge-api/api/stats >/dev/null
+          curl --fail --silent http://127.0.0.1:3000/core-api/health | grep -q '"status"'
+          curl --fail --silent http://127.0.0.1:3000/bridge-api/health | grep -q '"status"'
+          curl --fail --silent http://127.0.0.1:3000/bridge-api/api/stats | grep -q '"stats"'
           WRITE_TOKEN="$(sed -n 's/^PROJECTVAULT_STATIC_WRITE_TOKEN=//p' .env)"
           test -n "$WRITE_TOKEN"
           python - <<'PY'
@@ -107,16 +107,19 @@ jobs:
             -X POST -H 'Content-Type: application/json' \
             -d '{"document_id":"chat:smoke-unassigned","project_id":"smoke-project"}' \
             http://127.0.0.1:3000/bridge-api/api/assignments)"
+          printf 'ProjectVault read-only write attempt: HTTP %s\n' "$READ_DENIED"
           test "$READ_DENIED" = "403"
           INGEST_STATUS="$(curl --silent --output /tmp/pv-ingest.json --write-out '%{http_code}' \
             -X POST -H "Authorization: Bearer ${WRITE_TOKEN}" \
             -F "export=@/tmp/projectvault-smoke.zip;type=application/zip" \
             http://127.0.0.1:3000/bridge-api/api/ingest/export)"
+          printf 'ProjectVault writer ingestion: HTTP %s\n' "$INGEST_STATUS"
           test "$INGEST_STATUS" = "200"
           ASSIGN_STATUS="$(curl --silent --output /tmp/pv-assign.json --write-out '%{http_code}' \
             -X POST -H "Authorization: Bearer ${WRITE_TOKEN}" -H 'Content-Type: application/json' \
             -d '{"document_id":"chat:smoke-unassigned","project_id":"smoke-project"}' \
             http://127.0.0.1:3000/bridge-api/api/assignments)"
+          printf 'ProjectVault writer assignment: HTTP %s\n' "$ASSIGN_STATUS"
           test "$ASSIGN_STATUS" = "200"
           python - <<'PY'
           import hashlib, hmac, json, time, urllib.request, uuid

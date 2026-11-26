@@ -17,8 +17,13 @@
     reverse_proxy core-api:8000
   }
 
-  try_files {path} /index.html
-  file_server
+  # Static SPA fallback is deliberately inside the catch-all handle. If
+  # try_files runs globally, it rewrites API paths to index.html before the
+  # more-specific reverse-proxy handles can match them.
+  handle {
+    try_files {path} /index.html
+    file_server
+  }
 
   header {
     X-Content-Type-Options nosniff
