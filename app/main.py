@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 from .auth import Principal, require_capability
 from .core import Decision, POState, evaluate_hdb, omega_gate, stable_hash
 from .evidence import evidence_receipt
+from .ingress_contracts import evaluate_ingress_contracts
 from .federation_routing import (
     AdmissibilityGate,
     CapabilityGraph,
@@ -60,13 +61,17 @@ class HumanData(BaseModel):
 class Ingress(BaseModel):
     payload: dict[str, Any]
     action: Literal["READ", "COMMIT", "EXECUTE", "EXPORT", "PUBLISH"] = "EXECUTE"
+    ontology_hash: str | None = Field(default=None, pattern=SHA256_PATTERN)
+    transition_hash: str | None = Field(default=None, pattern=SHA256_PATTERN)
+    source_state: str | None = Field(default=None, min_length=1, max_length=128)
+    target_state: str | None = Field(default=None, min_length=1, max_length=128)
     human: HumanData | None = None
     source: str = "external"
     request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
 
 class ContractArtifactCreate(BaseModel):
-    kind: Literal["ontology", "policy", "task", "rubric", "memory_policy"]
+    kind: Literal["ontology", "policy", "task", "rubric", "memory_policy", "transition"]
     version: str = Field(min_length=1, max_length=128)
     content: dict[str, Any]
 
@@ -191,7 +196,22 @@ def read_contract_artifact(artifact_hash: str, principal: Principal = Depends(re
 @app.post("/bridge/ingress")
 def ingress(req: Ingress, principal: Principal = Depends(require_capability("bridge:ingress"))) -> dict[str, Any]:
     hdb = evaluate_hdb(req.human.model_dump() if req.human else None)
-    decision, reason = omega_gate(hdb=hdb, action=req.action, ontology_ok=True, signature_valid=True, transition_valid=True)
+    contract_validation = evaluate_ingress_contracts(
+        action=req.action,
+        ontology_hash=req.ontology_hash,
+        transition_hash=req.transition_hash,
+        source_state=req.source_state,
+        target_state=req.target_state,
+    )
+    # Principal is returned only after HMAC, timestamp, nonce and capability validation.
+    signature_valid = isinstance(principal, Principal) and bool(principal.principal_id.strip())
+    decision, reason = omega_gate(
+        hdb=hdb,
+        action=req.action,
+        ontology_ok=contract_validation.ontology_ok,
+        signature_valid=signature_valid,
+        transition_valid=contract_validation.transition_valid,
+    )
     po_state = POState.PASS if decision is Decision.PASS else POState.FAIL if decision is Decision.BLOCK else POState.EVALUATING
     payload_hash = stable_hash(req.payload)
     retain_raw_payload = decision is Decision.PASS and req.human is None
@@ -204,12 +224,14 @@ def ingress(req: Ingress, principal: Principal = Depends(require_capability("bri
         "payload_retained": retain_raw_payload,
         "hdb": {"decision": hdb.decision.value, "reason": hdb.reason},
         "gate": {"decision": decision.value, "reason": reason},
+        "contract_validation": contract_validation.as_dict(),
+        "signature_valid": signature_valid,
         "po_state": po_state.value,
     }
     if retain_raw_payload:
         event["payload"] = req.payload
     receipt = append_event(event, decision.value)
-    return {"request_id": req.request_id, "decision": decision.value, "reason": reason, "po_state": po_state.value, "executed": False, "quarantined": decision is not Decision.PASS, "payload_hash": payload_hash, "payload_retained": retain_raw_payload, "receipt": receipt}
+    return {"request_id": req.request_id, "decision": decision.value, "reason": reason, "po_state": po_state.value, "executed": False, "quarantined": decision is not Decision.PASS, "payload_hash": payload_hash, "payload_retained": retain_raw_payload, "contract_validation": contract_validation.as_dict(), "receipt": receipt}
 
 
 @app.get("/ledger")

@@ -70,17 +70,22 @@ def evaluate_hdb(human: dict[str, Any] | None) -> HDBResult:
     return HDBResult(Decision.PASS, "authorized representation")
 
 
-def omega_gate(*, hdb: HDBResult, action: str, ontology_ok: bool, signature_valid: bool, transition_valid: bool) -> tuple[Decision, str]:
-    if not ontology_ok:
-        return Decision.BLOCK, "ontology violation"
+def omega_gate(*, hdb: HDBResult, action: str, ontology_ok: bool | None, signature_valid: bool | None, transition_valid: bool | None) -> tuple[Decision, str]:
+    # Known violations dominate unknown inputs; unresolved contracts fail closed as HOLD.
     if hdb.decision is Decision.BLOCK:
         return Decision.BLOCK, hdb.reason
+    if ontology_ok is False:
+        return Decision.BLOCK, "ontology violation"
+    if transition_valid is False:
+        return Decision.BLOCK, "transition contract violation"
+    if signature_valid is False:
+        return Decision.BLOCK, "invalid signature"
+    if ontology_ok is None:
+        return Decision.HOLD, "ontology unresolved"
+    if signature_valid is None:
+        return Decision.HOLD, "authentication context unresolved"
+    if transition_valid is None:
+        return Decision.HOLD, "transition contract unresolved"
     if hdb.decision is Decision.HOLD:
         return Decision.HOLD, hdb.reason
-    if not signature_valid:
-        return Decision.BLOCK, "invalid signature"
-    if signature_valid and not transition_valid:
-        return Decision.BLOCK, "valid_signature != valid_transition"
-    if action in BLOCKED_ACTIONS and not transition_valid:
-        return Decision.BLOCK, "critical action denied"
-    return Decision.PASS, "admissible transition"
+    return Decision.PASS, "admissible declared transition"
