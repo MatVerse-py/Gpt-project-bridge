@@ -93,6 +93,7 @@ class OpenAIResponseResult:
     request_hash: str
     response_hash: str
     provider_request_id: str | None
+    provider_status: str = "unknown"
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -104,6 +105,7 @@ class OpenAIResponseResult:
             "request_hash": self.request_hash,
             "response_hash": self.response_hash,
             "provider_request_id": self.provider_request_id,
+            "provider_status": self.provider_status,
         }
 
 
@@ -302,6 +304,9 @@ class OpenAIResponsesRuntime:
             request_hash=request_hash,
             response_hash=response_hash,
             provider_request_id=provider_request_id,
+            provider_status=payload.get("status") if isinstance(payload.get("status"), str) and payload.get("status") in {
+                "completed", "incomplete", "failed", "cancelled", "queued", "in_progress"
+            } else "unknown",
         )
 
     def governed_invoke(

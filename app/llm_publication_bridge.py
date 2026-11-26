@@ -417,11 +417,30 @@ def canonical_matverse_capabilities() -> tuple[Capability, ...]:
             roles=(Role.CODE, Role.DRAFT, Role.REVIEW),
         ),
         Capability(
+            capability_id="claude", provider="anthropic", model="configured-claude-model",
+            principal="llm:anthropic:claude", roles=(Role.RESEARCH, Role.CODE, Role.DRAFT, Role.REVIEW),
+        ),
+        Capability(
+            capability_id="kilo", provider="kilo", model="configured-kilo-model",
+            principal="agent:kilo", roles=(Role.CODE, Role.REVIEW, Role.REDTEAM),
+        ),
+        Capability(
+            capability_id="base44", provider="base44", model="platform:base44",
+            principal="platform:base44", roles=(Role.CODE, Role.WORKFLOW),
+        ),
+        Capability(
             capability_id="manus",
             provider="manus",
             model="configured-manus-agent",
             principal="agent:manus",
             roles=(Role.WORKFLOW, Role.RESEARCH, Role.CURATION),
+        ),
+        Capability(
+            capability_id="venice",
+            provider="venice",
+            model="configured-venice-model",
+            principal="llm:venice",
+            roles=(Role.RESEARCH, Role.CODE, Role.DRAFT, Role.REVIEW, Role.REDTEAM),
         ),
         Capability(
             capability_id="minimax",

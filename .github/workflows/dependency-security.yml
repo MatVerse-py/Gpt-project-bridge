@@ -1,0 +1,52 @@
+name: Dependency security and compatibility
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "requirements.txt"
+      - ".github/workflows/dependency-security.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install project dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Verify selected framework versions
+        run: |
+          python - <<'PY'
+          from importlib.metadata import version
+          from packaging.version import Version
+
+          fastapi = Version(version("fastapi"))
+          starlette = Version(version("starlette"))
+          httpx2 = Version(version("httpx2"))
+
+          assert fastapi == Version("0.162.0"), fastapi
+          assert starlette >= Version("1.1.0"), starlette
+          assert httpx2 >= Version("2.0.0"), httpx2
+          print(f"FastAPI={fastapi}; Starlette={starlette}; httpx2={httpx2}")
+          PY
+      - name: Check dependency consistency
+        run: python -m pip check
+      - name: Audit all resolved dependencies
+        run: |
+          python -m pip install pip-audit
+          python -m pip_audit -r requirements.txt
+      - name: Compile application and tests
+        run: python -m compileall -q app tests
+      - name: Run complete test suite
+        run: python -m pytest -q

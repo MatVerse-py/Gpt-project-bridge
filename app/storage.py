@@ -14,7 +14,7 @@ from .model_bridge import build_handoff_digest
 from .state_store import resolve_transactional_state_store
 
 DB_PATH = Path(os.environ.get("MATVERSE_DB", "matverse.db"))
-CONTRACT_KINDS = {"ontology", "policy", "task", "rubric", "memory_policy"}
+CONTRACT_KINDS = {"ontology", "policy", "task", "rubric", "memory_policy", "transition"}
 _GIT_OBJECT_ID = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 
 
