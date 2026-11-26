@@ -77,7 +77,7 @@ def omega_gate(*, hdb: HDBResult, action: str, ontology_ok: bool | None, signatu
     if ontology_ok is False:
         return Decision.BLOCK, "ontology violation"
     if transition_valid is False:
-        return Decision.BLOCK, "transition contract violation"
+        return Decision.BLOCK, "valid_signature != valid_transition: transition contract violation"
     if signature_valid is False:
         return Decision.BLOCK, "invalid signature"
     if ontology_ok is None:
