@@ -26,10 +26,11 @@ The local console combines the existing Agent Bridge and ProjectVault without me
 - Architecture: [docs/INTEGRATION_ARCHITECTURE_V1.md](docs/INTEGRATION_ARCHITECTURE_V1.md)
 - Local runbook: [docs/LOCAL_END_TO_END_RUNBOOK.md](docs/LOCAL_END_TO_END_RUNBOOK.md)
 - Operator Skill: [skills/matverse-capability-bridge/SKILL.md](skills/matverse-capability-bridge/SKILL.md)
+- ProjectVault authorization: [docs/PROJECTVAULT_AUTH_BOUNDARY_V1.md](docs/PROJECTVAULT_AUTH_BOUNDARY_V1.md)
 
 Run locally with Docker Compose after copying `.env.example` to `.env`, generating unique secrets and configuring only the providers you intend to use. Local Ollama/llama.cpp is preferred for no per-call inference cost. xAI and Hugging Face Inference Providers require separate credentials; Hugging Face inference can be pay-as-you-go.
 
-The browser HMAC console is localhost-only. Remote browser authentication is not implemented; do not expose the signing secret to a remote browser. ProjectVault and MNB memory use different database schemas.
+The browser HMAC console is localhost-only. The production gateway exposes only authenticated MCP/core API routes; its default route denies the browser console until an OIDC/BFF surface exists. ProjectVault uses separate read and write scopes/tokens. ProjectVault and MNB memory use different database schemas.
 
 ## MARXIV Runtime Publisher
 

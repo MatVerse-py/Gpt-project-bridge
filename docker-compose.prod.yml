@@ -7,7 +7,7 @@ services:
       PROJECTVAULT_OIDC_AUDIENCE: ${PROJECTVAULT_OIDC_AUDIENCE:?Set OIDC audience}
       PROJECTVAULT_OIDC_JWKS_URL: ${PROJECTVAULT_OIDC_JWKS_URL:?Set OIDC JWKS URL}
   gateway:
-    image: caddy:2.8.4-alpine
+    image: caddy:2.11.9-alpine
     restart: unless-stopped
     environment:
       GPB_DOMAIN: ${GPB_DOMAIN:?Set GPB_DOMAIN}
@@ -22,8 +22,6 @@ services:
       api:
         condition: service_healthy
       core-api:
-        condition: service_healthy
-      web:
         condition: service_healthy
     security_opt:
       - no-new-privileges:true

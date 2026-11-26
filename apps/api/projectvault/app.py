@@ -65,7 +65,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="GPT Project Bridge",
         version=__version__,
-        description="Owner-controlled project knowledge vault with REST and MCP read access.",
+        description="Owner-controlled project knowledge vault with read access and explicitly authorized ingestion.",
     )
     app.state.settings = settings
     app.state.db = db
@@ -108,6 +108,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         assert result is not None
         return result
 
+    async def write_principal(request: Request) -> Principal:
+        user = await principal(request)
+        if not user.allows(settings.write_scope):
+            raise HTTPException(
+                403,
+                f"Insufficient scope: {settings.write_scope}",
+                headers={"WWW-Authenticate": auth.challenge(settings.write_scope)},
+            )
+        return user
+
     async def optional_mcp_principal(request: Request) -> Principal | None:
         return await auth.authenticate(request, optional=settings.auth_mode in {"oidc", "hybrid"})
 
@@ -127,7 +137,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {
             "resource": settings.public_base_url,
             "authorization_servers": [settings.oidc_issuer],
-            "scopes_supported": [settings.required_scope],
+            "scopes_supported": [settings.required_scope, settings.write_scope],
             "resource_documentation": f"{settings.public_base_url}/",
         }
 
@@ -207,7 +217,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return item
 
     @app.post("/api/assignments")
-    async def api_assignments(payload: dict[str, str], user: Principal = Depends(principal)) -> dict[str, object]:
+    async def api_assignments(payload: dict[str, str], user: Principal = Depends(write_principal)) -> dict[str, object]:
         document_id = str(payload.get("document_id") or "").strip()
         project_id = str(payload.get("project_id") or "").strip()
         if not document_id or not project_id:
@@ -216,13 +226,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             db.assign_document(document_id, project_id, user.subject)
         except KeyError as exc:
             raise HTTPException(404, f"not_found:{exc.args[0]}") from exc
+        db.audit(user.subject, "api_assignments", document_id, None, {"project_id": project_id})
         return {"status": "assigned", "document_id": document_id, "project_id": project_id}
 
     @app.post("/api/ingest/export")
     async def api_ingest_export(
         export: UploadFile = File(...),
         owner_map: UploadFile | None = File(None),
-        user: Principal = Depends(principal),
+        user: Principal = Depends(write_principal),
     ) -> dict[str, object]:
         filename = Path(export.filename or "chatgpt-export.zip").name
         if not filename.lower().endswith(".zip"):
@@ -257,7 +268,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         archive: UploadFile = File(...),
         project_id: str = Form(...),
         project_name: str = Form(...),
-        user: Principal = Depends(principal),
+        user: Principal = Depends(write_principal),
     ) -> dict[str, object]:
         filename = Path(archive.filename or "project-files.zip").name
         if not filename.lower().endswith(".zip"):
@@ -293,7 +304,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         backup: UploadFile = File(...),
         project_id: str | None = Form(None),
         project_name: str | None = Form(None),
-        user: Principal = Depends(principal),
+        user: Principal = Depends(write_principal),
     ) -> dict[str, object]:
         filename = Path(backup.filename or "tasks-data.manustask").name
         if not filename.lower().endswith(".manustask"):

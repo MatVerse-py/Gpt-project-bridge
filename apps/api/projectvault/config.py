@@ -36,6 +36,8 @@ class Settings:
     required_scope: str
     allowed_origins: tuple[str, ...]
     max_results: int
+    write_scope: str = "projects.write"
+    static_write_token: str | None = None
     max_upload_bytes: int = 6 * 1024 * 1024 * 1024
     max_archive_files: int = 50_000
     max_archive_expanded_bytes: int = 32 * 1024 * 1024 * 1024
@@ -66,6 +68,8 @@ class Settings:
             oidc_audience=os.getenv("PROJECTVAULT_OIDC_AUDIENCE"),
             oidc_jwks_url=os.getenv("PROJECTVAULT_OIDC_JWKS_URL"),
             required_scope=os.getenv("PROJECTVAULT_REQUIRED_SCOPE", "projects.read"),
+            write_scope=os.getenv("PROJECTVAULT_WRITE_SCOPE", "projects.write").strip(),
+            static_write_token=(os.getenv("PROJECTVAULT_STATIC_WRITE_TOKEN") or "").strip() or None,
             allowed_origins=_csv("PROJECTVAULT_ALLOWED_ORIGINS", "https://chatgpt.com"),
             max_results=max(1, min(100, int(os.getenv("PROJECTVAULT_MAX_RESULTS", "20")))),
             max_upload_bytes=_positive_int(
@@ -99,6 +103,14 @@ class Settings:
     def validate(self) -> None:
         if self.auth_mode not in {"disabled", "static", "oidc", "hybrid"}:
             raise ValueError("PROJECTVAULT_AUTH_MODE must be disabled, static, oidc, or hybrid")
+        if not self.required_scope.strip() or not self.write_scope.strip():
+            raise ValueError("ProjectVault read and write scopes must be non-empty")
+        if self.write_scope == self.required_scope:
+            raise ValueError("PROJECTVAULT_WRITE_SCOPE must differ from PROJECTVAULT_REQUIRED_SCOPE")
+        if self.static_write_token and self.auth_mode not in {"static", "hybrid"}:
+            raise ValueError("PROJECTVAULT_STATIC_WRITE_TOKEN requires static or hybrid auth mode")
+        if self.static_write_token and self.static_token and self.static_write_token == self.static_token:
+            raise ValueError("ProjectVault read and write tokens must be different")
         if self.auth_mode == "disabled" and self.host not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError("AUTH_MODE=disabled is allowed only on a loopback host")
         if self.auth_mode in {"static", "hybrid"} and not self.static_token:

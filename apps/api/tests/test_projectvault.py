@@ -34,6 +34,15 @@ def settings(tmp_path: Path) -> Settings:
     )
 
 
+def static_settings(tmp_path: Path, *, write_token: str | None = None) -> Settings:
+    return replace(
+        settings(tmp_path),
+        auth_mode="static",
+        static_token="read-token",
+        static_write_token=write_token,
+    )
+
+
 def sample_export(path: Path) -> None:
     payload = [
         {
@@ -169,6 +178,61 @@ def test_static_auth_blocks_missing_token(tmp_path: Path) -> None:
     assert allowed.status_code == 200
 
 
+
+def test_static_read_token_cannot_assign_or_ingest(tmp_path: Path) -> None:
+    cfg = static_settings(tmp_path)
+    export = tmp_path / "source.zip"
+    sample_export(export)
+    ingest_export(Database(cfg.database_path), export)
+    client = TestClient(create_app(cfg))
+    read_headers = {"Authorization": "Bearer read-token"}
+
+    assert client.get("/api/stats", headers=read_headers).status_code == 200
+    assignment = client.post(
+        "/api/assignments",
+        headers=read_headers,
+        json={"document_id": "chat:conv-2", "project_id": "project-alpha"},
+    )
+    assert assignment.status_code == 403
+
+    with export.open("rb") as handle:
+        ingestion = client.post(
+            "/api/ingest/export",
+            headers=read_headers,
+            files={"export": ("export.zip", handle, "application/zip")},
+        )
+    assert ingestion.status_code == 403
+
+
+def test_separate_static_write_token_can_ingest_and_assign(tmp_path: Path) -> None:
+    cfg = static_settings(tmp_path, write_token="write-token")
+    client = TestClient(create_app(cfg))
+    export = tmp_path / "source.zip"
+    sample_export(export)
+
+    with export.open("rb") as handle:
+        denied = client.post(
+            "/api/ingest/export",
+            headers={"Authorization": "Bearer read-token"},
+            files={"export": ("export.zip", handle, "application/zip")},
+        )
+    assert denied.status_code == 403
+
+    with export.open("rb") as handle:
+        ingested = client.post(
+            "/api/ingest/export",
+            headers={"Authorization": "Bearer write-token"},
+            files={"export": ("export.zip", handle, "application/zip")},
+        )
+    assert ingested.status_code == 200, ingested.text
+
+    assigned = client.post(
+        "/api/assignments",
+        headers={"Authorization": "Bearer write-token"},
+        json={"document_id": "chat:conv-2", "project_id": "project-alpha"},
+    )
+    assert assigned.status_code == 200, assigned.text
+
 def test_oidc_mode_exposes_tools_then_returns_auth_challenge(tmp_path: Path) -> None:
     cfg = Settings(
         database_path=tmp_path / "vault.db",
@@ -195,6 +259,7 @@ def test_oidc_mode_exposes_tools_then_returns_auth_challenge(tmp_path: Path) -> 
     assert "mcp/www_authenticate" in result["_meta"]
     metadata = client.get("/.well-known/oauth-protected-resource").json()
     assert metadata["authorization_servers"] == ["https://idp.example.com/"]
+    assert metadata["scopes_supported"] == ["projects.read", "projects.write"]
 
 
 def test_dashboard_api_and_browser_ingest(tmp_path: Path) -> None:

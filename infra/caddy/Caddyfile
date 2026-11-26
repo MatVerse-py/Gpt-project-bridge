@@ -11,8 +11,11 @@
     reverse_proxy core-api:8000
   }
 
+  # The browser console is loopback-only until an authenticated OIDC/BFF
+  # surface exists. Do not inject ProjectVault's server-side token into a
+  # public browser session.
   handle {
-    reverse_proxy web:3000
+    respond "Remote browser console is disabled pending OIDC/BFF authentication." 404
   }
 
   header {

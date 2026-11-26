@@ -1,4 +1,4 @@
-FROM caddy:2.8.4-alpine
+FROM caddy:2.11.9-alpine
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY index.html styles.css app.js core.js /srv/
 EXPOSE 3000

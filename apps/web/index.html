@@ -64,6 +64,11 @@
       <section id="ingest" class="page" hidden>
         <div class="eyebrow">Controlled import</div><h1>Ingest</h1>
         <p>The bridge never infers project membership from names or themes. Unknown content stays UNASSIGNED.</p>
+        <article class="card">
+          <h2>Write authorization</h2>
+          <p>Ingestion and project assignment require a separate <code>projects.write</code> token. The proxy read token cannot perform writes. This field is not stored in browser storage and is cleared after a successful import.</p>
+          <label class="field"><span>ProjectVault write token (optional for loopback-disabled development)</span><input id="projectvault-write-token" type="password" autocomplete="off" spellcheck="false"></label>
+        </article>
         <div class="grid two">
           <article class="card"><h2>ChatGPT Export</h2>
             <form id="export-form" class="form">
@@ -211,7 +216,7 @@
         <div class="grid actions">
           <article class="card"><h2>API</h2><p id="api-status">Checking…</p></article>
           <article class="card"><h2>Storage</h2><p>SQLite FTS5 and mounted local volume. Single-node write deployment.</p></article>
-          <article class="card"><h2>Privacy</h2><p>No external telemetry by default. The API token is injected by the web proxy and never sent to browser JavaScript.</p></article>
+          <article class="card"><h2>Privacy</h2><p>No external telemetry by default. The read-only API token is injected by the local web proxy. A writer token is supplied explicitly for a write request and is never persisted in browser storage.</p></article>
         </div>
         <h2 class="section-title">Current counters</h2><pre id="settings-stats" class="code"></pre>
       </section>

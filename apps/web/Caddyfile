@@ -3,8 +3,11 @@
   root * /srv
 
   handle_path /bridge-api/* {
+    # Preserve an explicitly supplied operator/OIDC bearer token. Only requests
+    # without Authorization receive the server-side read-only token.
+    @missing_auth not header Authorization *
+    request_header @missing_auth Authorization "Bearer {$GPB_API_TOKEN}"
     reverse_proxy api:8787 {
-      header_up Authorization "Bearer {$GPB_API_TOKEN}"
       header_up -Origin
     }
   }

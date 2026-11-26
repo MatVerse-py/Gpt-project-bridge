@@ -88,6 +88,36 @@ jobs:
           curl --fail --silent http://127.0.0.1:3000/ | grep -q "Capability Bridge"
           curl --fail --silent http://127.0.0.1:3000/core-api/health
           curl --fail --silent http://127.0.0.1:3000/bridge-api/health
+          curl --fail --silent http://127.0.0.1:3000/bridge-api/api/stats >/dev/null
+          WRITE_TOKEN="$(sed -n 's/^PROJECTVAULT_STATIC_WRITE_TOKEN=//p' .env)"
+          test -n "$WRITE_TOKEN"
+          python - <<'PY'
+          import json, zipfile
+          conversations = [
+              {"id":"smoke-conv","title":"Smoke assigned","create_time":1,"update_time":2,
+               "project_id":"smoke-project","project_name":"Smoke",
+               "mapping":{"m1":{"message":{"id":"m1","author":{"role":"user"},"create_time":1,"content":{"parts":["smoke assigned"]}}}}},
+              {"id":"smoke-unassigned","title":"Smoke unassigned","create_time":1,"update_time":2,
+               "mapping":{"m2":{"message":{"id":"m2","author":{"role":"user"},"create_time":1,"content":{"parts":["smoke unassigned"]}}}}}
+          ]
+          with zipfile.ZipFile("/tmp/projectvault-smoke.zip","w",zipfile.ZIP_DEFLATED) as archive:
+              archive.writestr("conversations.json",json.dumps(conversations))
+          PY
+          READ_DENIED="$(curl --silent --output /tmp/pv-read.json --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' \
+            -d '{"document_id":"chat:smoke-unassigned","project_id":"smoke-project"}' \
+            http://127.0.0.1:3000/bridge-api/api/assignments)"
+          test "$READ_DENIED" = "403"
+          INGEST_STATUS="$(curl --silent --output /tmp/pv-ingest.json --write-out '%{http_code}' \
+            -X POST -H "Authorization: Bearer ${WRITE_TOKEN}" \
+            -F "export=@/tmp/projectvault-smoke.zip;type=application/zip" \
+            http://127.0.0.1:3000/bridge-api/api/ingest/export)"
+          test "$INGEST_STATUS" = "200"
+          ASSIGN_STATUS="$(curl --silent --output /tmp/pv-assign.json --write-out '%{http_code}' \
+            -X POST -H "Authorization: Bearer ${WRITE_TOKEN}" -H 'Content-Type: application/json' \
+            -d '{"document_id":"chat:smoke-unassigned","project_id":"smoke-project"}' \
+            http://127.0.0.1:3000/bridge-api/api/assignments)"
+          test "$ASSIGN_STATUS" = "200"
           python - <<'PY'
           import hashlib, hmac, json, time, urllib.request, uuid
           principal = "operator"
