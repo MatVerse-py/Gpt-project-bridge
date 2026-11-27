@@ -127,7 +127,7 @@ class IAQuantumChainService:
         try:
             matrix = self.qex.execute_l0_matrix(
                 submission["payload"],
-                ontology_ok=True,
+                ontology_ok=self.qex.ontology_admissible(),
                 signature_valid=authenticated,
                 transition_valid=(gate["decision"] == "PASS"),
             )

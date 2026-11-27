@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 import time
 import uuid
 
@@ -11,6 +12,7 @@ from fastapi.testclient import TestClient
 from app import storage
 from app.main import app
 from app.auth import sign_request
+from app.iaquantumchain.qex_adapter import QeXAdapter, QeXAdmissionError
 from app.iaquantumchain.service import IAQuantumChainService
 
 
@@ -104,3 +106,19 @@ def test_authenticated_capability_api_executes_l0(tmp_path, monkeypatch):
     assert result["decision"] == "PASS"
     assert result["tsc"]["status"] == "EXACT"
     assert all(item["observable"]["result"] == 0 for item in result["results"])
+
+
+
+def test_noncanonical_qex_problem_is_not_ontology_admissible():
+    qex = QeXAdapter()
+    assert qex.ontology_admissible() is True
+    canonical_contract = qex.contract
+    qex.contract = lambda: replace(canonical_contract(), problem_hash="0" * 64)
+    assert qex.ontology_admissible() is False
+    with pytest.raises(QeXAdmissionError):
+        qex.execute_l0_matrix(
+            {"bit": 0},
+            ontology_ok=qex.ontology_admissible(),
+            signature_valid=True,
+            transition_valid=True,
+        )

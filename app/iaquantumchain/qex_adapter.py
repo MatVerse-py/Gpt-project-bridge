@@ -6,6 +6,8 @@ import time
 from dataclasses import asdict
 from typing import Any, Mapping
 
+from app.core import stable_hash
+
 
 class QeXUnavailable(RuntimeError):
     pass
@@ -50,6 +52,17 @@ class QeXAdapter:
         if not self.available:
             raise QeXUnavailable("QeX modules are unavailable")
         return self._modules["app.qex_experiment"].qex_substrate_01_contract()
+
+    def ontology_admissible(self) -> bool:
+        """Validate the frozen L0 problem identity before the Ω-Gate selection call."""
+        contract = self.contract()
+        expected_problem_hash = stable_hash({"problem": "NOT", "domain": "bit"})
+        return (
+            contract.experiment_id == "QEX-SUBSTRATE-01"
+            and contract.problem_hash == expected_problem_hash
+            and "bit_not" in contract.required_capabilities
+            and contract.require_classical_baseline is True
+        )
 
     @staticmethod
     def _validate_observable(observable: Mapping[str, Any]) -> None:
