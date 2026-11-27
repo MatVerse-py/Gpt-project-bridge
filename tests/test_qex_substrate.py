@@ -29,7 +29,7 @@ def contract(**overrides):
 
 def test_best_justified_infrastructure_can_be_classical():
     profiles = [
-        CapabilityProfile("cpu", ComputeRegime.CLASSICAL, capabilities=("optimization",), estimated_cost=1, estimated_latency_ms=100),
+        CapabilityProfile("cpu", ComputeRegime.CLASSICAL, capabilities=("optimization",), estimated_cost=1, estimated_latency_ms=100, error_rate=0.001),
         CapabilityProfile("qpu", ComputeRegime.QUANTUM_GATE, QuantumModality.SUPERCONDUCTING, ("optimization",), "HIGH", True, 8, 4000, 0.02),
     ]
     result = select_substrate(contract(), profiles)
