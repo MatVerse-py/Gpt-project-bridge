@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import time
 import uuid
 
 import pytest
@@ -7,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app import storage
 from app.main import app
+from app.auth import sign_request
 from app.iaquantumchain.service import IAQuantumChainService
 
 
@@ -52,3 +56,51 @@ def test_read_only_api_status_and_dashboard_are_mounted():
     dashboard = client.get("/v1/iaquantumchain/dashboard")
     assert dashboard.status_code == 200
     assert "MatVerse" in dashboard.text
+
+
+
+def test_authenticated_capability_api_executes_l0(tmp_path, monkeypatch):
+    principal = "l0-api-ci"
+    secret = "ci-only-secret"
+    monkeypatch.setattr(storage, "DB_PATH", tmp_path / "iaquantumchain-api.sqlite3")
+    monkeypatch.setenv(
+        "MATVERSE_PRINCIPALS_JSON",
+        json.dumps({
+            principal: {
+                "secret": secret,
+                "capabilities": ["iaquantumchain:experiment:submit"],
+            }
+        }),
+    )
+    monkeypatch.delenv("MATVERSE_AUTH_NONCE_URL", raising=False)
+
+    path = "/v1/iaquantumchain/experiments"
+    body = json.dumps(
+        {
+            "experiment_id": "QEX-SUBSTRATE-01",
+            "payload": {"bit": 1},
+            "request_id": str(uuid.uuid4()),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    timestamp = str(int(time.time()))
+    nonce = uuid.uuid4().hex
+    digest = hashlib.sha256(body).hexdigest()
+    signature = sign_request(secret, "POST", path, timestamp, nonce, digest)
+    headers = {
+        "X-MatVerse-Principal": principal,
+        "X-MatVerse-Timestamp": timestamp,
+        "X-MatVerse-Nonce": nonce,
+        "X-MatVerse-Content-SHA256": digest,
+        "X-MatVerse-Signature": signature,
+        "Content-Type": "application/json",
+    }
+
+    response = TestClient(app).post(path, content=body, headers=headers)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["status"] == "EXECUTED_L0"
+    assert result["decision"] == "PASS"
+    assert result["tsc"]["status"] == "EXACT"
+    assert all(item["observable"]["result"] == 0 for item in result["results"])
