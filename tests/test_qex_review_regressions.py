@@ -100,3 +100,13 @@ def test_comparator_preserves_integer_precision_and_classifies_large_finite_delt
         hard_invariants=("experiment_id",),
         numeric_tolerances={"p": 0.0},
     ) is ComparisonStatus.DIVERGENT
+
+
+
+def test_comparator_uses_exact_arithmetic_beyond_decimal_context_precision():
+    assert compare_substrate_results(
+        {"experiment_id": "same", "x": 10**28 + 1},
+        {"experiment_id": "same", "x": 0},
+        hard_invariants=("experiment_id",),
+        numeric_tolerances={"x": 10**28},
+    ) is ComparisonStatus.DIVERGENT

@@ -136,3 +136,31 @@ def test_preference_score_overflow_blocks_candidate():
     assessment = assess_candidate(contract(budget_max=None, latency_max_ms=None), profile)
     assert assessment.decision is Decision.BLOCK
     assert assessment.preference_score is None
+
+
+
+def test_assess_candidate_revalidates_nonfinite_mutated_frozen_inputs():
+    profile = CapabilityProfile(
+        "mutated",
+        ComputeRegime.CLASSICAL,
+        capabilities=("optimization",),
+        estimated_cost=1.0,
+        estimated_latency_ms=1.0,
+        error_rate=0.1,
+    )
+    object.__setattr__(profile, "estimated_cost", float("nan"))
+    assessment = assess_candidate(contract(budget_max=1.0, latency_max_ms=1.0), profile)
+    assert assessment.decision is Decision.BLOCK
+    assert assessment.preference_score is None
+
+    clean_profile = CapabilityProfile(
+        "clean",
+        ComputeRegime.CLASSICAL,
+        capabilities=("optimization",),
+        estimated_cost=1.0,
+        estimated_latency_ms=1.0,
+        error_rate=0.1,
+    )
+    invalid_contract = contract(budget_max=1.0, latency_max_ms=1.0)
+    object.__setattr__(invalid_contract, "budget_max", float("nan"))
+    assert assess_candidate(invalid_contract, clean_profile).decision is Decision.BLOCK

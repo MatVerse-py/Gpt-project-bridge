@@ -13,12 +13,12 @@ from app.evidence import evidence_receipt
 def _validate_optional_nonnegative_finite(name: str, value: float | None) -> None:
     if value is None:
         return
-    if isinstance(value, bool):
-        raise ValueError(f"{name} must be a finite non-negative number")
+    if type(value) not in (int, float):
+        raise ValueError(f"{name} must be a finite non-negative int or float")
     try:
         normalized = float(value)
     except (TypeError, ValueError, OverflowError) as exc:
-        raise ValueError(f"{name} must be a finite non-negative number") from exc
+        raise ValueError(f"{name} must be a finite non-negative int or float") from exc
     if not isfinite(normalized) or normalized < 0:
         raise ValueError(f"{name} must be a finite non-negative number")
 
