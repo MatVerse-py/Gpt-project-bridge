@@ -5,6 +5,7 @@ from app.qex_substrate import (
     ComputeRegime,
     ExperimentContract,
     QuantumModality,
+    assess_candidate,
     compare_substrate_results,
     select_substrate,
 )
@@ -106,7 +107,7 @@ def test_cost_latency_and_contract_limits_must_be_finite_nonnegative():
         contract(latency_max_ms=-1)
 
 
-def test_zero_tolerance_is_strict_and_overflow_is_incomparable():
+def test_zero_tolerance_is_strict_and_large_finite_delta_is_divergent():
     hard = ("problem_hash",)
     assert compare_substrate_results(
         {"problem_hash": "p", "value": 0.0},
@@ -119,4 +120,19 @@ def test_zero_tolerance_is_strict_and_overflow_is_incomparable():
         {"problem_hash": "p", "value": -1.7e308},
         hard_invariants=hard,
         numeric_tolerances={"value": 0.0},
-    ) is ComparisonStatus.INCOMPARABLE
+    ) is ComparisonStatus.DIVERGENT
+
+
+
+def test_preference_score_overflow_blocks_candidate():
+    profile = CapabilityProfile(
+        "overflow",
+        ComputeRegime.CLASSICAL,
+        capabilities=("optimization",),
+        estimated_cost=1.797e308,
+        estimated_latency_ms=1.797e308,
+        error_rate=0.5,
+    )
+    assessment = assess_candidate(contract(budget_max=None, latency_max_ms=None), profile)
+    assert assessment.decision is Decision.BLOCK
+    assert assessment.preference_score is None

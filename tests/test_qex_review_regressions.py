@@ -68,7 +68,7 @@ def test_classical_baseline_hold_receipt_is_present():
 
 def test_comparator_rejects_nan_infinity_and_overflow():
     right = {"experiment_id": "same", "p": 0.5}
-    for bad in (float("nan"), float("inf"), 10**10000):
+    for bad in (float("nan"), float("inf")):
         left = {"experiment_id": "same", "p": bad}
         assert compare_substrate_results(
             left, right, hard_invariants=("experiment_id",), numeric_tolerances={"p": 1e-9}
@@ -84,3 +84,19 @@ def test_comparator_rejects_nonfinite_tolerance():
         hard_invariants=("experiment_id",),
         numeric_tolerances={"p": float("nan")},
     ) is ComparisonStatus.INCOMPARABLE
+
+
+
+def test_comparator_preserves_integer_precision_and_classifies_large_finite_deltas():
+    assert compare_substrate_results(
+        {"experiment_id": "same", "p": 9007199254740992},
+        {"experiment_id": "same", "p": 9007199254740993},
+        hard_invariants=("experiment_id",),
+        numeric_tolerances={"p": 0.0},
+    ) is ComparisonStatus.DIVERGENT
+    assert compare_substrate_results(
+        {"experiment_id": "same", "p": 1.7e308},
+        {"experiment_id": "same", "p": -1.7e308},
+        hard_invariants=("experiment_id",),
+        numeric_tolerances={"p": 0.0},
+    ) is ComparisonStatus.DIVERGENT

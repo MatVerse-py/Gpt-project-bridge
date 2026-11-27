@@ -7,9 +7,8 @@ def qex_substrate_01_contract() -> ExperimentContract:
 
     Derived comparison metrics such as TVD are intentionally not embedded in
     the contract hash. They belong to the adjudication layer, so the same
-    experiment identity can be replayed across current L0 adapters and future compatible
-
-    substrates without silently changing the experiment definition.
+    experiment identity can be replayed across current L0 adapters and future
+    compatible substrates without silently changing the experiment definition.
     """
     return ExperimentContract(
         experiment_id="QEX-SUBSTRATE-01",

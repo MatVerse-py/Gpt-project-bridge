@@ -3,8 +3,10 @@ from __future__ import annotations
 import uuid
 
 import pytest
+from fastapi.testclient import TestClient
 
 from app import storage
+from app.main import app
 from app.iaquantumchain.service import IAQuantumChainService
 
 
@@ -39,3 +41,14 @@ def test_l0_uses_real_qex_bridge_governance_tsc_and_shared_ledger(tmp_path, monk
     assert ledger["ok"] is True
     assert ledger["events"] >= 2
     assert service.get_run(result["run_id"])["found"] is True
+
+
+
+def test_read_only_api_status_and_dashboard_are_mounted():
+    client = TestClient(app)
+    status = client.get("/v1/iaquantumchain/status/public")
+    assert status.status_code == 200
+    assert status.json()["modules"]["QeX"]["state"] == "READY_L0"
+    dashboard = client.get("/v1/iaquantumchain/dashboard")
+    assert dashboard.status_code == 200
+    assert "MatVerse" in dashboard.text

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from enum import Enum
+from decimal import Decimal, InvalidOperation
 from math import isfinite
 from typing import Any, Iterable, Mapping
 
@@ -155,6 +156,8 @@ def assess_candidate(contract: ExperimentContract, profile: CapabilityProfile) -
         + float(profile.estimated_latency_ms) / 1000.0
         + float(profile.error_rate) * 1000.0
     )
+    if not isfinite(score):
+        return CandidateAssessment(profile.backend_id, Decision.BLOCK, ("non-finite preference score",), None)
     return CandidateAssessment(profile.backend_id, Decision.PASS, (), score)
 
 
@@ -264,25 +267,32 @@ def compare_substrate_results(
     for key, tolerance in numeric_tolerances.items():
         if key not in shared or isinstance(tolerance, bool):
             return ComparisonStatus.INCOMPARABLE
+        raw_left, raw_right = left[key], right[key]
+        if (
+            isinstance(raw_left, bool)
+            or isinstance(raw_right, bool)
+            or not isinstance(raw_left, (int, float))
+            or not isinstance(raw_right, (int, float))
+            or isinstance(tolerance, bool)
+            or not isinstance(tolerance, (int, float))
+        ):
+            return ComparisonStatus.INCOMPARABLE
         try:
-            normalized_tolerance = float(tolerance)
-            left_value = float(left[key])
-            right_value = float(right[key])
-        except (TypeError, ValueError, OverflowError):
+            left_value = Decimal(str(raw_left))
+            right_value = Decimal(str(raw_right))
+            tolerance_value = Decimal(str(tolerance))
+        except (InvalidOperation, ValueError):
             return ComparisonStatus.INCOMPARABLE
         if (
-            not isfinite(normalized_tolerance)
-            or normalized_tolerance < 0
-            or not isfinite(left_value)
-            or not isfinite(right_value)
+            not left_value.is_finite()
+            or not right_value.is_finite()
+            or not tolerance_value.is_finite()
+            or tolerance_value < 0
         ):
             return ComparisonStatus.INCOMPARABLE
         delta = abs(left_value - right_value)
-        if not isfinite(delta):
-            return ComparisonStatus.INCOMPARABLE
-        tolerance = normalized_tolerance
         compared = True
-        if delta > tolerance:
+        if delta > tolerance_value:
             return ComparisonStatus.DIVERGENT
         if delta > 0:
             nonzero_delta = True
