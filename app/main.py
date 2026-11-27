@@ -378,3 +378,6 @@ from .openai_provider import router as openai_provider_router
 
 app.include_router(federation_trust_plane_router)
 app.include_router(openai_provider_router)
+
+from .iaquantumchain.api import router as iaquantumchain_router
+app.include_router(iaquantumchain_router, prefix="/v1/iaquantumchain")
