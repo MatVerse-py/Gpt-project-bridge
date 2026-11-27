@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from enum import Enum
-from decimal import Decimal, InvalidOperation
+from fractions import Fraction
 from math import isfinite
 from typing import Any, Iterable, Mapping
 
@@ -21,6 +21,15 @@ def _validate_optional_nonnegative_finite(name: str, value: float | None) -> Non
         raise ValueError(f"{name} must be a finite non-negative int or float") from exc
     if not isfinite(normalized) or normalized < 0:
         raise ValueError(f"{name} must be a finite non-negative number")
+
+
+def _numeric_fraction(value: Any) -> Fraction | None:
+    """Convert finite numeric values without losing integer precision."""
+    if type(value) is int:
+        return Fraction(value, 1)
+    if type(value) is float and isfinite(value):
+        return Fraction.from_float(value)
+    return None
 
 
 class ComputeRegime(str, Enum):
@@ -125,6 +134,16 @@ class SelectionResult:
 
 
 def assess_candidate(contract: ExperimentContract, profile: CapabilityProfile) -> CandidateAssessment:
+    try:
+        for name in ("estimated_cost", "estimated_latency_ms", "coherence_us", "error_rate"):
+            _validate_optional_nonnegative_finite(name, getattr(profile, name))
+        for name in ("budget_max", "latency_max_ms"):
+            _validate_optional_nonnegative_finite(name, getattr(contract, name))
+        if profile.error_rate is not None and profile.error_rate > 1:
+            raise ValueError("error_rate must be in [0,1]")
+    except ValueError as exc:
+        return CandidateAssessment(profile.backend_id, Decision.BLOCK, (str(exc),), None)
+
     reasons: list[str] = []
     if not profile.available:
         reasons.append("backend unavailable")
@@ -268,27 +287,10 @@ def compare_substrate_results(
         if key not in shared or isinstance(tolerance, bool):
             return ComparisonStatus.INCOMPARABLE
         raw_left, raw_right = left[key], right[key]
-        if (
-            isinstance(raw_left, bool)
-            or isinstance(raw_right, bool)
-            or not isinstance(raw_left, (int, float))
-            or not isinstance(raw_right, (int, float))
-            or isinstance(tolerance, bool)
-            or not isinstance(tolerance, (int, float))
-        ):
-            return ComparisonStatus.INCOMPARABLE
-        try:
-            left_value = Decimal(str(raw_left))
-            right_value = Decimal(str(raw_right))
-            tolerance_value = Decimal(str(tolerance))
-        except (InvalidOperation, ValueError):
-            return ComparisonStatus.INCOMPARABLE
-        if (
-            not left_value.is_finite()
-            or not right_value.is_finite()
-            or not tolerance_value.is_finite()
-            or tolerance_value < 0
-        ):
+        left_value = _numeric_fraction(raw_left)
+        right_value = _numeric_fraction(raw_right)
+        tolerance_value = _numeric_fraction(tolerance)
+        if left_value is None or right_value is None or tolerance_value is None or tolerance_value < 0:
             return ComparisonStatus.INCOMPARABLE
         delta = abs(left_value - right_value)
         compared = True
