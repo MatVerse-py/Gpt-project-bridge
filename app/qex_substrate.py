@@ -2,11 +2,24 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from enum import Enum
-from math import isclose, isfinite
+from math import isfinite
 from typing import Any, Iterable, Mapping
 
 from app.core import Decision, evaluate_hdb, omega_gate, stable_hash
 from app.evidence import evidence_receipt
+
+
+def _validate_optional_nonnegative_finite(name: str, value: float | None) -> None:
+    if value is None:
+        return
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be a finite non-negative number")
+    try:
+        normalized = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{name} must be a finite non-negative number") from exc
+    if not isfinite(normalized) or normalized < 0:
+        raise ValueError(f"{name} must be a finite non-negative number")
 
 
 class ComputeRegime(str, Enum):
@@ -55,12 +68,16 @@ class CapabilityProfile:
             raise ValueError("annealing regime requires ANNEALING modality")
         if self.regime is ComputeRegime.CLASSICAL and self.modality is not None:
             raise ValueError("classical substrate cannot declare quantum modality")
-        if self.error_rate is not None and (
-            isinstance(self.error_rate, bool)
-            or not isfinite(float(self.error_rate))
-            or not 0 <= self.error_rate <= 1
-        ):
-            raise ValueError("error_rate must be finite and in [0,1]")
+        for name in ("estimated_cost", "estimated_latency_ms", "coherence_us"):
+            _validate_optional_nonnegative_finite(name, getattr(self, name))
+        if self.error_rate is not None:
+            _validate_optional_nonnegative_finite("error_rate", self.error_rate)
+            if self.error_rate > 1:
+                raise ValueError("error_rate must be in [0,1]")
+        for name in ("logical_qubits", "physical_qubits"):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or value < 0):
+                raise ValueError(f"{name} must be a non-negative integer")
 
     @property
     def profile_hash(self) -> str:
@@ -80,6 +97,10 @@ class ExperimentContract:
     latency_max_ms: float | None = None
     allowed_regimes: tuple[ComputeRegime, ...] = tuple(ComputeRegime)
     require_classical_baseline: bool = True
+
+    def __post_init__(self) -> None:
+        _validate_optional_nonnegative_finite("budget_max", self.budget_max)
+        _validate_optional_nonnegative_finite("latency_max_ms", self.latency_max_ms)
 
     @property
     def contract_hash(self) -> str:
@@ -142,19 +163,28 @@ def select_substrate(
     profiles: Iterable[CapabilityProfile],
     *,
     human: dict[str, Any] | None = None,
-    ontology_ok: bool = True,
-    signature_valid: bool = True,
-    transition_valid: bool = True,
+    ontology_ok: bool = False,
+    signature_valid: bool = False,
+    transition_valid: bool = False,
 ) -> SelectionResult:
-    hdb = evaluate_hdb(human)
-    gate, reason = omega_gate(
-        hdb=hdb,
-        action="EXECUTE",
-        ontology_ok=ontology_ok,
-        signature_valid=signature_valid,
-        transition_valid=transition_valid,
-    )
     profiles = tuple(profiles)
+    flags = {
+        "ontology_ok": ontology_ok,
+        "signature_valid": signature_valid,
+        "transition_valid": transition_valid,
+    }
+    invalid_flags = [name for name, value in flags.items() if type(value) is not bool]
+    if invalid_flags:
+        gate, reason = Decision.BLOCK, "admissibility flags must be booleans: " + ",".join(invalid_flags)
+    else:
+        hdb = evaluate_hdb(human)
+        gate, reason = omega_gate(
+            hdb=hdb,
+            action="EXECUTE",
+            ontology_ok=ontology_ok,
+            signature_valid=signature_valid,
+            transition_valid=transition_valid,
+        )
     if gate is not Decision.PASS:
         assessments = tuple(CandidateAssessment(p.backend_id, gate, (reason,), None) for p in profiles)
         receipt = evidence_receipt(
@@ -248,10 +278,11 @@ def compare_substrate_results(
         ):
             return ComparisonStatus.INCOMPARABLE
         delta = abs(left_value - right_value)
+        if not isfinite(delta):
+            return ComparisonStatus.INCOMPARABLE
         tolerance = normalized_tolerance
         compared = True
-        at_boundary = isclose(delta, tolerance, rel_tol=0.0, abs_tol=1e-12)
-        if delta > tolerance and not at_boundary:
+        if delta > tolerance:
             return ComparisonStatus.DIVERGENT
         if delta > 0:
             nonzero_delta = True

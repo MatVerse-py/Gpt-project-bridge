@@ -66,7 +66,14 @@ class QeXAdapter:
         if type(result) is not int or result not in (0, 1):
             raise QeXAdmissionError("result must be integer 0 or 1")
 
-    def execute_l0_matrix(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+    def execute_l0_matrix(
+        self,
+        payload: Mapping[str, Any],
+        *,
+        ontology_ok: bool = False,
+        signature_valid: bool = False,
+        transition_valid: bool = False,
+    ) -> dict[str, Any]:
         if not self.available:
             raise QeXUnavailable("QeX modules are unavailable")
         if set(payload) != {"bit"} or type(payload.get("bit")) is not int or payload["bit"] not in (0, 1):
@@ -95,11 +102,18 @@ class QeXAdapter:
                 available=True,
             ),
         )
-        assessments = tuple(substrate.assess_candidate(contract, profile) for profile in profiles)
         if not contract.require_classical_baseline:
             raise QeXAdmissionError("L0 contract must require a classical baseline")
-        if any(item.decision.value != "PASS" for item in assessments):
-            raise QeXAdmissionError("one or more L0 substrates failed capability admission")
+        selection = substrate.select_substrate(
+            contract,
+            profiles,
+            ontology_ok=ontology_ok,
+            signature_valid=signature_valid,
+            transition_valid=transition_valid,
+        )
+        if selection.selected_backend_id is None:
+            raise QeXAdmissionError("QeX substrate selection did not pass constitutional admissibility")
+        assessments = selection.assessments
 
         results: list[dict[str, Any]] = []
         for adapter in adapters:
@@ -129,9 +143,6 @@ class QeXAdapter:
                 "backend_metadata_hash": result.backend_metadata_hash,
             })
 
-        selection = substrate.select_substrate(contract, profiles)
-        if selection.selected_backend_id is None:
-            raise QeXAdmissionError("QeX could not establish the required classical baseline")
         return {
             "contract": {
                 "experiment_id": contract.experiment_id,

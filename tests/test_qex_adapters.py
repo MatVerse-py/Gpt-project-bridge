@@ -49,3 +49,18 @@ def test_execution_rejects_noncanonical_payload():
             assert "integer 0 or 1" in str(exc)
         else:
             raise AssertionError("adapter accepted bool as a bit")
+
+
+
+def test_not_adapters_reject_contract_for_a_different_problem():
+    from dataclasses import replace
+    import pytest
+    from app.core import stable_hash
+
+    wrong = replace(
+        contract(),
+        problem_hash=stable_hash({"problem": "ADD", "domain": "bit"}),
+    )
+    for adapter in (ClassicalNotAdapter(), IdealStatevectorNotAdapter()):
+        with pytest.raises(ValueError, match="canonical QEX-SUBSTRATE-01 NOT"):
+            adapter.execute(wrong, {"bit": 0})

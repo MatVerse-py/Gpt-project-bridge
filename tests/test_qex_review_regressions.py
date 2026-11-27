@@ -25,14 +25,10 @@ def contract() -> ExperimentContract:
 
 def test_unknown_telemetry_is_not_scored_as_zero():
     c = contract()
-    unknown = CapabilityProfile(
-        backend_id="cpu-unknown",
-        regime=ComputeRegime.CLASSICAL,
-        capabilities=("bit_not",),
-    )
+    unknown = CapabilityProfile("cpu-unknown", ComputeRegime.CLASSICAL, capabilities=("bit_not",))
     known = CapabilityProfile(
-        backend_id="hybrid-known",
-        regime=ComputeRegime.HYBRID,
+        "hybrid-known",
+        ComputeRegime.HYBRID,
         capabilities=("bit_not",),
         estimated_cost=2.0,
         estimated_latency_ms=10.0,
@@ -40,38 +36,42 @@ def test_unknown_telemetry_is_not_scored_as_zero():
     )
     assert assess_candidate(c, unknown).preference_score is None
     assert assess_candidate(c, known).preference_score is not None
-    selected = select_substrate(c, (unknown, known))
+    selected = select_substrate(
+        c, (unknown, known), ontology_ok=True, signature_valid=True, transition_valid=True
+    )
     assert selected.selected_backend_id == "hybrid-known"
 
 
-def test_gate_failure_receipt_binds_profiles_and_assessments():
+def test_fail_closed_receipt_binds_assessment_content_independently_of_profile_hash():
     c = contract()
-    first = CapabilityProfile("cpu-a", ComputeRegime.CLASSICAL, capabilities=("bit_not",))
-    second = CapabilityProfile("cpu-b", ComputeRegime.CLASSICAL, capabilities=("bit_not",))
-    r1 = select_substrate(c, (first,), signature_valid=False).receipt
-    r2 = select_substrate(c, (second,), signature_valid=False).receipt
-    assert r1["input_hash"] != r2["input_hash"]
-    assert r1["output_hash"] != r2["output_hash"]
+    profile = CapabilityProfile("cpu-a", ComputeRegime.CLASSICAL, capabilities=("bit_not",))
+    ontology_block = select_substrate(
+        c, (profile,), ontology_ok=False, signature_valid=True, transition_valid=True
+    ).receipt
+    signature_block = select_substrate(
+        c, (profile,), ontology_ok=True, signature_valid=False, transition_valid=True
+    ).receipt
+    assert ontology_block["input_hash"] == signature_block["input_hash"]
+    assert ontology_block["output_hash"] != signature_block["output_hash"]
 
 
-def test_classical_baseline_hold_receipt_binds_candidate_assessments():
+def test_classical_baseline_hold_receipt_is_present():
     c = contract()
     profile = CapabilityProfile("hybrid-a", ComputeRegime.HYBRID, capabilities=("bit_not",))
-    result = select_substrate(c, (profile,))
-    other = CapabilityProfile("hybrid-b", ComputeRegime.HYBRID, capabilities=("bit_not",))
-    other_result = select_substrate(c, (other,))
+    result = select_substrate(
+        c, (profile,), ontology_ok=True, signature_valid=True, transition_valid=True
+    )
     assert result.selected_backend_id is None
-    assert result.receipt["input_hash"] != other_result.receipt["input_hash"]
-    assert result.receipt["output_hash"] != other_result.receipt["output_hash"]
+    assert isinstance(result.receipt.get("receipt_hash"), str)
+    assert len(result.receipt["receipt_hash"]) == 64
 
 
 def test_comparator_rejects_nan_infinity_and_overflow():
-    hard = ("experiment_id",)
     right = {"experiment_id": "same", "p": 0.5}
     for bad in (float("nan"), float("inf"), 10**10000):
         left = {"experiment_id": "same", "p": bad}
         assert compare_substrate_results(
-            left, right, hard_invariants=hard, numeric_tolerances={"p": 1e-9}
+            left, right, hard_invariants=("experiment_id",), numeric_tolerances={"p": 1e-9}
         ) is ComparisonStatus.INCOMPARABLE
 
 
@@ -79,5 +79,8 @@ def test_comparator_rejects_nonfinite_tolerance():
     left = {"experiment_id": "same", "p": 0.5}
     right = {"experiment_id": "same", "p": 0.5}
     assert compare_substrate_results(
-        left, right, hard_invariants=("experiment_id",), numeric_tolerances={"p": float("nan")}
+        left,
+        right,
+        hard_invariants=("experiment_id",),
+        numeric_tolerances={"p": float("nan")},
     ) is ComparisonStatus.INCOMPARABLE

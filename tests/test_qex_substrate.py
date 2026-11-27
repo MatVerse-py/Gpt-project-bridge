@@ -32,7 +32,7 @@ def test_best_justified_infrastructure_can_be_classical():
         CapabilityProfile("cpu", ComputeRegime.CLASSICAL, capabilities=("optimization",), estimated_cost=1, estimated_latency_ms=100, error_rate=0.001),
         CapabilityProfile("qpu", ComputeRegime.QUANTUM_GATE, QuantumModality.SUPERCONDUCTING, ("optimization",), "HIGH", True, 8, 4000, 0.02),
     ]
-    result = select_substrate(contract(), profiles)
+    result = select_substrate(contract(), profiles, ontology_ok=True, signature_valid=True, transition_valid=True)
     assert result.selected_backend_id == "cpu"
     assert result.receipt["schema"] == "matverse.evidence-receipt.v1"
 
@@ -42,13 +42,13 @@ def test_quantum_can_win_after_admissibility_when_profile_justifies_it():
         CapabilityProfile("cpu", ComputeRegime.CLASSICAL, capabilities=("optimization",), estimated_cost=5, estimated_latency_ms=4000),
         CapabilityProfile("ion-qpu", ComputeRegime.QUANTUM_GATE, QuantumModality.TRAPPED_ION, ("optimization",), "HIGH", True, 1, 100, 0.0001),
     ]
-    result = select_substrate(contract(), profiles)
+    result = select_substrate(contract(), profiles, ontology_ok=True, signature_valid=True, transition_valid=True)
     assert result.selected_backend_id == "ion-qpu"
 
 
 def test_missing_classical_baseline_holds_selection():
     profiles = [CapabilityProfile("qpu", ComputeRegime.QUANTUM_GATE, QuantumModality.SUPERCONDUCTING, ("optimization",), "HIGH", True, 1, 100)]
-    result = select_substrate(contract(), profiles)
+    result = select_substrate(contract(), profiles, ontology_ok=True, signature_valid=True, transition_valid=True)
     assert result.selected_backend_id is None
 
 
@@ -57,14 +57,14 @@ def test_topological_claim_is_fail_closed_while_contested():
         CapabilityProfile("cpu", ComputeRegime.CLASSICAL, capabilities=("optimization",), estimated_cost=5, estimated_latency_ms=100),
         CapabilityProfile("topo", ComputeRegime.QUANTUM_GATE, QuantumModality.TOPOLOGICAL, ("optimization",), "EXPERIMENTAL", True, 1, 100),
     ]
-    result = select_substrate(contract(), profiles)
+    result = select_substrate(contract(), profiles, ontology_ok=True, signature_valid=True, transition_valid=True)
     topo = next(a for a in result.assessments if a.backend_id == "topo")
     assert topo.decision is Decision.BLOCK
 
 
 def test_omega_gate_precedes_preference_routing():
     profiles = [CapabilityProfile("cpu", ComputeRegime.CLASSICAL, capabilities=("optimization",), estimated_cost=1, estimated_latency_ms=100)]
-    result = select_substrate(contract(), profiles, signature_valid=False)
+    result = select_substrate(contract(), profiles, ontology_ok=True, signature_valid=False, transition_valid=True)
     assert result.selected_backend_id is None
     assert result.assessments[0].decision is Decision.BLOCK
 
@@ -82,3 +82,41 @@ def test_substrate_invariance_divergent_and_incomparable():
     hard = ("problem_hash", "metric_schema_hash")
     assert compare_substrate_results({"problem_hash": "a", "metric_schema_hash": "m"}, {"problem_hash": "b", "metric_schema_hash": "m"}, hard_invariants=hard) is ComparisonStatus.DIVERGENT
     assert compare_substrate_results({"problem_hash": "a"}, {"problem_hash": "a"}, hard_invariants=hard) is ComparisonStatus.INCOMPARABLE
+
+
+
+def test_selection_defaults_fail_closed_and_reject_non_boolean_flags():
+    profiles = [CapabilityProfile("cpu", ComputeRegime.CLASSICAL, capabilities=("optimization",), estimated_cost=1, estimated_latency_ms=100, error_rate=0.001)]
+    assert select_substrate(contract(), profiles).selected_backend_id is None
+    invalid = select_substrate(contract(), profiles, ontology_ok="false", signature_valid=True, transition_valid=True)
+    assert invalid.selected_backend_id is None
+    assert invalid.assessments[0].decision is Decision.BLOCK
+
+
+def test_cost_latency_and_contract_limits_must_be_finite_nonnegative():
+    import pytest
+
+    with pytest.raises(ValueError):
+        CapabilityProfile("nan-cost", ComputeRegime.CLASSICAL, estimated_cost=float("nan"))
+    with pytest.raises(ValueError):
+        CapabilityProfile("negative-latency", ComputeRegime.CLASSICAL, estimated_latency_ms=-1)
+    with pytest.raises(ValueError):
+        contract(budget_max=float("nan"))
+    with pytest.raises(ValueError):
+        contract(latency_max_ms=-1)
+
+
+def test_zero_tolerance_is_strict_and_overflow_is_incomparable():
+    hard = ("problem_hash",)
+    assert compare_substrate_results(
+        {"problem_hash": "p", "value": 0.0},
+        {"problem_hash": "p", "value": 5e-13},
+        hard_invariants=hard,
+        numeric_tolerances={"value": 0.0},
+    ) is ComparisonStatus.DIVERGENT
+    assert compare_substrate_results(
+        {"problem_hash": "p", "value": 1.7e308},
+        {"problem_hash": "p", "value": -1.7e308},
+        hard_invariants=hard,
+        numeric_tolerances={"value": 0.0},
+    ) is ComparisonStatus.INCOMPARABLE

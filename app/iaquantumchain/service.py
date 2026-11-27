@@ -125,7 +125,12 @@ class IAQuantumChainService:
             return {"run_id": run_id, "decision": "HOLD", "status": "QEX_NOT_INSTALLED", "reason": reason, "envelope": envelope, "ledger": ledger}
 
         try:
-            matrix = self.qex.execute_l0_matrix(submission["payload"])
+            matrix = self.qex.execute_l0_matrix(
+                submission["payload"],
+                ontology_ok=True,
+                signature_valid=authenticated,
+                transition_valid=(gate["decision"] == "PASS"),
+            )
             items = matrix["results"]
             if len(items) != 2:
                 raise ValueError("L0 must return exactly two substrate results")
@@ -147,6 +152,7 @@ class IAQuantumChainService:
                 "tsc_preserved": comparison["preserved"],
                 "tsc_approximated": comparison["approximated"],
                 "tsc_lost": comparison["lost"],
+                "comparison_receipt_hash": comparison["receipt"]["receipt_hash"],
             }, decision)
             return {
                 "run_id": run_id,

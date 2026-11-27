@@ -25,6 +25,8 @@ def test_l0_uses_real_qex_bridge_governance_tsc_and_shared_ledger(tmp_path, monk
     assert result["status"] == "EXECUTED_L0"
     assert result["decision"] == "PASS"
     assert result["tsc"]["status"] == "EXACT"
+    assert result["tsc"]["receipt"]["schema"] == "matverse.evidence-receipt.v1"
+    assert len(result["tsc"]["receipt"]["receipt_hash"]) == 64
     assert len(result["results"]) == 2
     assert result["results"][0]["execution_class"] == "CLASSICAL"
     assert result["results"][1]["execution_class"] == "QUANTUM_SIMULATED"

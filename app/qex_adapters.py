@@ -75,6 +75,16 @@ class IdealStatevectorNotAdapter:
         return _build_result(contract, self.backend_id, self.regime, payload, result, p0, p1)
 
 
+def _validate_not_contract(contract: ExperimentContract) -> None:
+    expected_problem_hash = stable_hash({"problem": "NOT", "domain": "bit"})
+    if (
+        contract.experiment_id != "QEX-SUBSTRATE-01"
+        or contract.problem_hash != expected_problem_hash
+        or "bit_not" not in contract.required_capabilities
+    ):
+        raise ValueError("contract does not describe the canonical QEX-SUBSTRATE-01 NOT experiment")
+
+
 def _validated_bit(payload: Mapping[str, Any]) -> int:
     if set(payload) != {"bit"}:
         raise ValueError("payload must contain exactly one field: bit")
@@ -95,6 +105,7 @@ def _build_result(
     *,
     backend_metadata: Mapping[str, Any] | None = None,
 ) -> ExecutionResult:
+    _validate_not_contract(contract)
     metadata = dict(backend_metadata or {})
     backend_payload = {
         "backend_id": backend_id,
