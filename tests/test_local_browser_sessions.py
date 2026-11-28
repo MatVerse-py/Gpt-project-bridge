@@ -164,9 +164,7 @@ class Tests(unittest.TestCase):
         runtime.shutdown()
 
     def test_bridge_dispatches_browser_tools(self):
-        install(agent_mcp)
-        from app import local_web_mcp
-        local_web_mcp.install(agent_mcp)
+        import app.matverse_mcp  # noqa: F401 — exercise the production unified launcher
         bridge = agent_mcp.BridgeMCP()
         bridge.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-11-25"}})
         bridge.handle({"jsonrpc": "2.0", "method": "notifications/initialized"})
