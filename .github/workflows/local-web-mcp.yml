@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: local-web-mcp-\${{ github.ref }}
+  group: local-web-mcp-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
