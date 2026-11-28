@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "matverse": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "C:\\REPLACE\\WITH\\ABSOLUTE\\PATH\\Gpt-project-bridge\\scripts\\run_matverse_mcp.cmd"
+      ],
+      "env": {
+        "MATVERSE_WEB_ORIGINS": "https://github.com,https://zenodo.org,https://orcid.org,https://arxiv.org,https://huggingface.co,https://api.crossref.org",
+        "MATVERSE_BROWSER_HEADLESS": "1",
+        "MATVERSE_BROWSER_PERSISTENT": "0"
+      }
+    }
+  }
+}
